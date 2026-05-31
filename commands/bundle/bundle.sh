@@ -3,11 +3,11 @@ set -euo pipefail
 
 # Aaron Sound Sorter bundle creator.
 # Default mode is an AI handoff bundle: code + tests + tools + commands + docs +
-# active root brain JSONs + locked smoke acceptance audio fixtures.
+# active root brain JSONs + small checked-in test audio fixtures.
 # Use CODE_ONLY=1 or EXCLUDE_BRAINS=1 when you explicitly need no brains.
 # Use INCLUDE_ACCEPTANCE_AUDIO=0 only when you intentionally do NOT want the
-# locked smoke WAV fixtures. The default AI handoff bundle must be runnable by
-# another AI without Aaron adding the sample fixtures by hand.
+# locked smoke/regression WAV fixtures. The default AI handoff bundle must be
+# runnable by another AI without Aaron adding the sample fixtures by hand.
 # By default this runs make clean-for-bundle first so old reports/runs/root ZIPs
 # do not get copied into AI handoff bundles. Use SKIP_CLEAN=1 to skip that step.
 
@@ -53,16 +53,18 @@ RSYNC_ARGS=(
   --delete
   --prune-empty-dirs
 
-  # The locked smoke panel must be included before broad sample/audio excludes.
-  # rsync uses the first matching filter. If these rules come after samples/ or
-  # *.wav excludes, the bundle will lie by including expected_results.json but
-  # dropping the actual WAV fixtures.
+  # Small checked-in test audio fixtures must be included before broad
+  # sample/audio excludes. rsync uses the first matching filter. If these rules
+  # come after samples/ or *.wav excludes, the bundle will include pytest files
+  # while silently dropping their WAV fixtures.
 )
 
 if [[ "$INCLUDE_ACCEPTANCE_AUDIO" == "1" ]]; then
   RSYNC_ARGS+=(
     --include='/tests/acceptance/locked_smoke_v1/samples/'
     --include='/tests/acceptance/locked_smoke_v1/samples/***'
+    --include='/tests/regression_audio/'
+    --include='/tests/regression_audio/***'
   )
 fi
 
@@ -134,7 +136,8 @@ RSYNC_ARGS+=(
   --exclude='/Aaron_Sorted_Sounds_manifest.csv'
   --exclude='/Aaron_Sorted_Sounds_summary.txt'
 
-  # General audio files are excluded outside the locked smoke panel.
+  # General audio files are excluded outside the small checked-in test
+  # fixture folders included above.
   --exclude='**/*.wav'
   --exclude='**/*.aif'
   --exclude='**/*.aiff'
@@ -229,7 +232,7 @@ Created: $(date)
 Mode: $MODE
 Project root source: $PROJECT_ROOT
 Includes active root brain JSONs: $([[ "$EXCLUDE_BRAINS" == "1" ]] && echo no || echo yes)
-Includes locked smoke acceptance audio fixtures: $INCLUDE_ACCEPTANCE_AUDIO
+Includes locked smoke/regression audio fixtures: $INCLUDE_ACCEPTANCE_AUDIO
 Locked smoke expected cases: $ACCEPTANCE_EXPECTED_COUNT
 Locked smoke audio fixtures included: $ACCEPTANCE_FIXTURE_COUNT
 Locked smoke missing fixtures: $ACCEPTANCE_MISSING_COUNT
@@ -251,7 +254,7 @@ Excluded by design:
 - virtual environments
 - git metadata
 - large archives
-- general audio files outside tests/acceptance/locked_smoke_v1/samples
+- general audio files outside checked-in test fixture folders
 META
 
 cd "$STAGE_DIR"
@@ -268,7 +271,7 @@ $ZIP_OUT
 
 Mode: $MODE
 Includes root active brain JSONs: $([[ "$EXCLUDE_BRAINS" == "1" ]] && echo no || echo yes)
-Includes locked acceptance audio fixtures: $INCLUDE_ACCEPTANCE_AUDIO
+Includes locked acceptance/regression audio fixtures: $INCLUDE_ACCEPTANCE_AUDIO
 Locked smoke expected cases: $ACCEPTANCE_EXPECTED_COUNT
 Locked smoke audio fixtures included: $ACCEPTANCE_FIXTURE_COUNT
 Locked smoke missing fixtures: $ACCEPTANCE_MISSING_COUNT
@@ -281,7 +284,7 @@ Useful commands:
   SKIP_CLEAN=1 ./commands/bundle/bundle.sh            # AI handoff, skip clean-for-bundle
   CODE_ONLY=1 ./commands/bundle/bundle.sh             # source-only, excludes root brains and acceptance audio
   EXCLUDE_BRAINS=1 ./commands/bundle/bundle.sh        # excludes root brains but keeps acceptance audio unless CODE_ONLY=1
-  INCLUDE_ACCEPTANCE_AUDIO=0 ./commands/bundle/bundle.sh
+  INCLUDE_ACCEPTANCE_AUDIO=0 ./commands/bundle/bundle.sh   # excludes locked smoke and regression audio fixtures
 
 DONE
 

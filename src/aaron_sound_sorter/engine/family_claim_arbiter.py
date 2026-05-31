@@ -2945,6 +2945,11 @@ class FamilyClaimArbiter:
         branch = str(layer.get("physics_layer_branch") or layer.get("instrument_branch_selected") or "")
         if branch not in self.BRANCH_LOOP_TARGETS:
             return ""
+        # If measured structure strongly supports a drum loop, don't override to an
+        # instrument branch. This prevents drum loops from being misrouted to Bass Loops
+        # or other instrument folders.
+        if self._facts_support_final_drum_loop(facts, winning_claim):
+            return ""
         try:
             branch_confidence = float(
                 layer.get("physics_layer_branch_confidence", layer.get("instrument_branch_selected_confidence", 0.0))
