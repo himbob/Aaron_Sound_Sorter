@@ -1,0 +1,72 @@
+{
+  "anchor_pack": "drum_loops",
+  "target_category": "Drums/Drum Loops",
+  "description": "Drum loop positives plus traps that stop drum-loop rescue from stealing pitched instrument and vocal loops.",
+  "cases": [
+    {
+      "id": "drum_loop_positive_full_95",
+      "filename": "Drum_Full_06_95bpm.wav",
+      "scenario": "category_positive",
+      "expected_top": "Drums",
+      "accepted_folder_prefixes": ["Drums/Drum Loops"],
+      "accepted_review_prefixes": [],
+      "forbidden_folder_prefixes": ["Instruments", "FX", "Drums/Kick Drums", "Drums/Snares"],
+      "protected": true,
+      "change_scope": "drum_loop_identity",
+      "failure_type": "shape_role_bug",
+      "notes": "Full drum loop must not collapse into a one-shot or musical loop."
+    },
+    {
+      "id": "drum_loop_near_miss_kick_one_shot",
+      "filename": "CS_NE_Kick_OneShot_Monroe.wav",
+      "scenario": "category_near_miss",
+      "expected_top": "Drums",
+      "accepted_folder_prefixes": ["Drums/Kick Drums", "Drums/Kicks"],
+      "accepted_review_prefixes": [],
+      "forbidden_folder_prefixes": ["Drums/Drum Loops", "Instruments", "FX"],
+      "protected": true,
+      "change_scope": "drum_loop_near_miss",
+      "failure_type": "shape_role_bug",
+      "notes": "Kick one-shot is a near-miss for drum-loop rules; it must not be promoted into Drum Loops."
+    },
+    {
+      "id": "drum_loop_must_not_steal_piano",
+      "filename": "Piano 1 - 80 Bpm - Key C.wav",
+      "scenario": "category_must_not_steal",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": ["Instruments/Keys/Piano", "Instruments/Instrument Loops"],
+      "accepted_review_prefixes": [],
+      "forbidden_folder_prefixes": ["Drums", "FX"],
+      "protected": true,
+      "change_scope": "drum_loop_vs_pitched_loop",
+      "failure_type": "good_role_bad_family",
+      "notes": "Piano loop must not be rescued into drum loops."
+    },
+    {
+      "id": "drum_loop_must_not_steal_vocal",
+      "filename": "Phonk_Rap_Vocals_26_keyCmin_151bpm.wav",
+      "scenario": "category_must_not_steal",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": ["Instruments/Voice"],
+      "accepted_review_prefixes": [],
+      "forbidden_folder_prefixes": ["Drums", "FX/Structural and Transitional FX/Risers and Builds"],
+      "protected": true,
+      "change_scope": "drum_loop_vs_voice",
+      "failure_type": "good_role_bad_family",
+      "notes": "Vocal loop must not be pulled into drum loops."
+    },
+    {
+      "id": "drum_loop_should_review_ambiguous_av5",
+      "filename": "AV5_5_94bpm_Hit 2.wav",
+      "scenario": "category_should_review",
+      "expected_top": "_TO_REVIEW",
+      "accepted_folder_prefixes": [],
+      "accepted_review_prefixes": ["_TO_REVIEW"],
+      "forbidden_folder_prefixes": ["Drums/Drum Loops", "Drums/Kick Drums", "FX/Structural and Transitional FX/Risers and Builds"],
+      "protected": true,
+      "change_scope": "review_over_false_drum_loop",
+      "failure_type": "arbiter_boundary",
+      "notes": "Ambiguous musical hit should not be forced into drum loop."
+    }
+  ]
+}

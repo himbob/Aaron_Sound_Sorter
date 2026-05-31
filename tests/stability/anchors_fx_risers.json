@@ -1,0 +1,72 @@
+{
+  "anchor_pack": "fx_risers",
+  "target_category": "FX/Structural and Transitional FX/Risers and Builds",
+  "description": "Riser positives plus neighbor traps that prevent riser fixes from stealing vocals, sax, piano, synth pads, and drum loops.",
+  "cases": [
+    {
+      "id": "riser_positive_short_effect",
+      "filename": "Riser Short Effect.wav",
+      "scenario": "category_positive",
+      "expected_top": "FX",
+      "accepted_folder_prefixes": ["FX/Structural and Transitional FX/Risers and Builds"],
+      "accepted_review_prefixes": [],
+      "forbidden_folder_prefixes": ["Instruments/Voice", "Instruments/Woodwinds", "Drums"],
+      "protected": true,
+      "change_scope": "fx_riser_identity",
+      "failure_type": "shape_role_bug",
+      "notes": "True riser should stay in FX/Risers."
+    },
+    {
+      "id": "riser_near_miss_police_siren",
+      "filename": "MS_O_01_Outlaw_Fx Police_D#minor_91bpm_Wet.wav",
+      "scenario": "category_near_miss",
+      "expected_top": "FX",
+      "accepted_folder_prefixes": ["FX/Designed Noise FX", "FX/Structural and Transitional FX", "FX/Hybrid Designed FX"],
+      "accepted_review_prefixes": ["_TO_REVIEW"],
+      "forbidden_folder_prefixes": ["Instruments/Voice", "Drums"],
+      "protected": true,
+      "change_scope": "fx_role_boundary",
+      "failure_type": "category_identity_inside_family",
+      "notes": "Siren/police FX may be FX but should not become voice or drums."
+    },
+    {
+      "id": "riser_must_not_steal_vocal_phrase",
+      "filename": "Money_vocals_female_rap_110bpm.wav",
+      "scenario": "category_must_not_steal",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": ["Instruments/Voice"],
+      "accepted_review_prefixes": [],
+      "forbidden_folder_prefixes": ["FX/Structural and Transitional FX/Risers and Builds", "FX/Structural and Transitional FX/Drops and Downlifters", "FX/Impacts and Hits", "Drums"],
+      "protected": true,
+      "change_scope": "fx_riser_vs_voice",
+      "failure_type": "good_role_bad_family",
+      "notes": "Vocal pitch motion must not be treated as transition FX."
+    },
+    {
+      "id": "riser_must_not_steal_sax_phrase",
+      "filename": "AA_JBL_78bpm_Cm_Sax_Loop_1.wav",
+      "scenario": "category_must_not_steal",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": ["Instruments/Woodwinds", "Instruments/Brass and Woodwinds", "Instruments/Instrument Loops"],
+      "accepted_review_prefixes": ["_TO_REVIEW"],
+      "forbidden_folder_prefixes": ["FX/Structural and Transitional FX/Risers and Builds", "FX/Impacts and Hits", "Instruments/Voice", "Drums"],
+      "protected": true,
+      "change_scope": "fx_riser_vs_reed",
+      "failure_type": "physics_interpretation_bug",
+      "notes": "Reverb sax movement must not be pulled into risers."
+    },
+    {
+      "id": "riser_should_review_ambiguous_av5",
+      "filename": "AV5_5_94bpm_Hit 2.wav",
+      "scenario": "category_should_review",
+      "expected_top": "_TO_REVIEW",
+      "accepted_folder_prefixes": [],
+      "accepted_review_prefixes": ["_TO_REVIEW"],
+      "forbidden_folder_prefixes": ["FX/Structural and Transitional FX/Risers and Builds", "Instruments/Voice", "Drums/Kick Drums"],
+      "protected": true,
+      "change_scope": "review_over_false_riser",
+      "failure_type": "arbiter_boundary",
+      "notes": "Ambiguous musical hit should not be forced into riser."
+    }
+  ]
+}

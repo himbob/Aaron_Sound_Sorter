@@ -1,0 +1,7 @@
+{
+  "description": "Default locked budget. Protected category-stability output drift is unapproved unless a future patch intentionally lists affected cases, anchor packs, target categories, or scenarios here.",
+  "allowed_case_ids": [],
+  "allowed_anchor_packs": [],
+  "allowed_target_categories": [],
+  "allowed_scenarios": []
+}

@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+.venv_phase4/
+
+# macOS
+.DS_Store
+._*
+
+# Project generated output
+outputs/
+reports/
+_reports/
+dist/
+build/
+
+# Large generated brain files
+stage4_folder_brain*.json
+
+# Local training/audio data
+training/
+*.wav
+*.aif
+*.aiff
+*.flac
+*.mp3
+*.m4a
+*.zip

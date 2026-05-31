@@ -1,0 +1,5 @@
+# Runtime dependencies for Aaron Sound Sorter.
+# Keep this file small. Development and quality tools belong in the other
+# requirements files so normal users do not install linter/type-checker stacks.
+numpy>=1.26,<3
+soundfile>=0.12.1

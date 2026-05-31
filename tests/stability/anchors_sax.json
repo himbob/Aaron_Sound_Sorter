@@ -1,0 +1,85 @@
+{
+  "anchor_pack": "sax",
+  "target_category": "Instruments/Woodwinds/Saxophone",
+  "description": "Sax/reed positives plus traps that prevent sax from stealing vocals, piano, synths, and ambiguous mixed loops.",
+  "cases": [
+    {
+      "id": "sax_positive_aajbl_11",
+      "filename": "AA_JBL_74bpm_Am_Sax_Loop_11.wav",
+      "scenario": "category_positive",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": ["Instruments/Woodwinds", "Instruments/Brass and Woodwinds", "Instruments/Instrument Loops"],
+      "accepted_review_prefixes": ["_TO_REVIEW"],
+      "forbidden_folder_prefixes": ["Instruments/Voice", "FX", "Drums", "Instruments/Keys/Piano"],
+      "protected": true,
+      "change_scope": "sax_identity",
+      "failure_type": "physics_interpretation_bug",
+      "notes": "Sax loop must stay sax/woodwind or broad instrument."
+    },
+    {
+      "id": "sax_positive_intro_wet",
+      "filename": "Intro Sax_FMinor_96BPM.wav",
+      "scenario": "category_positive",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": ["Instruments/Woodwinds", "Instruments/Brass and Woodwinds", "Instruments/Instrument Loops"],
+      "accepted_review_prefixes": ["_TO_REVIEW"],
+      "forbidden_folder_prefixes": ["Instruments/Voice", "FX", "Drums"],
+      "protected": true,
+      "change_scope": "wet_sax_identity",
+      "failure_type": "physics_interpretation_bug",
+      "notes": "Wet/reverb sax should not become voice or FX."
+    },
+    {
+      "id": "sax_positive_sparse_solo_hiphoptapes28",
+      "filename": "HipHopTapes_28_Saxophone_D#m_90bpm.wav",
+      "scenario": "category_positive",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": ["Instruments/Woodwinds", "Instruments/Brass and Woodwinds", "Instruments/Instrument Loops"],
+      "accepted_review_prefixes": ["_TO_REVIEW"],
+      "forbidden_folder_prefixes": ["Instruments/Voice", "FX", "Drums"],
+      "protected": true,
+      "change_scope": "sax_vs_voice",
+      "failure_type": "physics_interpretation_bug",
+      "notes": "Sparse tonal sax phrase previously went to Voice; physics should treat it as reed/woodwind or broad instrument."
+    },
+    {
+      "id": "sax_near_miss_mixed_brass_sax",
+      "filename": "Brass_Saxophone_RnB_Multi_Instrument_F_Minor_80BPM.wav",
+      "scenario": "category_near_miss",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": ["Instruments/Instrument Loops", "Instruments/Mixed Musical Loops", "Instruments/Woodwinds", "Instruments/Brass and Woodwinds"],
+      "accepted_review_prefixes": ["_TO_REVIEW"],
+      "forbidden_folder_prefixes": ["Instruments/Voice", "FX", "Drums"],
+      "protected": true,
+      "change_scope": "sax_vs_mixed_loop",
+      "failure_type": "category_identity_inside_family",
+      "notes": "Mixed brass/sax loop can be sax-ish or broad, but must not be voice/FX/drums."
+    },
+    {
+      "id": "sax_must_not_steal_vocal_shot",
+      "filename": "DOJO_CGNB_Female_Vocal_Shot_01_D.wav",
+      "scenario": "category_must_not_steal",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": ["Instruments/Voice"],
+      "accepted_review_prefixes": [],
+      "forbidden_folder_prefixes": ["Instruments/Woodwinds", "Instruments/Brass and Woodwinds", "FX", "Drums"],
+      "protected": true,
+      "change_scope": "sax_vs_voice",
+      "failure_type": "good_role_bad_family",
+      "notes": "Processed vocal shot must not be stolen by sax/reed."
+    },
+    {
+      "id": "sax_should_review_ambiguous_av5",
+      "filename": "AV5_5_94bpm_Hit 2.wav",
+      "scenario": "category_should_review",
+      "expected_top": "_TO_REVIEW",
+      "accepted_folder_prefixes": [],
+      "accepted_review_prefixes": ["_TO_REVIEW"],
+      "forbidden_folder_prefixes": ["Instruments/Woodwinds/Saxophone", "Instruments/Voice", "FX/Structural and Transitional FX/Risers and Builds"],
+      "protected": true,
+      "change_scope": "review_over_false_sax",
+      "failure_type": "arbiter_boundary",
+      "notes": "Ambiguous hit is safer in review than forced sax."
+    }
+  ]
+}

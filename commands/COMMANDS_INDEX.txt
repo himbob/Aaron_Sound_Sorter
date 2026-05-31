@@ -1,0 +1,20 @@
+Commands are grouped by purpose.
+
+quality/RUN_PYTEST.command
+  Runs active pytest tests.
+
+smoke/RUN_SELF_TEST.command
+  Runs the built-in Stage 4 self-test.
+
+smoke/RUN_REAL_PERCUSSION_SORT.command
+  Sorts the real one_shot_percussive_sounds.zip on T9.
+
+smoke/RUN_REAL_FX_SORT.command
+  Sorts the real FX_Aaron2.zip on T9.
+
+training/RUN_TRAIN_LOCKED_CURATED.command
+  Rebuilds stage4_folder_brain.json from training/locked_curated_v1.
+
+release/MAKE_RELEASE_BUNDLE.command
+  Makes a symlink-preserving release ZIP.
+commands/diagnostics/RUN_BRAIN_LANE_BIG_VARIETY_TEST.command - builds a report-folder-only brain-lane variety test input, runs sort, analyzes lane winners, and packages upload-back reports under _reports.

@@ -1,0 +1,72 @@
+{
+  "anchor_pack": "piano",
+  "target_category": "Instruments/Keys/Piano",
+  "description": "Piano/electric-piano positives plus traps that prevent keys fixes from stealing sax, voice, drums, or FX.",
+  "cases": [
+    {
+      "id": "piano_positive_key_c",
+      "filename": "Piano 1 - 80 Bpm - Key C.wav",
+      "scenario": "category_positive",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": ["Instruments/Keys/Piano"],
+      "accepted_review_prefixes": [],
+      "forbidden_folder_prefixes": ["Instruments/Synths", "Instruments/Woodwinds", "Instruments/Voice", "Drums", "FX"],
+      "protected": true,
+      "change_scope": "piano_identity",
+      "failure_type": "category_identity_inside_family",
+      "notes": "Acoustic piano loop should stay Piano."
+    },
+    {
+      "id": "piano_positive_vintage_electric",
+      "filename": "DHB Loop 1 Vintage Piano E minor 81 Bpm Piano chords.wav",
+      "scenario": "category_positive",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": ["Instruments/Keys/Piano", "Instruments/Keys/Electric Piano", "Instruments/Instrument Loops"],
+      "accepted_review_prefixes": [],
+      "forbidden_folder_prefixes": ["Instruments/Woodwinds", "Instruments/Voice", "Drums", "FX"],
+      "protected": true,
+      "change_scope": "piano_identity",
+      "failure_type": "category_identity_inside_family",
+      "notes": "Vintage piano/electric piano loop may be piano/electric/broad instrument, not sax/voice/FX."
+    },
+    {
+      "id": "piano_near_miss_electric_ws2",
+      "filename": "WS2_KIT_1_Electric_Piano_Chords_Fm_101BPM.wav",
+      "scenario": "category_near_miss",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": ["Instruments/Keys/Electric Piano", "Instruments/Keys/Piano", "Instruments/Instrument Loops"],
+      "accepted_review_prefixes": [],
+      "forbidden_folder_prefixes": ["Instruments/Woodwinds", "Instruments/Voice", "Drums", "FX"],
+      "protected": true,
+      "change_scope": "electric_piano_identity",
+      "failure_type": "category_identity_inside_family",
+      "notes": "Electric piano should not become sax, voice, drums, or FX."
+    },
+    {
+      "id": "piano_must_not_steal_sax",
+      "filename": "SCY097_03_Sax_Loop_KeyEm_90bpm_01.wav",
+      "scenario": "category_must_not_steal",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": ["Instruments/Woodwinds", "Instruments/Brass and Woodwinds", "Instruments/Instrument Loops"],
+      "accepted_review_prefixes": ["_TO_REVIEW"],
+      "forbidden_folder_prefixes": ["Instruments/Keys/Piano", "Instruments/Keys/Electric Piano", "Instruments/Voice", "FX", "Drums"],
+      "protected": true,
+      "change_scope": "piano_vs_reed",
+      "failure_type": "good_role_bad_family",
+      "notes": "Sax loop must not be stolen by piano/keys."
+    },
+    {
+      "id": "piano_should_review_ambiguous_av5",
+      "filename": "AV5_5_94bpm_Hit 2.wav",
+      "scenario": "category_should_review",
+      "expected_top": "_TO_REVIEW",
+      "accepted_folder_prefixes": [],
+      "accepted_review_prefixes": ["_TO_REVIEW"],
+      "forbidden_folder_prefixes": ["Instruments/Keys/Piano", "Instruments/Voice", "FX/Structural and Transitional FX/Risers and Builds"],
+      "protected": true,
+      "change_scope": "review_over_false_piano",
+      "failure_type": "arbiter_boundary",
+      "notes": "Ambiguous hit should not be forced into piano."
+    }
+  ]
+}

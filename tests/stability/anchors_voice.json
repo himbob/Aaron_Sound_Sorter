@@ -1,0 +1,72 @@
+{
+  "anchor_pack": "voice",
+  "target_category": "Instruments/Voice",
+  "description": "Voice positives plus near-miss traps that must not be stolen by Voice or let Voice fall into FX, sax, synth, or drums.",
+  "cases": [
+    {
+      "id": "voice_positive_money_female_rap",
+      "filename": "Money_vocals_female_rap_110bpm.wav",
+      "scenario": "category_positive",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": ["Instruments/Voice"],
+      "accepted_review_prefixes": [],
+      "forbidden_folder_prefixes": ["FX/Structural and Transitional FX/Risers and Builds", "FX/Impacts and Hits", "Drums", "Instruments/Woodwinds", "Instruments/Synths"],
+      "protected": true,
+      "change_scope": "voice_vs_fx_transition",
+      "failure_type": "good_role_bad_family",
+      "notes": "Female rap vocal must remain Voice and must never become riser, sax, synth, or drums."
+    },
+    {
+      "id": "voice_positive_dojo_shout",
+      "filename": "DOJO_FBP_Female_Vocal_Shout.wav",
+      "scenario": "category_positive",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": ["Instruments/Voice"],
+      "accepted_review_prefixes": [],
+      "forbidden_folder_prefixes": ["FX/Structural and Transitional FX", "Drums", "Instruments/Woodwinds", "Instruments/Synths"],
+      "protected": true,
+      "change_scope": "voice_one_shot",
+      "failure_type": "good_role_bad_family",
+      "notes": "Female vocal shout must stay Voice, not percussion or FX."
+    },
+    {
+      "id": "voice_near_miss_formant_fx_siren",
+      "filename": "MS_O_01_Outlaw_Fx Police_D#minor_91bpm_Wet.wav",
+      "scenario": "category_near_miss",
+      "expected_top": "FX",
+      "accepted_folder_prefixes": ["FX/Designed Noise FX", "FX/Structural and Transitional FX", "FX/Hybrid Designed FX"],
+      "accepted_review_prefixes": ["_TO_REVIEW"],
+      "forbidden_folder_prefixes": ["Instruments/Voice", "Drums"],
+      "protected": true,
+      "change_scope": "voice_vs_formant_fx",
+      "failure_type": "shape_role_boundary",
+      "notes": "Processed FX with possible formant behavior must not be stolen by Voice."
+    },
+    {
+      "id": "voice_must_not_steal_wet_sax",
+      "filename": "Intro Sax_FMinor_96BPM.wav",
+      "scenario": "category_must_not_steal",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": ["Instruments/Woodwinds", "Instruments/Brass and Woodwinds", "Instruments/Instrument Loops"],
+      "accepted_review_prefixes": ["_TO_REVIEW"],
+      "forbidden_folder_prefixes": ["Instruments/Voice", "FX", "Drums"],
+      "protected": true,
+      "change_scope": "voice_vs_reed",
+      "failure_type": "physics_interpretation_bug",
+      "notes": "Wet sax may be broad instrument or review, but Voice must not steal it."
+    },
+    {
+      "id": "voice_should_review_ambiguous_av5",
+      "filename": "AV5_5_94bpm_Hit 2.wav",
+      "scenario": "category_should_review",
+      "expected_top": "_TO_REVIEW",
+      "accepted_folder_prefixes": [],
+      "accepted_review_prefixes": ["_TO_REVIEW"],
+      "forbidden_folder_prefixes": ["Instruments/Voice", "FX/Structural and Transitional FX/Risers and Builds", "Drums/Kick Drums"],
+      "protected": true,
+      "change_scope": "review_over_false_voice",
+      "failure_type": "arbiter_boundary",
+      "notes": "Ambiguous musical hit is safer as review than forced Voice or FX."
+    }
+  ]
+}

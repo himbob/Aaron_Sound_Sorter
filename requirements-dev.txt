@@ -1,0 +1,6 @@
+# Full local development stack used by make bootstrap / make install-dev.
+-r requirements.txt
+-r requirements-quality.txt
+packaging>=24,<26
+tomli>=2,<3; python_version < "3.11"
+build>=1.2,<2

@@ -1,0 +1,491 @@
+{
+  "panel_name": "locked_smoke_v1",
+  "description": "Critical real-audio smoke panel. Small enough for AI tools to run before returning behavior-changing code. Contains broad-family sentinels plus known fragile/failing files from FX_Aaron2. Extended with sax/piano/synth leaf-depth regressions from the 2026-05-22 FX review. Added processed vocal-shot guard for sax-rescue overreach. Added wet reverb sax acceptance guard for Intro Sax_FMinor_96BPM. Added first-arrival PhysicsVoter sax safeguards for SCY, HipHopTapes, and Chopart mixed piano/sax anti-voice cases.",
+  "rules": {
+    "fail_on_missing_sample": true,
+    "fail_on_missing_manifest_row": true,
+    "fail_on_wrong_top_family": true,
+    "allow_review_when_listed": true,
+    "ai_must_run_before_returning_behavior_bundle": true
+  },
+  "acceptance_policy": {
+    "purpose": "This is a leash for AI changes, not a complete test library.",
+    "required_for": "Any behavior-changing classifier, voter, brain, claim, feature, routing, placement, or training code edit.",
+    "not_enough_by_itself": "Passing this panel does not prove the sorter is good. Failing this panel means the patch cannot be returned as fixed.",
+    "expected_runtime": "The panel is intentionally small, currently 32 samples, so AI tools can run it themselves."
+  },
+  "cases": [
+    {
+      "id": "kick_clean_cs_ne_monroe",
+      "filename": "CS_NE_Kick_OneShot_Monroe.wav",
+      "expected_top": "Drums",
+      "accepted_folder_prefixes": [
+        "Drums/Kicks",
+        "Drums/Kick Drums"
+      ],
+      "accepted_review_prefixes": [],
+      "strictness": "deep",
+      "protected": true,
+      "notes": "Clear kick one-shot. Must not become bass, impact, tom, synth, or review."
+    },
+    {
+      "id": "snare_clean_jackbaby",
+      "filename": "JACKBABY_SNARE_11.wav",
+      "expected_top": "Drums",
+      "accepted_folder_prefixes": [
+        "Drums/Snares",
+        "Drums/Snare Drums",
+        "Drums/Rims and Sticks"
+      ],
+      "accepted_review_prefixes": [],
+      "strictness": "deep",
+      "protected": true,
+      "notes": "Clear snare one-shot. Must not become clap, kick, FX, or instrument."
+    },
+    {
+      "id": "clap_clean_clap2",
+      "filename": "Clap2.wav",
+      "expected_top": "Drums",
+      "accepted_folder_prefixes": [
+        "Drums/Claps",
+        "Drums/Claps and Snaps",
+        "Drums/Claps Snaps Slaps"
+      ],
+      "accepted_review_prefixes": [],
+      "strictness": "deep",
+      "protected": true,
+      "notes": "Clear clap one-shot. Must stay in clap/snap/slap family."
+    },
+    {
+      "id": "drum_loop_full_95",
+      "filename": "Drum_Full_06_95bpm.wav",
+      "expected_top": "Drums",
+      "accepted_folder_prefixes": [
+        "Drums/Drum Loops"
+      ],
+      "accepted_review_prefixes": [],
+      "strictness": "deep",
+      "protected": true,
+      "notes": "Full drum loop. Must not become one-shot, instrument, or FX."
+    },
+    {
+      "id": "bass_loop_way_it_is",
+      "filename": "MS_TLV1_03_The Way It Is_Bass_Eminor_98bpm_Dry.wav",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": [
+        "Instruments/Bass"
+      ],
+      "accepted_review_prefixes": [
+        "_TO_REVIEW"
+      ],
+      "strictness": "broad",
+      "protected": true,
+      "notes": "Bass loop. Must not become kick/drum loop or FX."
+    },
+    {
+      "id": "piano_loop_key_c",
+      "filename": "Piano 1 - 80 Bpm - Key C.wav",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": [
+        "Instruments/Keys/Piano/Loops",
+        "Instruments/Keys/Piano"
+      ],
+      "accepted_review_prefixes": [],
+      "strictness": "deep",
+      "protected": true,
+      "notes": "Obvious acoustic piano/key-C loop. Must land in Piano; broad Instrument Loops, Synth, Guitar, Voice, Sax, Drums, FX, or review are not acceptable."
+    },
+    {
+      "id": "strings_loop_77_ebm",
+      "filename": "03.strings_77bpm_Ebm.wav",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": [
+        "Instruments/Strings",
+        "Instruments/Instrument Loops"
+      ],
+      "accepted_review_prefixes": [
+        "_TO_REVIEW"
+      ],
+      "strictness": "broad",
+      "protected": true,
+      "notes": "String loop. Must not be stolen by sax/brass/synth/drums."
+    },
+    {
+      "id": "synth_pad_e_pad_097",
+      "filename": "01 E Pad 097 Ebm.wav",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": [
+        "Instruments/Synths",
+        "Instruments/Instrument Loops"
+      ],
+      "accepted_review_prefixes": [
+        "_TO_REVIEW"
+      ],
+      "strictness": "broad",
+      "protected": true,
+      "notes": "Known fragile synth pad. Must not become voice, brass, bells, drums, or FX."
+    },
+    {
+      "id": "synth_bells_no_safety",
+      "filename": "01_WCS_No_Safety_BPM92_D#min__Bells.wav",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": [
+        "Instruments/Synths",
+        "Instruments/Mallets",
+        "Instruments/Mallets and Bells",
+        "Instruments/Instrument Loops"
+      ],
+      "accepted_review_prefixes": [
+        "_TO_REVIEW"
+      ],
+      "strictness": "broad",
+      "protected": true,
+      "notes": "Bell-like synth. Accept synth/mallet-bell/broad instrument; never voice, sax, drums, or FX."
+    },
+    {
+      "id": "synth_lead_k_dot_fluteish",
+      "filename": "02_K_DOT_vol_4_Lead_Em_100bpm.wav",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": [
+        "Instruments/Synths",
+        "Instruments/Brass and Woodwinds",
+        "Instruments/Woodwinds",
+        "Instruments/Instrument Loops"
+      ],
+      "accepted_review_prefixes": [
+        "_TO_REVIEW"
+      ],
+      "strictness": "broad",
+      "protected": true,
+      "notes": "Known fragile flute-like synth lead. Any instrument branch or review is safer than FX/drums/voice."
+    },
+    {
+      "id": "vocal_money_female_rap",
+      "filename": "Money_vocals_female_rap_110bpm.wav",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": [
+        "Instruments/Voice"
+      ],
+      "accepted_review_prefixes": [],
+      "strictness": "deep",
+      "protected": true,
+      "notes": "Known current failure/fragile case. Real female rap vocal must never go to FX riser, brass, synth, bells, or drums."
+    },
+    {
+      "id": "vocal_female_shout_dojo",
+      "filename": "DOJO_FBP_Female_Vocal_Shout.wav",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": [
+        "Instruments/Voice"
+      ],
+      "accepted_review_prefixes": [],
+      "strictness": "deep",
+      "protected": true,
+      "notes": "Clear vocal one-shot/shout. Must stay voice."
+    },
+    {
+      "id": "vocal_or_brass_hit_av5",
+      "filename": "AV5_5_94bpm_Hit 2.wav",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": [
+        "Instruments/Instrument Loops",
+        "Instruments/Mixed Musical Loops",
+        "Instruments/Brass and Woodwinds",
+        "Instruments/Strings"
+      ],
+      "accepted_review_prefixes": [
+        "_TO_REVIEW"
+      ],
+      "strictness": "broad",
+      "protected": true,
+      "notes": "Known fragile mislabeled/ambiguous musical hit. User described it as staggered brass/strings, not strong voice. Do not force Voice or FX."
+    },
+    {
+      "id": "sax_loop_aajbl_11",
+      "filename": "AA_JBL_74bpm_Am_Sax_Loop_11.wav",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": [
+        "Instruments/Brass and Woodwinds",
+        "Instruments/Woodwinds",
+        "Instruments/Instrument Loops"
+      ],
+      "accepted_review_prefixes": [
+        "_TO_REVIEW"
+      ],
+      "strictness": "broad",
+      "protected": true,
+      "notes": "Sax loop. Must not become mallets, synth, voice, drums, or FX."
+    },
+    {
+      "id": "ambiguous_pitched_loop_she2",
+      "filename": "SHE2_loop 14_full_123 bpm_D#.wav",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": [
+        "Instruments/Brass and Woodwinds",
+        "Instruments/Woodwinds",
+        "Instruments/Instrument Loops",
+        "Instruments/Mixed Musical Loops"
+      ],
+      "accepted_review_prefixes": [
+        "_TO_REVIEW"
+      ],
+      "strictness": "broad",
+      "protected": true,
+      "notes": "Known fragile/failing case. Ambiguous pitched loop. Broad instrument or review is acceptable; FX/drums/voice/synth/mallet overclaim is not."
+    },
+    {
+      "id": "mixed_brass_sax_rnb",
+      "filename": "Brass_Saxophone_RnB_Multi_Instrument_F_Minor_80BPM.wav",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": [
+        "Instruments/Mixed Musical Loops",
+        "Instruments/Instrument Loops",
+        "Instruments/Brass and Woodwinds",
+        "Instruments/Woodwinds"
+      ],
+      "accepted_review_prefixes": [
+        "_TO_REVIEW"
+      ],
+      "strictness": "broad",
+      "protected": true,
+      "notes": "Known fragile mixed instrument loop. Do not force Synth, FX, Drums, or Voice."
+    },
+    {
+      "id": "fx_riser_short_effect",
+      "filename": "Riser Short Effect.wav",
+      "expected_top": "FX",
+      "accepted_folder_prefixes": [
+        "FX/Risers",
+        "FX/Structural and Transitional FX",
+        "FX"
+      ],
+      "accepted_review_prefixes": [],
+      "strictness": "deep",
+      "protected": true,
+      "notes": "Clear riser/transition FX. Must stay FX."
+    },
+    {
+      "id": "sax_loop_aajbl_78_cm",
+      "filename": "AA_JBL_78bpm_Cm_Sax_Loop_1.wav",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": [
+        "Instruments/Woodwinds/Saxophone",
+        "Instruments/Brass and Woodwinds/Sax",
+        "Instruments/Brass and Woodwinds/Saxophone"
+      ],
+      "accepted_review_prefixes": [],
+      "strictness": "deep",
+      "protected": true,
+      "notes": "Clear pure sax loop from latest failure set. Must not flatten to generic Instrument Loops or be stolen by synth, horns, harmonica, voice, drums, or FX."
+    },
+    {
+      "id": "wet_sax_jazzhiphop_15",
+      "filename": "JazzHipHop_15_Saxophone_Melody_D#m_84bpm.wav",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": [
+        "Instruments/Woodwinds/Saxophone",
+        "Instruments/Brass and Woodwinds/Sax",
+        "Instruments/Brass and Woodwinds/Saxophone"
+      ],
+      "accepted_review_prefixes": [],
+      "strictness": "deep",
+      "protected": true,
+      "notes": "Wet/delayed sax melody from FX_Aaron2 that previously went to Synth Arp. Must remain a sax leaf despite reverb/delay."
+    },
+    {
+      "id": "piano_loop_dhb_vintage",
+      "filename": "DHB Loop 1 Vintage Piano E minor 81 Bpm Piano chords.wav",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": [
+        "Instruments/Keys/Piano",
+        "Instruments/Piano",
+        "Instruments/Keys/Electric Piano/Loops",
+        "Instruments/Keys/Electric Piano",
+        "Instruments/Keys",
+        "Instruments/Piano and Keys/Electric Piano",
+        "Instruments/Piano and Keys"
+      ],
+      "accepted_review_prefixes": [],
+      "strictness": "deep",
+      "protected": true,
+      "notes": "Vintage piano/key loop sentinel. Accept sibling Keys/Electric Piano folders; the protected behavior is preventing sax/voice/drum/FX theft, not forcing a brittle piano-vs-electric-piano leaf."
+    },
+    {
+      "id": "synth_loop_05_emn",
+      "filename": "05_Emn_198bpm_synth 1.wav",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": [
+        "Instruments/Synths/Synth Loops",
+        "Instruments/Synths and Electronic/Synth Loop",
+        "Instruments/Synths and Electronic/Synth Loops"
+      ],
+      "accepted_review_prefixes": [],
+      "strictness": "deep",
+      "protected": true,
+      "notes": "Obvious synth loop from FX_Aaron2. Must not flatten to generic Instrument Loops or be stolen by sax/voice/drums/FX."
+    },
+    {
+      "id": "vocal_shot_processed_dojo_female_d",
+      "filename": "DOJO_CGNB_Female_Vocal_Shot_01_D.wav",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": [
+        "Instruments/Voice/Phrase/One Shots",
+        "Instruments/Voice/Vocal One Shots",
+        "Instruments/Voice/Vocal Chops",
+        "Instruments/Voice"
+      ],
+      "accepted_review_prefixes": [],
+      "strictness": "deep",
+      "protected": true,
+      "notes": "Processed female vocal shot. Must not be rescued into Saxophone/Loops or any other loop folder."
+    },
+    {
+      "id": "electric_piano_not_sax_ws2_101_fm",
+      "filename": "WS2_KIT_1_Electric_Piano_Chords_Fm_101BPM.wav",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": [
+        "Instruments/Keys/Electric Piano/Loops",
+        "Instruments/Keys/Electric Piano",
+        "Instruments/Keys",
+        "Instruments/Piano and Keys/Electric Piano",
+        "Instruments/Piano and Keys"
+      ],
+      "accepted_review_prefixes": [],
+      "strictness": "deep",
+      "protected": true,
+      "notes": "Anti-steal case. Electric piano chords may be wet/processed, but must not be rescued into Saxophone/Loops or other woodwind folders."
+    },
+    {
+      "id": "vocal_loop_not_sax_phonk_151_cmin",
+      "filename": "Phonk_Rap_Vocals_26_keyCmin_151bpm.wav",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": [
+        "Instruments/Voice/Vocal Loops/Loops",
+        "Instruments/Voice/Vocal Loops",
+        "Instruments/Voice",
+        "Instruments/Voice and Vocals/Vocal Loops",
+        "Instruments/Voice and Vocals"
+      ],
+      "accepted_review_prefixes": [],
+      "strictness": "deep",
+      "protected": true,
+      "notes": "Anti-steal case. Rap/vocal loop must stay in voice/vocal family and must not be rescued into Saxophone/Loops."
+    },
+    {
+      "id": "wet_reverb_sax_intro_fminor_96",
+      "filename": "Intro Sax_FMinor_96BPM.wav",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": [
+        "Instruments/Woodwinds/Saxophone",
+        "Instruments/Brass and Woodwinds/Sax",
+        "Instruments/Brass and Woodwinds/Saxophone"
+      ],
+      "accepted_review_prefixes": [],
+      "strictness": "deep",
+      "protected": true,
+      "notes": "Wet/reverberant sax phrase added after the 2026-05-24 regression where sax-like files could fall to Voice, Synth, or generic Instrument Loops. Must remain Saxophone and never Voice."
+    },
+    {
+      "id": "wet_sax_scy097_no_voice",
+      "filename": "SCY097_03_Sax_Loop_KeyEm_90bpm_01.wav",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": [
+        "Instruments/Woodwinds/Saxophone",
+        "Instruments/Brass and Woodwinds/Sax",
+        "Instruments/Brass and Woodwinds/Saxophone"
+      ],
+      "accepted_review_prefixes": [],
+      "strictness": "deep",
+      "protected": true,
+      "notes": "Wet sax loop that previously went to Voice. PhysicsVoter must expose Sax and final placement must not be Voice."
+    },
+    {
+      "id": "wet_sax_hiphoptapes_no_voice",
+      "filename": "HipHopTapes_29_Saxophone_D#m_90bpm.wav",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": [
+        "Instruments/Woodwinds/Saxophone",
+        "Instruments/Brass and Woodwinds/Sax",
+        "Instruments/Brass and Woodwinds/Saxophone"
+      ],
+      "accepted_review_prefixes": [],
+      "strictness": "deep",
+      "protected": true,
+      "notes": "Sax loop that previously went to Voice. Must remain Saxophone and never Voice."
+    },
+    {
+      "id": "mixed_piano_sax_chopart_never_voice",
+      "filename": "Chopart3_GodlikeLoops_90_Piano_Sax_Songstarter_Abm_Loop_Fine.wav",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": [
+        "Instruments/Woodwinds/Saxophone",
+        "Instruments/Brass and Woodwinds/Sax",
+        "Instruments/Brass and Woodwinds/Saxophone",
+        "Instruments/Instrument Loops",
+        "Instruments/Mixed Musical Loops"
+      ],
+      "accepted_review_prefixes": [],
+      "strictness": "broad",
+      "protected": true,
+      "notes": "Mixed piano/sax songstarter that previously went to Voice. PhysicsVoter should surface Sax, but final placement may remain broad Instrument Loop if mixed identity is not safely pure sax. Voice is never acceptable."
+    },
+    {
+      "id": "dark_low_mid_sax_grimy_hiphop_no_guitar",
+      "filename": "GrimyHipHop_Saxophone_15_Fm_Melody_Dark_Dusty_Warm_Loop_84bpm.wav",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": [
+        "Instruments/Woodwinds/Saxophone",
+        "Instruments/Brass and Woodwinds/Sax",
+        "Instruments/Brass and Woodwinds/Saxophone"
+      ],
+      "accepted_review_prefixes": [],
+      "strictness": "deep",
+      "protected": true,
+      "notes": "Dark low-mid sax loop from FX_Aaron2. Regression guard: must not be stolen by Guitar, Synth, Voice, Drums, or FX."
+    },
+    {
+      "id": "dark_low_mid_sax_hiphoptapes_31_no_guitar",
+      "filename": "HipHopTapes_31_Saxophone_D#m_90bpm.wav",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": [
+        "Instruments/Woodwinds/Saxophone",
+        "Instruments/Brass and Woodwinds/Sax",
+        "Instruments/Brass and Woodwinds/Saxophone"
+      ],
+      "accepted_review_prefixes": [],
+      "strictness": "deep",
+      "protected": true,
+      "notes": "Dark low-mid sax loop from FX_Aaron2. Regression guard: must not be stolen by Guitar, Synth, Voice, Drums, or FX."
+    },
+    {
+      "id": "electric_keys_ews_not_sax_or_guitar",
+      "filename": "EWS_Keys_resampled_HipHop_RnB_G_Major_88BPM.wav",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": [
+        "Instruments/Keys/Electric Piano",
+        "Instruments/Keys",
+        "Instruments/Piano and Keys/Electric Piano",
+        "Instruments/Piano and Keys"
+      ],
+      "accepted_review_prefixes": [],
+      "strictness": "deep",
+      "protected": true,
+      "notes": "Keys/Rhodes loop regression. Must not be pushed into sax, guitar, voice, drums, or FX."
+    },
+    {
+      "id": "police_fx_siren_not_piano_or_sax",
+      "filename": "MS_O_01_Outlaw_Fx Police_D#minor_91bpm_Wet.wav",
+      "expected_top": "FX",
+      "accepted_folder_prefixes": [
+        "FX/Designed Noise FX/Siren",
+        "FX/Designed Noise FX",
+        "FX/Alarms",
+        "FX"
+      ],
+      "accepted_review_prefixes": [],
+      "strictness": "deep",
+      "protected": true,
+      "notes": "Police/siren FX regression. Strong concrete FX agreement must not be overridden into keys, sax, or guitar."
+    }
+  ]
+}

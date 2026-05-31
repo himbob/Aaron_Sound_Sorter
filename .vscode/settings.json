@@ -1,0 +1,12 @@
+{
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/src"
+  ],
+  "python.analysis.autoSearchPaths": true,
+  "python.analysis.enableEditableInstalls": true,
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv_phase4/bin/python",
+  "python.testing.pytestEnabled": true,
+  "python.testing.pytestArgs": [
+    "tests"
+  ]
+}

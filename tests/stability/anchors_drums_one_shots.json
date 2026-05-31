@@ -1,0 +1,72 @@
+{
+  "anchor_pack": "drums_one_shots",
+  "target_category": "Drums/One Shots",
+  "description": "Drum one-shot positives plus traps that prevent short vocals, basses, and FX hits from becoming generic percussion.",
+  "cases": [
+    {
+      "id": "drum_one_shot_positive_kick",
+      "filename": "CS_NE_Kick_OneShot_Monroe.wav",
+      "scenario": "category_positive",
+      "expected_top": "Drums",
+      "accepted_folder_prefixes": ["Drums/Kick Drums", "Drums/Kicks"],
+      "accepted_review_prefixes": [],
+      "forbidden_folder_prefixes": ["Drums/Drum Loops", "Instruments/Bass", "FX/Impacts and Hits", "FX/Structural and Transitional FX"],
+      "protected": true,
+      "change_scope": "drum_one_shot_identity",
+      "failure_type": "shape_role_bug",
+      "notes": "Kick one-shot must not become drum loop, bass, or FX impact."
+    },
+    {
+      "id": "drum_one_shot_positive_snare",
+      "filename": "JACKBABY_SNARE_11.wav",
+      "scenario": "category_positive",
+      "expected_top": "Drums",
+      "accepted_folder_prefixes": ["Drums/Snares", "Drums/Snare Drums", "Drums/Rims and Sticks"],
+      "accepted_review_prefixes": [],
+      "forbidden_folder_prefixes": ["Drums/Drum Loops", "Instruments", "FX"],
+      "protected": true,
+      "change_scope": "drum_one_shot_identity",
+      "failure_type": "shape_role_bug",
+      "notes": "Snare/rim one-shot must remain a drum one-shot."
+    },
+    {
+      "id": "drum_one_shot_near_miss_clap",
+      "filename": "Clap2.wav",
+      "scenario": "category_near_miss",
+      "expected_top": "Drums",
+      "accepted_folder_prefixes": ["Drums/Claps", "Drums/Claps and Snaps", "Drums/Claps Snaps Slaps"],
+      "accepted_review_prefixes": [],
+      "forbidden_folder_prefixes": ["Drums/Drum Loops", "Instruments", "FX"],
+      "protected": true,
+      "change_scope": "clap_one_shot_identity",
+      "failure_type": "category_identity_inside_family",
+      "notes": "Clap one-shot can be clap/snap/slap, not loop/instrument/FX."
+    },
+    {
+      "id": "drum_one_shot_must_not_steal_vocal_shot",
+      "filename": "DOJO_CGNB_Female_Vocal_Shot_01_D.wav",
+      "scenario": "category_must_not_steal",
+      "expected_top": "Instruments",
+      "accepted_folder_prefixes": ["Instruments/Voice"],
+      "accepted_review_prefixes": [],
+      "forbidden_folder_prefixes": ["Drums", "FX/Animals", "FX/Structural and Transitional FX"],
+      "protected": true,
+      "change_scope": "drum_one_shot_vs_voice",
+      "failure_type": "good_role_bad_family",
+      "notes": "Short vocal shot must not be treated as percussion."
+    },
+    {
+      "id": "drum_one_shot_should_review_ambiguous_av5",
+      "filename": "AV5_5_94bpm_Hit 2.wav",
+      "scenario": "category_should_review",
+      "expected_top": "_TO_REVIEW",
+      "accepted_folder_prefixes": [],
+      "accepted_review_prefixes": ["_TO_REVIEW"],
+      "forbidden_folder_prefixes": ["Drums", "FX/Structural and Transitional FX/Risers and Builds", "Instruments/Voice"],
+      "protected": true,
+      "change_scope": "review_over_false_drum_one_shot",
+      "failure_type": "arbiter_boundary",
+      "notes": "Ambiguous hit should not be forced into a one-shot drum."
+    }
+  ]
+}
