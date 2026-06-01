@@ -209,8 +209,13 @@ class FamilyClaimArbiter:
         winning_claim = self._protect_measured_sax_loop_from_fx_or_review(winning_claim, facts)
         winning_claim = self._protect_clean_keys_loop_from_sax_or_fx(winning_claim, facts)
         winning_claim = self._protect_clean_pitched_instrument_loop_from_fx_leaf(winning_claim, facts)
+        winning_claim = self._review_conflicted_instrument_identity_leaf(winning_claim, facts)
+        winning_claim = self._protect_short_instrument_one_shot_from_loop_bucket(winning_claim, facts)
         winning_claim = self._protect_instrument_one_shot_leaf_from_measured_loop(winning_claim, facts)
+        winning_claim = self._protect_short_instrument_one_shot_from_loop_bucket(winning_claim, facts)
         winning_claim = self._preserve_measured_instrument_branch_after_broadening(winning_claim, facts)
+        winning_claim = self._review_uncertain_generic_loop_release(winning_claim, facts)
+        winning_claim = self._protect_short_instrument_one_shot_from_loop_bucket(winning_claim, facts)
         winning_claim = self._review_non_transition_pitched_loop_stolen_by_fx_leaf(winning_claim, facts)
         winning_claim = self._protect_measured_transition_fx_from_review_or_false_leaf(winning_claim, facts)
         winning_claim = self._rehome_true_voice_from_fx_bucket(winning_claim, facts)
@@ -225,6 +230,10 @@ class FamilyClaimArbiter:
             winning_claim,
             facts,
         )
+        winning_claim = self._protect_measured_mixed_loop_from_sax_overreach(winning_claim, facts)
+        winning_claim = self._protect_measured_rhythmic_break_loop(winning_claim, facts)
+        winning_claim = self._protect_measured_kick_one_shot(winning_claim, facts)
+        winning_claim = self._protect_measured_tonal_chord_stab(winning_claim, facts)
         debug_path = os.environ.get("AARON_DEBUG_CLAIMS_FILE")
         if debug_path:
             debug_claims = [raw_claim, winning_claim] + all_claims
@@ -321,6 +330,289 @@ class FamilyClaimArbiter:
             can_override=True,
             strength=max(0.92, winning_claim.strength),
             is_real_candidate=True,
+        )
+
+    def _protect_measured_mixed_loop_from_sax_overreach(
+        self,
+        winning_claim: ConsensusClaim,
+        facts: SharedAudioFacts | None,
+    ) -> ConsensusClaim:
+        """Broaden layered musical loops that were over-specialized as sax.
+
+        Sax/reed authority is useful for obvious solo sax, but it is not enough
+        when the measured body is a long repeated pitched loop and synth, keys,
+        voice, or other instrument panels sit in the same confidence region.
+        That is a mixed musical loop, not a terminal woodwind leaf.
+        """
+        if facts is None or winning_claim.family != "Instruments":
+            return winning_claim
+        path = self._norm_claim_path(winning_claim.folder_path or winning_claim.label)
+        if not any(token in path for token in ("sax", "woodwind", "brass")):
+            return winning_claim
+        shape = _shape_vote_from_facts(facts)
+        shape_confidence = _shape_confidence_from_facts(facts)
+        if shape not in {
+            "pitched_phrase",
+            "pitched_phrase_shape",
+            "repeated_phrase_loop",
+            "bass_phrase",
+            "sustained_pad",
+            "vocal_phrase",
+        }:
+            return winning_claim
+        event_count = self._shape_number(facts, "onset_count")
+        repeat = max(
+            self._shape_number(facts, "true_repetition_score"),
+            self._shape_number(facts, "onset_true_repetition_likelihood"),
+            self._shape_number(facts, "loop_tempo_confidence"),
+            self._shape_number(facts, "loop_pulse_clarity"),
+        )
+        if shape_confidence < 0.82 or event_count < 12.0 or repeat < 0.42:
+            return winning_claim
+        sax_score = max(
+            self._measured_score(facts, "woodwind_sax_score"),
+            self._measured_score(facts, "reed_wind_score"),
+            self._measured_score(facts, "reed_wind_authority_score"),
+        )
+        competing_identity = max(
+            self._measured_score(facts, "synth_tonal_source_score", "synth_lead_score", "synth_chord_score", "synth_pad_score"),
+            self._measured_score(facts, "struck_keys_score", "struck_keys_authority_score"),
+            self._measured_score(facts, "voice_score", "voice_choir_score"),
+            self._measured_score(facts, "plucked_string_score", "plucked_string_authority_score"),
+            self._compound_music_loop_support(facts),
+        )
+        physics_top = self._top_physics_guess_path(facts).lower()
+        broad_loop_candidate = self._facts_have_internal_candidate(
+            facts,
+            ("instrument loops", "mixed musical", "multi instrument"),
+            top_family="Instruments",
+            max_rank=6,
+            max_score=1.5,
+        ) or self._shared_candidate_has_top_family(
+            winning_claim,
+            ("instrument loops", "mixed musical", "multi instrument"),
+            top_family="Instruments",
+            max_score=14.0,
+            max_brain_rank=8,
+            max_physics_rank=6,
+        )
+        sax_is_decisive = bool(sax_score >= 0.74 and sax_score >= competing_identity + 0.10)
+        if sax_is_decisive and "sax" in physics_top:
+            return winning_claim
+        if competing_identity >= max(0.52, sax_score - 0.08) or broad_loop_candidate:
+            return claim_from_folder_path(
+                folder_path="Instruments/Instrument Loops/Loops",
+                source="final_mixed_loop_sax_overreach_broadening",
+                reason=(
+                    "final measured-loop invariant broadened a sax/woodwind leaf "
+                    "because repeated musical-loop evidence had competing non-reed "
+                    "instrument identity panels"
+                ),
+                shared=winning_claim.shared_candidates,
+                raw_candidate_score=winning_claim.raw_candidate_score,
+                brain_rank=winning_claim.brain_rank,
+                physics_rank=winning_claim.physics_rank,
+                shared_winner=winning_claim.shared_winner or winning_claim.folder_path,
+                can_override=True,
+                strength=max(0.92, winning_claim.strength),
+                is_real_candidate=winning_claim.is_real_candidate,
+            )
+        return winning_claim
+
+    def _protect_measured_rhythmic_break_loop(
+        self,
+        winning_claim: ConsensusClaim,
+        facts: SharedAudioFacts | None,
+    ) -> ConsensusClaim:
+        """Keep measured rhythmic break loops under Drums/Drum Loops."""
+        if facts is None:
+            return winning_claim
+        path = self._norm_claim_path(winning_claim.folder_path or winning_claim.label)
+        if winning_claim.family == "Drums" and "drum loops" in path:
+            return winning_claim
+        duration = _feature_number_from_facts(facts, "duration_sec")
+        if duration < 1.35:
+            return winning_claim
+        shape = _shape_vote_from_facts(facts)
+        shape_confidence = _shape_confidence_from_facts(facts)
+        if shape not in {"beat_loop", "drum_loop", "top_loop", "bass_phrase", "repeated_phrase_loop"}:
+            return winning_claim
+        event_count = self._shape_number(facts, "onset_count")
+        repeat = max(
+            self._shape_number(facts, "true_repetition_score"),
+            self._shape_number(facts, "onset_true_repetition_likelihood"),
+            self._shape_number(facts, "loop_tempo_confidence"),
+        )
+        pulse = max(
+            self._shape_number(facts, "loop_pulse_clarity"),
+            self._shape_number(facts, "loop_onset_periodicity"),
+            self._shape_number(facts, "pulse_regularity"),
+        )
+        percussive_event = max(
+            self._shape_number(facts, "percussive_event_ratio"),
+            self._measured_score(facts, "onset_percussive_onset_score"),
+        )
+        drum_family = max(
+            self._measured_score(facts, "drum_loop_source_score"),
+            self._measured_score(facts, "drum_hit_score"),
+            self._measured_score(facts, "drum_kick_source_score"),
+            self._measured_score(facts, "drum_snare_source_score"),
+            self._measured_score(facts, "drum_closed_hat_source_score"),
+            self._measured_score(facts, "drum_cymbal_source_score"),
+        )
+        candidate_supported = self._facts_have_internal_candidate(
+            facts,
+            ("drum loops", "drum loop"),
+            top_family="Drums",
+            max_rank=12,
+            max_score=6.0,
+        ) or self._shared_candidate_has_top_family(
+            winning_claim,
+            ("drum loops", "drum loop"),
+            top_family="Drums",
+            max_score=24.0,
+            max_brain_rank=12,
+            max_physics_rank=12,
+        )
+        rhythmic_body = bool(
+            shape_confidence >= 0.84
+            and event_count >= 8.0
+            and repeat >= 0.40
+            and pulse >= 0.32
+            and (percussive_event >= 0.40 or drum_family >= 0.46 or candidate_supported)
+        )
+        if not rhythmic_body:
+            return winning_claim
+        if self._facts_support_true_voice_role(facts) and percussive_event < 0.55 and not candidate_supported:
+            return winning_claim
+        return claim_from_folder_path(
+            folder_path="Drums/Drum Loops/Loops",
+            source="final_measured_rhythmic_break_loop_invariant",
+            reason=(
+                "final rhythmic-loop invariant kept repeated percussive/break "
+                "structure under Drum Loops despite conflicting FX/instrument lanes"
+            ),
+            shared=winning_claim.shared_candidates,
+            raw_candidate_score=winning_claim.raw_candidate_score,
+            brain_rank=winning_claim.brain_rank,
+            physics_rank=winning_claim.physics_rank,
+            shared_winner=winning_claim.shared_winner or winning_claim.folder_path,
+            can_override=True,
+            strength=max(0.93, winning_claim.strength),
+            is_real_candidate=winning_claim.is_real_candidate,
+        )
+
+    def _protect_measured_kick_one_shot(
+        self,
+        winning_claim: ConsensusClaim,
+        facts: SharedAudioFacts | None,
+    ) -> ConsensusClaim:
+        """Release short sub/kick one-shots from review or false bass/impact leaves."""
+        if facts is None:
+            return winning_claim
+        path = self._norm_claim_path(winning_claim.folder_path or winning_claim.label)
+        if winning_claim.family == "Drums" and "kick" in path:
+            return winning_claim
+        duration = _feature_number_from_facts(facts, "duration_sec")
+        if duration <= 0.0 or duration > 1.35:
+            return winning_claim
+        shape = _shape_vote_from_facts(facts)
+        if shape not in {"solo_phrase", "single_hit", "hit_with_tail", "echo_tail_hit"}:
+            return winning_claim
+        if self._shape_number(facts, "onset_count") > 3.0:
+            return winning_claim
+        kick_score = self._measured_score(facts, "drum_kick_source_score")
+        sub_hit = self._measured_score(facts, "fx_sub_hit_score")
+        one_shot = max(
+            self._measured_score(facts, "role_one_shot_score"),
+            self._shape_number(facts, "one_shot_score"),
+        )
+        kick_candidate = self._facts_have_internal_candidate(
+            facts,
+            ("kick",),
+            top_family="Drums",
+            max_rank=6,
+            max_score=1.5,
+        ) or self._shared_candidate_has_top_family(
+            winning_claim,
+            ("kick",),
+            top_family="Drums",
+            max_score=14.0,
+            max_brain_rank=6,
+            max_physics_rank=6,
+        )
+        if not (kick_score >= 0.56 and sub_hit >= 0.55 and one_shot >= 0.58 and kick_candidate):
+            return winning_claim
+        target = self._best_physics_drum_one_shot_folder(facts) or "Drums/Kick Drums/Generic Kick/One Shots"
+        if "kick" not in target.lower():
+            target = "Drums/Kick Drums/Generic Kick/One Shots"
+        return claim_from_folder_path(
+            folder_path=target,
+            source="final_measured_kick_one_shot_invariant",
+            reason="final kick one-shot invariant kept measured sub/kick transient evidence out of review or false parent buckets",
+            shared=winning_claim.shared_candidates,
+            raw_candidate_score=winning_claim.raw_candidate_score,
+            brain_rank=winning_claim.brain_rank,
+            physics_rank=winning_claim.physics_rank,
+            shared_winner=winning_claim.shared_winner or winning_claim.folder_path,
+            can_override=True,
+            strength=max(0.94, winning_claim.strength),
+            is_real_candidate=winning_claim.is_real_candidate,
+        )
+
+    def _protect_measured_tonal_chord_stab(
+        self,
+        winning_claim: ConsensusClaim,
+        facts: SharedAudioFacts | None,
+    ) -> ConsensusClaim:
+        """Keep clean tonal chord/key stabs out of snare/percussion leaves."""
+        if facts is None or winning_claim.family != "Drums":
+            return winning_claim
+        duration = _feature_number_from_facts(facts, "duration_sec")
+        if duration <= 0.0 or duration > 1.80:
+            return winning_claim
+        if self._facts_have_internal_candidate(
+            facts,
+            ("kick",),
+            top_family="Drums",
+            max_rank=6,
+            max_score=1.5,
+        ):
+            return winning_claim
+        shape = _shape_vote_from_facts(facts)
+        if shape not in {"solo_phrase", "echo_tail_hit", "hit_with_tail", "single_hit"}:
+            return winning_claim
+        tonal_source = max(
+            self._measured_score(facts, "synth_tonal_source_score", "synth_chord_score"),
+            self._measured_score(facts, "struck_keys_score", "struck_keys_authority_score"),
+            self._shape_number(facts, "sustained_tonal_frame_ratio"),
+        )
+        drum_source = max(
+            self._measured_score(facts, "drum_hit_score"),
+            self._measured_score(facts, "drum_snare_source_score"),
+            self._measured_score(facts, "drum_clap_source_score"),
+            self._measured_score(facts, "drum_tom_conga_source_score"),
+        )
+        if not (tonal_source >= 0.54 and drum_source <= 0.46):
+            return winning_claim
+        target = "Instruments/Synths/Synth Chord/One Shots"
+        if self._measured_score(facts, "struck_keys_authority_score", "struck_keys_score") >= tonal_source + 0.05:
+            target = "Instruments/Keys/Rhodes/One Shots"
+        return claim_from_folder_path(
+            folder_path=target,
+            source="final_measured_tonal_chord_stab_invariant",
+            reason=(
+                "final tonal-stab invariant kept clean pitched chord/key evidence "
+                "out of snare/percussion one-shot leaves"
+            ),
+            shared=winning_claim.shared_candidates,
+            raw_candidate_score=winning_claim.raw_candidate_score,
+            brain_rank=winning_claim.brain_rank,
+            physics_rank=winning_claim.physics_rank,
+            shared_winner=winning_claim.shared_winner or winning_claim.folder_path,
+            can_override=True,
+            strength=max(0.92, winning_claim.strength),
+            is_real_candidate=winning_claim.is_real_candidate,
         )
 
     def _facts_support_strong_drum_one_shot(self, facts: SharedAudioFacts | None) -> bool:
@@ -721,12 +1013,14 @@ class FamilyClaimArbiter:
         )
         voice_shape_release = measured_voice_shape_release or legacy_shape_test_release
         if voice_shape_release:
+            brain_voice_one_shot = self._brain_voice_one_shot_folder(facts)
             is_loop_body = bool(
                 self._shape_number(facts, "onset_count") >= 4.0
                 or self._shape_number(facts, "true_repetition_score") >= 0.45
             )
             folder_path = (
-                "Instruments/Voice/Vocal Loops/Loops" if is_loop_body else "Instruments/Voice/Phrase/One Shots"
+                brain_voice_one_shot
+                or ("Instruments/Voice/Vocal Loops/Loops" if is_loop_body else "Instruments/Voice/Phrase/One Shots")
             )
             return claim_from_folder_path(
                 folder_path=folder_path,
@@ -856,6 +1150,86 @@ class FamilyClaimArbiter:
             is_real_candidate=winning_claim.is_real_candidate,
         )
 
+    def _protect_short_instrument_one_shot_from_loop_bucket(
+        self,
+        winning_claim: ConsensusClaim,
+        facts: SharedAudioFacts | None,
+    ) -> ConsensusClaim:
+        """Keep short measured instrument events out of loop buckets.
+
+        Generic loop broadening is allowed for real musical phrases, but it must
+        not turn a short one-event instrument hit into Synth Loops or Instrument
+        Loops.  This uses measured duration, shape, role scores, and the
+        PhysicsVoter top path.  It does not use source names.
+        """
+        if facts is None or winning_claim.family != "Instruments":
+            return winning_claim
+        path = self._norm_claim_path(winning_claim.folder_path or winning_claim.label)
+        if "loop" not in path:
+            return winning_claim
+        if self._facts_support_short_true_voice_one_shot(facts):
+            return winning_claim
+        duration = _feature_number_from_facts(facts, "duration_sec")
+        if duration <= 0.0 or duration > 1.25:
+            return winning_claim
+        loop_role = max(
+            self._measured_role_value(facts, "pitched_music_loop"),
+            self._measured_role_value(facts, "vocal_music_loop"),
+            self._measured_role_value(facts, "drum_loop"),
+            self._measured_role_value(facts, "low_rhythmic_drum_loop"),
+            self._shape_number(facts, "loop_pulse_strength"),
+            self._shape_number(facts, "true_repetition_score"),
+            self._shape_number(facts, "onset_periodicity_score"),
+        )
+        if loop_role >= 0.55 and bool(getattr(facts, "is_loop_like", False)):
+            return winning_claim
+        physics_top = self._top_physics_guess_path(facts)
+        if not physics_top.startswith("instruments/") or "one shot" not in physics_top:
+            return winning_claim
+        folder_path = self._one_shot_folder_from_physics_path(physics_top)
+        if not folder_path:
+            return winning_claim
+        return claim_from_folder_path(
+            folder_path=folder_path,
+            source="final_short_instrument_one_shot_invariant",
+            reason=(
+                "final measured one-shot invariant kept a short instrument event "
+                "out of loop folders after identity broadening"
+            ),
+            shared=winning_claim.shared_candidates,
+            raw_candidate_score=winning_claim.raw_candidate_score,
+            brain_rank=winning_claim.brain_rank,
+            physics_rank=winning_claim.physics_rank,
+            shared_winner=winning_claim.shared_winner or winning_claim.folder_path,
+            can_override=True,
+            strength=max(0.92, winning_claim.strength),
+            is_real_candidate=winning_claim.is_real_candidate,
+        )
+
+    @staticmethod
+    def _one_shot_folder_from_physics_path(physics_top: str) -> str:
+        """Map a normalized PhysicsVoter one-shot path to a stable folder."""
+        path = str(physics_top or "").lower().replace("\\", "/")
+        if not path.startswith("instruments/") or "one shot" not in path:
+            return ""
+        if "/bass/" in path and "synth bass" in path:
+            return "Instruments/Bass/Synth Bass/One Shots"
+        if "/bass/" in path and "808" in path:
+            return "Instruments/Bass/808s/One Shots"
+        if "/bass/" in path:
+            return "Instruments/Bass/Bass One Shots"
+        if "synth" in path:
+            return "Instruments/Synths/Synth One Shots"
+        if "voice" in path or "vocal" in path:
+            return "Instruments/Voice/Phrase/One Shots"
+        if "sax" in path or "woodwind" in path or "brass" in path:
+            return "Instruments/Woodwinds/Saxophone/One Shots"
+        if "guitar" in path:
+            return "Instruments/Guitar/Guitar Plucks/One Shots"
+        if "key" in path or "piano" in path:
+            return "Instruments/Keys/Piano/One Shots"
+        return "Instruments/Instrument One Shots/One Shots"
+
     def _facts_support_measured_voiced_fx_one_shot(
         self,
         facts: SharedAudioFacts | None,
@@ -924,6 +1298,47 @@ class FamilyClaimArbiter:
             max_physics_rank=8,
         )
         return bool(fx_voice_or_design or not direct_instrument_voice)
+
+    def _brain_voice_one_shot_folder(self, facts: SharedAudioFacts | None) -> str:
+        """Return a safe Voice one-shot folder when brain lanes strongly agree.
+
+        The shape voter can mistake vibrato/formant pulses inside a single vocal
+        phrase for repetition.  When the brain ensemble itself strongly prefers
+        an Instruments/Voice one-shot leaf, keep the lowest safe Voice depth
+        instead of broadening to Vocal Loops.  This uses only internal voter
+        evidence, never source names.
+        """
+        if facts is None or not isinstance(getattr(facts, "evidence", None), dict):
+            return ""
+        ensemble = facts.evidence.get("brain_ensemble_vote_result")
+        guesses = ensemble.get("top_guesses") if isinstance(ensemble, dict) else []
+        if not isinstance(guesses, list):
+            return ""
+        for fallback_rank, row in enumerate(guesses[:4], start=1):
+            if not isinstance(row, dict):
+                continue
+            path = self._candidate_path(row).lower().replace("\\", "/")
+            if not path.startswith("instruments/voice") or "one shot" not in path:
+                continue
+            try:
+                rank = int(row.get("rank", fallback_rank) or fallback_rank)
+            except Exception:
+                rank = fallback_rank
+            try:
+                confidence = float(row.get("confidence", 0.0) or 0.0)
+            except Exception:
+                confidence = 0.0
+            try:
+                support = float(row.get("support", row.get("ensemble_support", 0.0)) or 0.0)
+            except Exception:
+                support = 0.0
+            try:
+                score = float(row.get("score", row.get("ensemble_score", 9999.0)) or 9999.0)
+            except Exception:
+                score = 9999.0
+            if rank <= 3 and (confidence >= 0.62 or support >= 1.25 or score <= 1.25):
+                return "Instruments/Voice/Phrase/One Shots"
+        return ""
 
     def _facts_support_short_true_voice_one_shot(self, facts: SharedAudioFacts | None) -> bool:
         """Return True for short one-event vocal shots with formant evidence."""
@@ -1030,6 +1445,18 @@ class FamilyClaimArbiter:
 
     def _subpanel_score(self, facts: SharedAudioFacts | None, name: str) -> float:
         return self._safe_float(self._physics_subpanel_flat(facts).get(name), 0.0)
+
+    def _measured_score(self, facts: SharedAudioFacts | None, *names: str) -> float:
+        """Return the strongest source-name-blind score for any supplied metric name."""
+        best = 0.0
+        for name in names:
+            best = max(
+                best,
+                _feature_number_from_facts(facts, name),
+                self._subpanel_score(facts, name),
+                _shape_metric_from_facts(facts, name),
+            )
+        return best
 
     def _facts_support_non_drum_voiced_phrase_hit(self, facts: SharedAudioFacts | None) -> bool:
         """Return True when a short hit is voiced/formant/synth-like, not drum-like.
@@ -1856,7 +2283,7 @@ class FamilyClaimArbiter:
         if self._facts_support_measured_sax_loop(facts, winning_claim):
             return winning_claim
         if self._facts_support_final_voice_instrument(facts, winning_claim):
-            folder_path = "Instruments/Voice/Vocal Loops/Loops"
+            folder_path = self._brain_voice_one_shot_folder(facts) or "Instruments/Voice/Vocal Loops/Loops"
             if self._facts_support_short_true_voice_one_shot(facts):
                 folder_path = "Instruments/Voice/Phrase/One Shots"
             return claim_from_folder_path(
@@ -2612,6 +3039,7 @@ class FamilyClaimArbiter:
             shape
             in {
                 "pitched_phrase",
+                "pitched_phrase_shape",
                 "bass_phrase",
                 "sustained_pad",
                 "compound_musical_loop",
@@ -2681,6 +3109,359 @@ class FamilyClaimArbiter:
             can_override=True,
             strength=max(0.90, winning_claim.strength),
             is_real_candidate=winning_claim.is_real_candidate,
+        )
+
+    def _review_conflicted_instrument_identity_leaf(
+        self,
+        winning_claim: ConsensusClaim,
+        facts: SharedAudioFacts | None,
+    ) -> ConsensusClaim:
+        """Review concrete instrument leaves when low-level panels disagree.
+
+        This is a source-name-blind safety layer. It does not force a sax,
+        guitar, voice, or synth answer. It only blocks a confident concrete
+        leaf when the measured physics says multiple instrument identities are
+        plausible and none has enough authority to claim the terminal folder.
+        """
+        if facts is None or winning_claim.family != "Instruments":
+            return winning_claim
+        path = self._norm_claim_path(winning_claim.folder_path or winning_claim.label)
+        concrete_leaf = any(
+            token in path
+            for token in (
+                "guitar",
+                "sax",
+                "woodwind",
+                "brass",
+                "voice",
+                "vocal",
+                "synth",
+                "keys",
+                "piano",
+                "strings",
+            )
+        )
+        if not concrete_leaf or "instrument loops" in path:
+            return winning_claim
+        shape = _shape_vote_from_facts(facts)
+        shape_confidence = _shape_confidence_from_facts(facts)
+        phrase_like = bool(
+            shape in {
+                "pitched_phrase",
+                "pitched_phrase_shape",
+                "vocal_phrase",
+                "solo_phrase",
+                "bass_phrase",
+                "sustained_pad",
+                "repeated_phrase_loop",
+            }
+            and shape_confidence >= 0.68
+        )
+        if not phrase_like:
+            return winning_claim
+        if (
+            winning_claim.source == "final_measured_synth_loop_invariant"
+            and self._measured_score(
+                facts,
+                "synth_tonal_source_score",
+                "synth_pad_score",
+                "synth_lead_score",
+                "synth_chord_score",
+            )
+            >= 0.58
+        ):
+            return winning_claim
+        if (
+            winning_claim.source in {
+                "final_measured_voice_invariant",
+                "final_short_true_voice_one_shot_invariant",
+            }
+            and self._facts_support_final_voice_instrument(facts, winning_claim)
+        ):
+            return winning_claim
+        if (
+            winning_claim.source in {"final_measured_sax_loop_invariant", "profile_candidate_sax_leaf_claim"}
+            and self._measured_score(
+                facts,
+                "reed_wind_authority_score",
+                "reed_wind_score",
+                "woodwind_sax_score",
+                "woodwind_flute_score",
+            )
+            >= 0.54
+        ):
+            return winning_claim
+        if not self._facts_have_conflicted_instrument_identity_panels(facts, path):
+            return winning_claim
+        broad_path = self._broad_instrument_path_for_conflicted_identity(winning_claim, facts, path)
+        if broad_path:
+            return claim_from_folder_path(
+                folder_path=broad_path,
+                source="final_conflicted_instrument_identity_broadening",
+                reason=(
+                    "final source-blind identity firewall broadened a concrete "
+                    "instrument leaf because low-level source panels agreed on "
+                    "Instruments but not the terminal identity"
+                ),
+                shared=winning_claim.shared_candidates,
+                raw_candidate_score=winning_claim.raw_candidate_score,
+                brain_rank=winning_claim.brain_rank,
+                physics_rank=winning_claim.physics_rank,
+                shared_winner=winning_claim.shared_winner or winning_claim.folder_path,
+                can_override=True,
+                strength=max(0.91, winning_claim.strength),
+                is_real_candidate=winning_claim.is_real_candidate,
+            )
+        return review_claim(
+            label="_TO_REVIEW/Measured Role Conflict",
+            source="final_conflicted_instrument_identity_review",
+            reason=(
+                "final source-blind identity firewall reviewed a concrete "
+                "instrument leaf because plucked/reed/voice/synth panels were "
+                "too conflicted even for a safe Instrument parent"
+            ),
+            shared=winning_claim.shared_candidates,
+            winner=winning_claim,
+            strength=max(0.92, winning_claim.strength),
+        )
+
+    def _broad_instrument_path_for_conflicted_identity(
+        self,
+        winning_claim: ConsensusClaim,
+        facts: SharedAudioFacts | None,
+        path: str,
+    ) -> str:
+        """Return a safe Instrument parent when only identity panels conflict.
+
+        This keeps the voter/arbiter contract intact: low-level voters may prove
+        the parent family and sometimes a branch, but a conflicted terminal leaf
+        should broaden inside Instruments instead of becoming review. Review is
+        reserved for cross-family or no-parent-authority conflicts.
+        """
+        if facts is None:
+            return ""
+        shape = _shape_vote_from_facts(facts)
+        shape_confidence = _shape_confidence_from_facts(facts)
+        if shape_confidence < 0.66:
+            return ""
+        if shape not in {
+            "pitched_phrase",
+            "pitched_phrase_shape",
+            "vocal_phrase",
+            "solo_phrase",
+            "bass_phrase",
+            "sustained_pad",
+            "repeated_phrase_loop",
+            "mixed_instrument_loop",
+            "compound_musical_loop",
+        }:
+            return ""
+        drumlike = max(
+            self._shape_number(facts, "drumlike_frame_ratio"),
+            self._shape_number(facts, "percussive_event_ratio"),
+            self._measured_role_value(facts, "drum_loop"),
+            self._measured_role_value(facts, "percussive_drum_loop"),
+        )
+        if drumlike >= 0.48:
+            return ""
+        parent = (
+            facts.evidence.get("parent_eligibility_v2", {})
+            if isinstance(getattr(facts, "evidence", None), dict)
+            else {}
+        )
+        parent_path = str(parent.get("broad_folder_path") or "") if isinstance(parent, dict) else ""
+        parent_role = str(parent.get("role_name") or "").lower() if isinstance(parent, dict) else ""
+        parent_confidence = self._safe_float(parent.get("confidence"), 0.0) if isinstance(parent, dict) else 0.0
+        if parent_path.startswith("Instruments/") and parent_confidence >= 0.55:
+            return parent_path
+        if "synth" in path and winning_claim.source == "final_measured_synth_loop_invariant":
+            return winning_claim.folder_path
+        if ("sax" in path or "woodwind" in path or "brass" in path) and winning_claim.source in {
+            "final_measured_sax_loop_invariant",
+            "profile_candidate_sax_leaf_claim",
+        }:
+            return winning_claim.folder_path
+        synth_score = self._measured_score(
+            facts,
+            "synth_tonal_source_score",
+            "synth_lead_score",
+            "synth_pad_score",
+            "synth_chord_score",
+        )
+        reed_score = max(
+            self._measured_score(facts, "reed_wind_authority_score"),
+            self._measured_score(facts, "reed_wind_score", "woodwind_sax_score", "woodwind_flute_score"),
+        )
+        plucked_score = max(
+            self._measured_score(facts, "plucked_string_authority_score"),
+            self._measured_score(facts, "plucked_string_score", "guitar_acoustic_score", "guitar_electric_score"),
+        )
+        keys_score = self._measured_score(facts, "struck_keys_authority_score", "struck_keys_score")
+        voice_score = self._measured_score(facts, "voice_score", "voice_choir_score", "human_spoken_voice_score")
+        physics_top = self._top_physics_guess_path(facts)
+        physics_top_l = physics_top.lower()
+        if synth_score >= 0.58 and "synth" in physics_top_l:
+            if shape in {"sustained_pad", "pitched_phrase", "pitched_phrase_shape", "vocal_phrase", "bass_phrase"}:
+                return "Instruments/Synths/Pads/Loops"
+            return "Instruments/Synths/Synth Loops/Loops"
+        if reed_score >= 0.58 and ("sax" in physics_top_l or "woodwind" in physics_top_l or "brass" in physics_top_l):
+            return "Instruments/Woodwinds/Saxophone/Loops"
+        if max(synth_score, reed_score, plucked_score, keys_score, voice_score) >= 0.50:
+            return "Instruments/Instrument Loops/Loops"
+        if physics_top_l.startswith("instruments/"):
+            return "Instruments/Instrument Loops/Loops"
+        if winning_claim.family == "Instruments":
+            return "Instruments/Instrument Loops/Loops"
+        return ""
+
+    def _facts_have_conflicted_instrument_identity_panels(
+        self,
+        facts: SharedAudioFacts | None,
+        path: str,
+    ) -> bool:
+        """Return True when terminal source panels are too close to trust."""
+        plucked_score = self._measured_score(
+            facts,
+            "plucked_string_score",
+            "guitar_acoustic_score",
+            "guitar_electric_score",
+            "guitar_nylon_score",
+        )
+        plucked_authority = self._measured_score(facts, "plucked_string_authority_score")
+        reed_score = self._measured_score(
+            facts,
+            "reed_wind_score",
+            "woodwind_sax_score",
+            "woodwind_flute_score",
+            "brass_trumpet_score",
+        )
+        reed_authority = self._measured_score(facts, "reed_wind_authority_score")
+        voice_score = self._measured_score(
+            facts,
+            "voice_score",
+            "human_spoken_voice_score",
+            "voice_choir_score",
+            "human_breath_mouth_score",
+        )
+        synth_score = self._measured_score(
+            facts,
+            "synth_tonal_source_score",
+            "synth_lead_score",
+            "synth_pad_score",
+            "synth_chord_score",
+        )
+        keys_score = self._measured_score(
+            facts,
+            "struck_keys_score",
+            "struck_keys_authority_score",
+            "keys_hammer_attack_score",
+            "keys_tonal_decay_score",
+        )
+        competing = {
+            "plucked": max(plucked_score, plucked_authority),
+            "reed": max(reed_score, reed_authority),
+            "voice": voice_score,
+            "synth": synth_score,
+            "keys": keys_score,
+        }
+        if "guitar" in path:
+            target = competing["plucked"]
+            nearest_decoy = max(competing["reed"], competing["voice"], competing["synth"], competing["keys"])
+            strong_target = bool(plucked_authority >= 0.68 and target >= nearest_decoy + 0.08)
+            return bool(not strong_target and target >= 0.42 and nearest_decoy >= max(0.54, target - 0.08))
+        if "sax" in path or "woodwind" in path or "brass" in path:
+            target = competing["reed"]
+            nearest_decoy = max(competing["plucked"], competing["voice"], competing["synth"], competing["keys"])
+            strong_target = bool(reed_authority >= 0.68 and target >= nearest_decoy + 0.08)
+            return bool(not strong_target and target >= 0.42 and nearest_decoy >= max(0.54, target - 0.08))
+        if "voice" in path or "vocal" in path:
+            target = competing["voice"]
+            nearest_decoy = max(competing["reed"], competing["plucked"], competing["synth"], competing["keys"])
+            strong_target = bool(target >= 0.78 and target >= nearest_decoy + 0.08)
+            return bool(not strong_target and target >= 0.50 and nearest_decoy >= target - 0.06)
+        if "synth" in path:
+            target = competing["synth"]
+            nearest_decoy = max(competing["reed"], competing["plucked"], competing["voice"], competing["keys"])
+            strong_target = bool(target >= 0.74 and target >= nearest_decoy + 0.08)
+            return bool(not strong_target and target >= 0.50 and nearest_decoy >= target - 0.06)
+        return False
+
+    def _review_uncertain_generic_loop_release(
+        self,
+        winning_claim: ConsensusClaim,
+        facts: SharedAudioFacts | None,
+    ) -> ConsensusClaim:
+        """Review broad loop releases when they are structure-only guesses.
+
+        The previous behavior converted several conflicted loop bodies into
+        confident Instrument Loops or Synth Loops. Broad buckets are useful,
+        but they still need a reliable source-family authority. When the loop
+        structure is real and the source panels stay weak, review is more
+        honest than a forced producer folder.
+        """
+        if facts is None or winning_claim.family != "Instruments":
+            return winning_claim
+        if winning_claim.source not in {
+            "final_false_voice_loop_broad_instrument_invariant",
+            "final_measured_synth_loop_invariant",
+        }:
+            return winning_claim
+        path = self._norm_claim_path(winning_claim.folder_path or winning_claim.label)
+        if "instrument loops" not in path and "synth" not in path:
+            return winning_claim
+        shape = _shape_vote_from_facts(facts)
+        shape_confidence = _shape_confidence_from_facts(facts)
+        if shape not in {"bass_phrase", "pitched_phrase", "pitched_phrase_shape", "vocal_phrase", "sustained_pad"}:
+            return winning_claim
+        event_count = self._measured_score(facts, "onset_count", "physics_subpanel_event_count")
+        repeat = max(
+            self._measured_score(facts, "true_repetition_score"),
+            self._measured_score(facts, "onset_true_repetition_likelihood"),
+            self._measured_score(facts, "loop_tempo_confidence"),
+            self._measured_score(facts, "loop_pulse_clarity"),
+            self._measured_score(facts, "loop_onset_periodicity"),
+            self._measured_score(facts, "pulse_regularity"),
+        )
+        if shape_confidence < 0.88 or event_count < 16.0 or repeat < 0.50:
+            return winning_claim
+        strongest_source = max(
+            self._measured_score(facts, "synth_tonal_source_score", "synth_pad_score", "synth_lead_score", "synth_chord_score"),
+            self._measured_score(facts, "plucked_string_authority_score"),
+            self._measured_score(facts, "reed_wind_authority_score"),
+            self._measured_score(facts, "voice_score"),
+            self._measured_score(facts, "struck_keys_authority_score"),
+        )
+        # Strong source authority can keep a broad-loop rescue. Moderate source
+        # authority is also enough when the measured body is a clean non-drum
+        # pitched phrase and the physics voter already put the parent in
+        # Instruments. This is a voter-backed parent-family decision, not a
+        # structure-only release.
+        clean_non_drum_phrase = bool(
+            self._shape_number(facts, "percussive_event_ratio") <= 0.24
+            and self._shape_number(facts, "drumlike_frame_ratio") <= 0.26
+            and max(
+                self._measured_role_value(facts, "drum_loop"),
+                self._measured_role_value(facts, "percussive_drum_loop"),
+                self._measured_role_value(facts, "bright_drum_loop"),
+            )
+            < 0.62
+        )
+        physics_top = self._top_physics_guess_path(facts).lower()
+        if strongest_source >= 0.68:
+            return winning_claim
+        if strongest_source >= 0.50 and clean_non_drum_phrase and physics_top.startswith("instruments/"):
+            return winning_claim
+        return review_claim(
+            label="_TO_REVIEW/Measured Role Conflict",
+            source="final_uncertain_generic_loop_release_review",
+            reason=(
+                "final loop safety invariant reviewed a broad Instrument/Synth "
+                "loop release because repeated-loop structure was strong but no "
+                "source-family physics panel had enough authority"
+            ),
+            shared=winning_claim.shared_candidates,
+            winner=winning_claim,
+            strength=max(0.90, winning_claim.strength),
         )
 
     def _review_non_transition_pitched_loop_stolen_by_fx_leaf(
@@ -3844,7 +4625,15 @@ class FamilyClaimArbiter:
         if parent_mixed_music_loop:
             return True
         return bool(
-            shape in {"pitched_phrase", "sustained_pad", "vocal_phrase", "bass_phrase"}
+            shape in {
+                "pitched_phrase",
+                "sustained_pad",
+                "vocal_phrase",
+                "bass_phrase",
+                "repeated_phrase_loop",
+                "mixed_instrument_loop",
+                "compound_musical_loop",
+            }
             and shape_confidence >= 0.68
             and pitched_loop >= 0.58
             and self._shape_number(facts, "pitched_event_ratio") >= 0.50
@@ -4032,6 +4821,12 @@ class FamilyClaimArbiter:
                 "stutter",
                 "hybrid designed",
                 "designed noise",
+                "foley",
+                "machine",
+                "engine",
+                "motor",
+                "coin",
+                "object",
             )
         ):
             return False
@@ -4138,7 +4933,7 @@ class FamilyClaimArbiter:
         )
         transition_shaped_drum_loop = self._facts_support_rhythmic_drum_loop_over_transition(facts)
         strong_pitched_nonpercussive_loop = bool(
-            shape in {"pitched_phrase", "sustained_pad", "vocal_phrase", "bass_phrase"}
+            shape in {"pitched_phrase", "pitched_phrase_shape", "sustained_pad", "vocal_phrase", "bass_phrase"}
             and shape_confidence >= 0.70
             and self._shape_number(facts, "pitched_event_ratio") >= 0.50
             and self._shape_number(facts, "sustained_tonal_frame_ratio") >= 0.50
@@ -5126,8 +5921,14 @@ class FamilyClaimArbiter:
         )
         if not isinstance(layer, dict):
             layer = {}
-        clean_electric_keys_loop_signal = bool(layer.get("instrument_clean_electric_keys_loop_signal"))
         physics_branch = str(layer.get("physics_layer_branch") or layer.get("instrument_branch_selected") or "")
+        if (
+            physics_branch == "MixedInstrument"
+            or bool(layer.get("compound_music_prefer_broad_loop"))
+            or self._safe_number(layer.get("compound_music_multi_source_loop_disagreement"), 0.0) >= 0.70
+        ):
+            return False
+        clean_electric_keys_loop_signal = bool(layer.get("instrument_clean_electric_keys_loop_signal"))
         direct_keys_candidate = bool(
             candidate_keys_evidence or piano_witness >= 0.68 or clean_electric_keys_loop_signal
         )
@@ -5990,7 +6791,7 @@ class FamilyClaimArbiter:
             or (best_fx_score < 10.0 and best_fx_score + 4.0 < best_instrument_score and instrument_support_count < 2)
         )
         return bool(
-            shape in {"pitched_phrase", "sustained_pad", "vocal_phrase", "bass_phrase"}
+            shape in {"pitched_phrase", "pitched_phrase_shape", "sustained_pad", "vocal_phrase", "bass_phrase"}
             and shape_confidence >= 0.70
             and self._measured_role_value(facts, "pitched_music_loop") >= 0.68
             and self._shape_number(facts, "pitched_event_ratio") >= 0.58

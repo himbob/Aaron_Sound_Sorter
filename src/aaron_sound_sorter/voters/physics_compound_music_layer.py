@@ -76,6 +76,13 @@ class PhysicsCompoundMusicLayer:
             + 0.18 * inverse_ramp(strongest, 0.52, 0.90)
             + 0.12 * inverse_ramp(strongest_gap, 0.035, 0.30)
         )
+        multi_source_loop_disagreement = clamp01(
+            0.30 * ramp(plausible_count, 3.0, 6.0)
+            + 0.24 * ramp(second, 0.42, 0.70)
+            + 0.20 * ramp(third, 0.36, 0.64)
+            + 0.16 * inverse_ramp(strongest_gap, 0.02, 0.22)
+            + 0.10 * ramp(event_count, 10.0, 48.0)
+        )
         layered_activity = clamp01(
             0.25 * ramp(event_count, 8.0, 44.0)
             + 0.20 * ramp(onset_span, 0.36, 0.88)
@@ -107,17 +114,24 @@ class PhysicsCompoundMusicLayer:
         compound_strength = clamp01(
             0.22 * instrument_anchor
             + 0.24 * band_spread
-            + 0.14 * branch_disagreement
+            + 0.10 * branch_disagreement
+            + 0.14 * multi_source_loop_disagreement
             + 0.24 * layered_activity
             + 0.18 * tonal_fx_wash
             + 0.06 * ramp(max(body_noise, tail_noise), 0.18, 0.55)
             - 0.24 * single_source_isolation
         )
+        no_single_branch_dominates = bool(
+            multi_source_loop_disagreement >= 0.62
+            and plausible_count >= 4
+            and strongest_gap <= 0.22
+            and strongest < 0.82
+        )
         prefer_broad_loop = bool(
             instrument_anchor >= 0.64
             and compound_strength >= 0.60
-            and band_spread >= 0.50
-            and layered_activity >= 0.62
+            and (band_spread >= 0.50 or no_single_branch_dominates)
+            and (layered_activity >= 0.62 or no_single_branch_dominates)
             and (is_loop or is_long or event_count >= 10.0)
             and not (single_source_isolation >= 0.72 and strongest >= 0.76)
         )
@@ -136,6 +150,7 @@ class PhysicsCompoundMusicLayer:
             "compound_music_strength": round(float(compound_strength), 6),
             "compound_music_band_spread": round(float(band_spread), 6),
             "compound_music_branch_disagreement": round(float(branch_disagreement), 6),
+            "compound_music_multi_source_loop_disagreement": round(float(multi_source_loop_disagreement), 6),
             "compound_music_layered_activity": round(float(layered_activity), 6),
             "compound_music_tonal_fx_wash": round(float(tonal_fx_wash), 6),
             "compound_music_single_source_isolation": round(float(single_source_isolation), 6),

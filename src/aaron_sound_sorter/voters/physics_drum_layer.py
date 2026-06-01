@@ -24,6 +24,7 @@ class PhysicsDrumLayer:
     """
 
     BRANCHES = (
+        "DrumLoop",
         "Kick",
         "TomOrConga",
         "Snare",
@@ -52,6 +53,17 @@ class PhysicsDrumLayer:
         evidence = self.evidence(facts)
         branch_scores = {name: float(evidence[f"drum_branch_{name}"]) for name in self.BRANCHES}
         branch, branch_strength = max(branch_scores.items(), key=lambda item: item[1])
+        drum_loop_strength = branch_scores.get("DrumLoop", 0.0)
+        shape_name = str(evidence.get("drum_anchor_shape_name", ""))
+        event_count = safe_float(evidence.get("drum_event_count", 0.0), 0.0)
+        if (
+            drum_loop_strength >= 0.62
+            and shape_name in {"beat_loop", "top_loop", "repeated_phrase_loop"}
+            and event_count >= 4.0
+            and (drum_loop_strength >= branch_strength - 0.12 or drum_loop_strength >= 0.82)
+        ):
+            branch = "DrumLoop"
+            branch_strength = drum_loop_strength
         evidence["drum_branch_selected"] = branch
         evidence["drum_branch_selected_confidence"] = round(float(branch_strength), 6)
         for name, value in branch_scores.items():
@@ -63,6 +75,8 @@ class PhysicsDrumLayer:
         shape = shape_vote(facts)
         roles = measured_roles(facts)
         subpanel_flat = physics_subpanel_flat(facts)
+        sub_drum_loop_source = safe_float(subpanel_flat.get("drum_loop_source_score", 0.0), 0.0)
+        sub_rhythmic_break_loop = safe_float(subpanel_flat.get("rhythmic_break_loop_score", 0.0), 0.0)
         fa = first_arrival(facts)
         shape_name = str(shape.get("primary_shape", ""))
         shape_confidence = number(shape, "confidence", 0.0)
@@ -338,6 +352,12 @@ class PhysicsDrumLayer:
         # bass or pitched phrase.  This is the fix for low pitched drum hits.
         branch_gate = clamp01(0.40 + 0.60 * drum_anchor)
         branch_scores = {
+            "DrumLoop": clamp01(
+                0.35 * sub_drum_loop_source
+                + 0.45 * sub_rhythmic_break_loop
+                + 0.10 * ramp(event_count, 4.0, 24.0)
+                + 0.10 * ramp(onset_span, 0.34, 0.90)
+            ),
             "Kick": clamp01(branch_gate * low_kick_core + 0.10 * ramp(sub, 0.72, 0.96)),
             "TomOrConga": clamp01(branch_gate * tom_conga_core),
             "Snare": clamp01(branch_gate * snare_core),
@@ -366,6 +386,11 @@ class PhysicsDrumLayer:
             scale=0.96,
             floor=0.34,
         )
+        if sub_rhythmic_break_loop >= 0.62 and sub_drum_loop_source >= 0.30:
+            branch_scores["DrumLoop"] = max(
+                branch_scores.get("DrumLoop", 0.0),
+                min(0.94, 0.58 + 0.30 * sub_rhythmic_break_loop),
+            )
 
         clap_source = safe_float(subpanel_flat.get("drum_clap_source_score", 0.0), 0.0)
         snare_source = safe_float(subpanel_flat.get("drum_snare_source_score", 0.0), 0.0)
@@ -514,6 +539,8 @@ class PhysicsDrumLayer:
             "drum_source_panel_metallic_percussion": round(
                 float(safe_float(subpanel_flat.get("drum_metallic_percussion_source_score", 0.0), 0.0)), 6
             ),
+            "drum_source_panel_drum_loop": round(float(sub_drum_loop_source), 6),
+            "drum_source_panel_rhythmic_break_loop": round(float(sub_rhythmic_break_loop), 6),
         }
         for name, value in branch_scores.items():
             out[f"drum_branch_{name}"] = round(float(value), 6)

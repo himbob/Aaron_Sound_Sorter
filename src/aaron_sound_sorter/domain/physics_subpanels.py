@@ -685,17 +685,49 @@ def build_low_level_physics_subpanels(feature_values: dict[str, float]) -> dict[
     if tonal_voiced_non_drum_hit_guard:
         metallic_percussion_source_score = min(metallic_percussion_source_score, 0.34)
 
+    # Drum-loop evidence cannot depend only on frame labels such as
+    # ``loop_percussive_event_ratio`` or ``loop_drumlike_frame_ratio``.  Real
+    # sampled breaks and synthetic hat loops often contain pitched low-end or
+    # narrow high-frequency bodies, so those frame classifiers under-read them
+    # as bass phrases, reeds, voices, or FX.  The invariant below is still
+    # source-name blind: it asks whether the audio is a repeated, fast-attacked,
+    # rhythmically distributed event stream with drum-band emphasis.  That is a
+    # drum-loop role signal even when the timbre is tonal or synthetic.
+    rhythmic_break_loop_score = clamp01(
+        0.22 * loop_panel["role_loop_score"]
+        + 0.17 * repeated_events
+        + 0.15 * ramp(event_count, 6.0, 32.0)
+        + 0.14 * ramp(onset_span, 0.42, 0.90)
+        + 0.12 * loop_panel["pulse_clarity"]
+        + 0.10 * loop_panel["onset_periodicity"]
+        + 0.08 * fast_attack
+        + 0.07 * max(ramp(loop_event_low, 0.42, 0.92), ramp(loop_event_high, 0.16, 0.70))
+        + 0.05 * ramp(event_rate, 1.0, 5.5)
+        - 0.10 * slow_attack
+        - 0.08 * ramp(loop_sustained, 0.88, 1.0)
+    )
+    rhythmic_transient_loop_score = clamp01(
+        0.24 * fast_attack
+        + 0.22 * ramp(event_count, 6.0, 18.0)
+        + 0.18 * ramp(onset_span, 0.40, 0.86)
+        + 0.14 * ramp(event_rate, 1.2, 4.2)
+        + 0.14 * max(ramp(loop_event_low, 0.50, 0.90), ramp(loop_event_high, 0.14, 0.55))
+        + 0.08 * inverse_ramp(tail, 0.20, 0.82)
+        - 0.10 * slow_attack
+    )
+    rhythmic_break_loop_score = max(rhythmic_break_loop_score, rhythmic_transient_loop_score)
     drum_loop_source_score = clamp01(
-        0.26 * loop_panel["role_loop_score"]
-        + 0.20 * ramp(loop_percussive, 0.12, 0.84)
-        + 0.18 * ramp(loop_drumlike, 0.10, 0.82)
-        + 0.14 * drum_hit_score
-        + 0.10 * repeated_events
-        + 0.07 * ramp(event_count, 5.0, 28.0)
+        0.22 * loop_panel["role_loop_score"]
+        + 0.18 * ramp(loop_percussive, 0.12, 0.84)
+        + 0.16 * ramp(loop_drumlike, 0.10, 0.82)
+        + 0.12 * drum_hit_score
+        + 0.08 * repeated_events
+        + 0.06 * ramp(event_count, 5.0, 28.0)
         + 0.05 * max(ramp(loop_event_low, 0.45, 0.92), ramp(loop_event_high, 0.18, 0.70))
-        - 0.12 * plucked_panel["plucked_string_score"]
-        - 0.08 * keys_panel["struck_keys_score"]
-        - 0.08 * reed_panel["reed_wind_score"]
+        + 0.25 * rhythmic_break_loop_score
+        - 0.08 * plucked_panel["plucked_string_score"]
+        - 0.06 * keys_panel["struck_keys_score"]
+        - 0.06 * reed_panel["reed_wind_score"]
         - 0.08 * loop_panel["delay_tail_likelihood"]
     )
 
@@ -1190,6 +1222,7 @@ def build_low_level_physics_subpanels(feature_values: dict[str, float]) -> dict[
         "voice_score": voice_score,
         "drum_hit_score": drum_hit_score,
         "drum_loop_source_score": drum_loop_source_score,
+        "rhythmic_break_loop_score": rhythmic_break_loop_score,
         "tonal_voiced_non_drum_hit_guard": tonal_voiced_non_drum_hit_guard,
         "metallic_noise_score": metallic_noise_score,
         "scrape_rasp_score": scrape_rasp_score,

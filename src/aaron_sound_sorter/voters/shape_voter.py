@@ -482,6 +482,33 @@ def classify_shape(values: Mapping[str, float], *, facts: SharedAudioFacts) -> S
         + 0.10 * ramp(span, 0.60, 0.92)
         + 0.08 * inverse_ramp(sustained_tonal, 0.45, 0.85)
     )
+    rhythmic_break_loop = clamp01(
+        0.30 * true_repetition
+        + 0.18 * ramp(onset_count, 6.0, 28.0)
+        + 0.16 * ramp(span, 0.42, 0.90)
+        + 0.16 * max(ramp(low_event, 0.62, 0.94), ramp(high_event, 0.32, 0.86))
+        + 0.14 * inverse_ramp(attack, 0.006, 0.12)
+        + 0.06 * ramp(onset_density, 0.8, 5.5)
+    )
+    # Low-end breakbeats and synthetic hat loops often look like pitched
+    # phrases because their events have clear pitch centers.  Shape should not
+    # require the source panel's drumlike/percussive labels to have already
+    # fired.  Repeated fast-attacked low/high event streams are structural drum
+    # loops at the shape layer; slower attacked multi-instrument loops remain
+    # pitched or mixed musical phrases.
+    if rhythmic_break_loop >= 0.62 and true_repetition >= 0.62 and onset_count >= 6.0:
+        preferred_drum_shape = "top_loop" if high_event >= 0.42 and high_total >= 0.18 else "beat_loop"
+        strongest_transition = max(scores.get("transition_riser", 0.0), scores.get("transition_drop", 0.0))
+        scores[preferred_drum_shape] = max(
+            scores[preferred_drum_shape],
+            rhythmic_break_loop + 0.03,
+            strongest_transition + 0.02,
+        )
+        scores["bass_phrase"] = min(scores["bass_phrase"], rhythmic_break_loop - 0.02)
+        scores["pitched_phrase"] = min(scores["pitched_phrase"], rhythmic_break_loop - 0.03)
+        scores[PITCHED_PHRASE_SHAPE] = min(scores[PITCHED_PHRASE_SHAPE], rhythmic_break_loop - 0.03)
+        scores["transition_riser"] = min(scores["transition_riser"], scores[preferred_drum_shape] - 0.04)
+        scores["transition_drop"] = min(scores["transition_drop"], scores[preferred_drum_shape] - 0.04)
     if (
         scores["repeated_phrase_loop"] >= 0.72
         and drum_repetition_loop >= 0.62

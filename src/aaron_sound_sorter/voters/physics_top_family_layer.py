@@ -66,7 +66,14 @@ class PhysicsTopFamilyLayer:
         }
         beat_loop_score = max(
             top_shape_scores.get("beat_loop", 0.0),
+            top_shape_scores.get("top_loop", 0.0),
             shape_confidence if shape_name == "beat_loop" else 0.0,
+            shape_confidence if shape_name == "top_loop" else 0.0,
+        )
+        repeated_loop_score = max(
+            beat_loop_score,
+            top_shape_scores.get("repeated_phrase_loop", 0.0),
+            shape_confidence if shape_name == "repeated_phrase_loop" else 0.0,
         )
         loop_percussive = number(values, "loop_percussive_event_ratio", number(shape, "percussive_event_ratio", 0.0))
         event_low = number(values, "loop_mean_event_low_ratio", number(shape, "low_event_ratio", 0.0))
@@ -216,18 +223,39 @@ class PhysicsTopFamilyLayer:
                 },
             )
         drum_loop_source = safe_float(instrument_evidence.get("instrument_subpanel_drum_loop_source_score", 0.0), 0.0)
+        rhythmic_break_loop = safe_float(
+            instrument_evidence.get("instrument_subpanel_rhythmic_break_loop_score", 0.0), 0.0
+        )
         measured_drum_loop_source = bool(
-            drum_loop_source >= 0.50
+            (
+                drum_loop_source >= 0.50
+                or (
+                    drum_loop_source >= 0.30
+                    and rhythmic_break_loop >= 0.62
+                    and repeated_loop_score >= 0.62
+                )
+                or (
+                    drum_loop_source >= 0.24
+                    and rhythmic_break_loop >= 0.70
+                    and drum_branch == "DrumLoop"
+                    and drum_branch_confidence >= 0.50
+                    and repeated_loop_score >= 0.62
+                )
+            )
             and max(
                 loop_percussive,
                 safe_float(drum_evidence.get("drum_loop_drumlike_frame_ratio", 0.0), 0.0),
                 drum_role,
                 low_drum_role,
+                rhythmic_break_loop,
             )
             >= 0.22
-            and beat_loop_score >= 0.48
+            and repeated_loop_score >= 0.48
             and instrument_anchor < max(0.86, drum_anchor + 0.22)
-            and fx_conflict < 0.62
+            and (
+                fx_conflict < 0.62
+                or (rhythmic_break_loop >= 0.66 and drum_loop_source >= 0.30 and repeated_loop_score >= 0.62)
+            )
         )
         if measured_drum_loop_source:
             return (
@@ -242,7 +270,9 @@ class PhysicsTopFamilyLayer:
                     "physics_top_layer_drum_branch_confidence": round(float(drum_branch_confidence), 6),
                     "physics_top_layer_drum_anchor": round(float(drum_anchor), 6),
                     "physics_top_layer_drum_loop_source_score": round(float(drum_loop_source), 6),
+                    "physics_top_layer_rhythmic_break_loop_score": round(float(rhythmic_break_loop), 6),
                     "physics_top_layer_beat_loop_score": round(float(beat_loop_score), 6),
+                    "physics_top_layer_repeated_loop_score": round(float(repeated_loop_score), 6),
                     "physics_top_layer_loop_percussive": round(float(loop_percussive), 6),
                     "physics_top_layer_instrument_branch": instrument_branch,
                     "physics_top_layer_instrument_branch_confidence": round(float(instrument_branch_confidence), 6),

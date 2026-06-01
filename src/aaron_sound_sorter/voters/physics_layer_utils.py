@@ -144,6 +144,8 @@ def candidate_is_broad_drum(folder: str) -> bool:
 
 def drum_candidate_matches_branch(folder: str, branch: str) -> bool:
     low = folder.lower()
+    if branch == "DrumLoop":
+        return "/drum loops/" in low or low.endswith("/drum loops/loops") or "/full drum loops/" in low
     if branch == "Kick":
         return "/kick drums/" in low or "/kick/" in low or " kick" in low
     if branch == "TomOrConga":

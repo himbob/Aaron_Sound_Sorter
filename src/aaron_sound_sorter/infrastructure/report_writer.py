@@ -15,6 +15,7 @@ from aaron_sound_sorter.domain.physics_category_panels import ALL_CATEGORY_SPECS
 from aaron_sound_sorter.infrastructure.brain_lane_validation import write_brain_lane_validation_reports
 
 SORTED_ROOT_NAME = "Aaron_Sorted_Sounds"
+DEBUG_PACKET_SIDECAR_NAME = f"{SORTED_ROOT_NAME}_debug_packets.jsonl"
 
 CATEGORY_PANEL_MANIFEST_FIELDS = [spec.score_key for spec in ALL_CATEGORY_SPECS]
 
@@ -165,6 +166,7 @@ class SortReportWriter:
         manifest_path = self.output_dir / f"{SORTED_ROOT_NAME}_manifest.csv"
         summary_path = self.output_dir / f"{SORTED_ROOT_NAME}_summary.txt"
         write_manifest(manifest_path, file_results)
+        write_debug_packets(self.output_dir / DEBUG_PACKET_SIDECAR_NAME, file_results)
         write_summary(summary_path, file_results)
         write_brain_ensemble_audit(self.output_dir / "Aaron_Brain_Ensemble_Audit.csv", file_results)
         write_brain_lane_validation_reports(self.output_dir, file_results)
@@ -271,6 +273,108 @@ def physics_subpanel_manifest_values(facts_evidence: dict[str, Any]) -> dict[str
         value = flat.get(field, facts_evidence.get(field, "") if isinstance(facts_evidence, dict) else "")
         row[field] = str(value)
     return row
+
+
+def compact_physics_subpanels(facts_evidence: dict[str, Any]) -> dict[str, Any]:
+    """Return a manifest-safe physics panel digest, not the full debug packet."""
+    subpanels = facts_evidence.get("physics_subpanels", {}) if isinstance(facts_evidence, dict) else {}
+    flat = subpanels.get("flat", {}) if isinstance(subpanels, dict) else {}
+    if not isinstance(flat, dict):
+        flat = {}
+    compact_flat = {field: flat[field] for field in PHYSICS_SUBPANEL_MANIFEST_FIELDS if field in flat}
+    digest: dict[str, Any] = {"flat": compact_flat}
+    if isinstance(subpanels, dict):
+        for key in ("selected", "summary", "warnings"):
+            if key in subpanels:
+                digest[key] = subpanels[key]
+    return digest
+
+
+def compact_parent_role_audit(facts_evidence: dict[str, Any]) -> dict[str, Any]:
+    """Return the role-audit keys needed for manifest triage."""
+    audit = facts_evidence.get("parent_role_audit", {}) if isinstance(facts_evidence, dict) else {}
+    if not isinstance(audit, dict):
+        return {}
+    keep = (
+        "detected_parent_role",
+        "parent_role",
+        "role_name",
+        "broad_folder_path",
+        "confidence",
+        "winning_role",
+        "role_score",
+        "reason",
+        "status",
+    )
+    return {key: audit[key] for key in keep if key in audit}
+
+
+def compact_shared_candidates(candidates: list[dict[str, Any]], limit: int = 5) -> list[dict[str, Any]]:
+    """Return manifest-safe shared candidate rows."""
+    rows: list[dict[str, Any]] = []
+    for row in candidates[:limit]:
+        if not isinstance(row, dict):
+            continue
+        rows.append(
+            {
+                "folder_path": row.get("folder_path", ""),
+                "label": row.get("label", ""),
+                "top_family": row.get("top_family", ""),
+                "combined_rank_score": row.get("combined_rank_score", ""),
+                "brain_rank": row.get("brain_rank", ""),
+                "physics_rank": row.get("physics_rank", ""),
+            }
+        )
+    return rows
+
+
+def compact_shared_facts(facts_evidence: dict[str, Any]) -> dict[str, Any]:
+    """Return a compact manifest digest of shared facts.
+
+    The full debug packet can be huge. The CSV manifest should remain usable in
+    Numbers, Excel, and quick Python scripts. Full evidence is written to the
+    JSONL sidecar instead.
+    """
+    if not isinstance(facts_evidence, dict):
+        return {"debug_packet_sidecar": DEBUG_PACKET_SIDECAR_NAME}
+    digest: dict[str, Any] = {
+        "debug_packet_sidecar": DEBUG_PACKET_SIDECAR_NAME,
+        "measured_roles": facts_evidence.get("measured_roles", {}),
+        "shape_vote": facts_evidence.get("shape_vote", {}),
+        "parent_role_audit": compact_parent_role_audit(facts_evidence),
+        "audio_analysis_packet_summary": facts_evidence.get("audio_analysis_packet_summary", {}),
+        "audio_analysis_cache_stats": facts_evidence.get("audio_analysis_cache_stats", {}),
+        "wetness_score": (facts_evidence.get("wetness_profile", {}) or {}).get("wetness_score", "")
+        if isinstance(facts_evidence.get("wetness_profile", {}), dict)
+        else "",
+        "physics_vote_1": compact_top_guess(facts_evidence.get("physics_vote_result", {})),
+        "brain_ensemble_vote_1": compact_top_guess(facts_evidence.get("brain_ensemble_vote_result", {})),
+    }
+    for key in (
+        "harmonic_core_recall_enabled",
+        "harmonic_core_recall_reason",
+        "baby_brains_affect_product_vote",
+        "harmonic_brains_affect_product_vote",
+    ):
+        if key in facts_evidence:
+            digest[key] = facts_evidence[key]
+    return digest
+
+
+def write_debug_packets(path: Path, file_results: list[SortFileResult]) -> None:
+    """Write full per-file evidence packets to a JSONL sidecar."""
+    with path.open("w", encoding="utf-8") as handle:
+        for result in file_results:
+            payload = {
+                "source_path": str(result.source_path),
+                "placed_path": str(result.placed_path or ""),
+                "folder_path": result.decision.folder_path,
+                "consensus_status": result.decision.consensus_status,
+                "decision_reason": result.decision.reason,
+                "facts_evidence": result.facts.evidence,
+                "shared_candidates": result.decision.shared_candidates,
+            }
+            handle.write(json.dumps(payload, sort_keys=True, default=str) + "\n")
 
 
 def compact_top_guess(digest: dict[str, Any], index: int = 0) -> dict[str, Any]:
@@ -528,12 +632,25 @@ def manifest_row(result: SortFileResult) -> dict[str, str]:
         "shape_vote_json": json.dumps(shape_vote, sort_keys=True),
         **physics_subpanel_manifest_values(result.facts.evidence if isinstance(result.facts.evidence, dict) else {}),
         "physics_subpanels_json": json.dumps(
-            result.facts.evidence.get("physics_subpanels", {}) if isinstance(result.facts.evidence, dict) else {},
+            compact_physics_subpanels(result.facts.evidence if isinstance(result.facts.evidence, dict) else {}),
             sort_keys=True,
+            default=str,
         ),
-        "parent_role_audit_json": json.dumps(result.facts.evidence.get("parent_role_audit", {}), sort_keys=True),
-        "shared_facts_json": json.dumps(result.facts.evidence, sort_keys=True),
-        "shared_candidates_json": json.dumps(result.decision.shared_candidates[:10], sort_keys=True),
+        "parent_role_audit_json": json.dumps(
+            compact_parent_role_audit(result.facts.evidence if isinstance(result.facts.evidence, dict) else {}),
+            sort_keys=True,
+            default=str,
+        ),
+        "shared_facts_json": json.dumps(
+            compact_shared_facts(result.facts.evidence if isinstance(result.facts.evidence, dict) else {}),
+            sort_keys=True,
+            default=str,
+        ),
+        "shared_candidates_json": json.dumps(
+            compact_shared_candidates(result.decision.shared_candidates, limit=5),
+            sort_keys=True,
+            default=str,
+        ),
     }
 
 

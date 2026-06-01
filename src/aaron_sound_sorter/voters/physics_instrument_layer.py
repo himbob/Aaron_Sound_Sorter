@@ -146,6 +146,7 @@ class PhysicsInstrumentLayer:
         sub_keys_authority = safe_float(subpanel_flat.get("struck_keys_authority_score", sub_keys), sub_keys)
         sub_synth_tonal = safe_float(subpanel_flat.get("synth_tonal_source_score", 0.0), 0.0)
         sub_drum_loop_source = safe_float(subpanel_flat.get("drum_loop_source_score", 0.0), 0.0)
+        sub_rhythmic_break_loop = safe_float(subpanel_flat.get("rhythmic_break_loop_score", 0.0), 0.0)
         sub_fx_transition_authority = safe_float(
             subpanel_flat.get("fx_transition_authority_score", sub_fx_motion), sub_fx_motion
         )
@@ -1529,6 +1530,7 @@ class PhysicsInstrumentLayer:
             "instrument_subpanel_struck_keys_authority_score": round(float(sub_keys_authority), 6),
             "instrument_subpanel_synth_tonal_source_score": round(float(sub_synth_tonal), 6),
             "instrument_subpanel_drum_loop_source_score": round(float(sub_drum_loop_source), 6),
+            "instrument_subpanel_rhythmic_break_loop_score": round(float(sub_rhythmic_break_loop), 6),
             "instrument_subpanel_fx_transition_authority_score": round(float(sub_fx_transition_authority), 6),
             "instrument_subpanel_bowed_string_score": round(float(sub_bowed), 6),
             "instrument_subpanel_voice_score": round(float(sub_voice), 6),
