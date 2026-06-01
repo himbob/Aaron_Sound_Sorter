@@ -2,26 +2,40 @@
 set -euo pipefail
 
 # Aaron Sound Sorter bundle creator.
-# Default mode is an AI handoff bundle: code + tests + tools + commands + docs +
-# active root brain JSONs + small checked-in test audio fixtures.
-# Use CODE_ONLY=1 or EXCLUDE_BRAINS=1 when you explicitly need no brains.
-# Use INCLUDE_ACCEPTANCE_AUDIO=0 only when you intentionally do NOT want the
-# locked smoke/regression WAV fixtures. The default AI handoff bundle must be
-# runnable by another AI without Aaron adding the sample fixtures by hand.
-# By default this runs make clean-for-bundle first so old reports/runs/root ZIPs
-# do not get copied into AI handoff bundles. Use SKIP_CLEAN=1 to skip that step.
+#
+# Default mode:
+#   AI handoff bundle with code, tests, tools, commands, docs, active root brain
+#   JSONs, and every audio fixture that currently exists under tests/.
+#
+# Important:
+#   - Includes tests/acceptance/locked_smoke_v1/samples/*
+#   - Includes tests/regression_audio/* if that folder exists
+#   - Includes any tests/**/samples/* folder
+#   - Includes all real, non-symlink audio files under tests/
+#   - Does not follow or include symbolic-link files or folders
+#   - Does NOT fail just because tests/regression_audio is missing.
+#     Use REQUIRE_REGRESSION_AUDIO=1 if you want missing regression_audio to fail.
+#
+# Use CODE_ONLY=1 when you intentionally want no brains and no test audio.
+# Use INCLUDE_TEST_AUDIO=0 when you intentionally want no test audio.
+# Use REQUIRE_REGRESSION_AUDIO=1 when regression_audio must exist and be staged.
+# Use SKIP_CLEAN=1 to skip make clean-for-bundle.
 
 PROJECT_ROOT="${PROJECT_ROOT:-/Volumes/T9/testbed/Aaron_Sound_Sorter}"
 PROJECT_ROOT="$(cd "$PROJECT_ROOT" && pwd)"
 
 CODE_ONLY="${CODE_ONLY:-0}"
 EXCLUDE_BRAINS="${EXCLUDE_BRAINS:-0}"
-INCLUDE_ACCEPTANCE_AUDIO="${INCLUDE_ACCEPTANCE_AUDIO:-1}"
+INCLUDE_TEST_AUDIO="${INCLUDE_TEST_AUDIO:-1}"
+INCLUDE_ACCEPTANCE_AUDIO="${INCLUDE_ACCEPTANCE_AUDIO:-$INCLUDE_TEST_AUDIO}"
+REQUIRE_REGRESSION_AUDIO="${REQUIRE_REGRESSION_AUDIO:-0}"
 SKIP_CLEAN="${SKIP_CLEAN:-0}"
 
 if [[ "$CODE_ONLY" == "1" ]]; then
   EXCLUDE_BRAINS=1
+  INCLUDE_TEST_AUDIO=0
   INCLUDE_ACCEPTANCE_AUDIO=0
+  REQUIRE_REGRESSION_AUDIO=0
 fi
 
 MODE="AI_HANDOFF_WITH_BRAINS"
@@ -50,21 +64,30 @@ mkdir -p "$STAGED_PROJECT"
 
 RSYNC_ARGS=(
   -a
+  --no-links
   --delete
   --prune-empty-dirs
-
-  # Small checked-in test audio fixtures must be included before broad
-  # sample/audio excludes. rsync uses the first matching filter. If these rules
-  # come after samples/ or *.wav excludes, the bundle will include pytest files
-  # while silently dropping their WAV fixtures.
 )
 
-if [[ "$INCLUDE_ACCEPTANCE_AUDIO" == "1" ]]; then
+# These include rules must come before the broad samples/ and *.wav excludes.
+# rsync uses the first matching rule.
+if [[ "$INCLUDE_TEST_AUDIO" == "1" ]]; then
   RSYNC_ARGS+=(
-    --include='/tests/acceptance/locked_smoke_v1/samples/'
-    --include='/tests/acceptance/locked_smoke_v1/samples/***'
+    --include='/tests/'
+    --include='/tests/**/'
+    --include='/tests/**/samples/'
+    --include='/tests/**/samples/***'
     --include='/tests/regression_audio/'
     --include='/tests/regression_audio/***'
+    --include='/tests/**/*.wav'
+    --include='/tests/**/*.aif'
+    --include='/tests/**/*.aiff'
+    --include='/tests/**/*.flac'
+    --include='/tests/**/*.ogg'
+    --include='/tests/**/*.mp3'
+    --include='/tests/**/*.m4a'
+    --include='/tests/**/*.aac'
+    --include='/tests/**/*.au'
   )
 fi
 
@@ -107,8 +130,7 @@ RSYNC_ARGS+=(
   --exclude='source_cache/'
   --exclude='**/source_cache/'
 
-  # Huge data/training/sample roots. The locked smoke panel samples were already
-  # included above and therefore survive these broad excludes.
+  # Huge data/training/sample roots.
   --exclude='training/'
   --exclude='_training_data/'
   --exclude='Sorted samples/'
@@ -136,8 +158,7 @@ RSYNC_ARGS+=(
   --exclude='/Aaron_Sorted_Sounds_manifest.csv'
   --exclude='/Aaron_Sorted_Sounds_summary.txt'
 
-  # General audio files are excluded outside the small checked-in test
-  # fixture folders included above.
+  # General audio files are excluded outside tests/ audio includes above.
   --exclude='**/*.wav'
   --exclude='**/*.aif'
   --exclude='**/*.aiff'
@@ -169,15 +190,81 @@ RSYNC_ARGS+=(
 
 rsync "${RSYNC_ARGS[@]}" "$PROJECT_ROOT/" "$STAGED_PROJECT/"
 
+# Belt-and-suspenders: make sure no symbolic links are left in staging.
+find "$STAGED_PROJECT" -type l -delete
+
 # Clean macOS metadata in staging before zipping.
 find "$STAGED_PROJECT" -name '._*' -type f -delete
 find "$STAGED_PROJECT" -name '.DS_Store' -type f -delete
+
+AUDIO_EXTS_PY="{'.wav', '.aif', '.aiff', '.flac', '.ogg', '.au', '.mp3', '.m4a', '.aac'}"
 
 ACCEPTANCE_EXPECTED="$STAGED_PROJECT/tests/acceptance/locked_smoke_v1/expected_results.json"
 ACCEPTANCE_SAMPLES="$STAGED_PROJECT/tests/acceptance/locked_smoke_v1/samples"
 ACCEPTANCE_FIXTURE_COUNT="0"
 ACCEPTANCE_EXPECTED_COUNT="0"
 ACCEPTANCE_MISSING_COUNT="0"
+
+TEST_AUDIO_SOURCE_COUNT="0"
+TEST_AUDIO_STAGED_COUNT="0"
+TEST_AUDIO_MISSING_COUNT="0"
+REGRESSION_AUDIO_SOURCE_COUNT="0"
+REGRESSION_AUDIO_STAGED_COUNT="0"
+REGRESSION_AUDIO_MISSING_COUNT="0"
+REGRESSION_AUDIO_STATUS="not_required"
+
+if [[ "$INCLUDE_TEST_AUDIO" == "1" ]]; then
+  TEST_AUDIO_VALIDATION_OUTPUT="$(python3 - "$PROJECT_ROOT/tests" "$STAGED_PROJECT/tests" <<'PY'
+import sys
+from pathlib import Path
+
+source_tests = Path(sys.argv[1])
+staged_tests = Path(sys.argv[2])
+exts = {'.wav', '.aif', '.aiff', '.flac', '.ogg', '.au', '.mp3', '.m4a', '.aac'}
+
+source_audio = []
+if source_tests.exists():
+    source_audio = sorted(
+        path.relative_to(source_tests)
+        for path in source_tests.rglob('*')
+        if path.is_file()
+        and not path.is_symlink()
+        and path.suffix.lower() in exts
+    )
+
+staged_audio = []
+if staged_tests.exists():
+    staged_audio = sorted(
+        path.relative_to(staged_tests)
+        for path in staged_tests.rglob('*')
+        if path.is_file()
+        and not path.is_symlink()
+        and path.suffix.lower() in exts
+    )
+
+missing = [rel for rel in source_audio if not (staged_tests / rel).exists()]
+
+print(f"test_audio_source={len(source_audio)}")
+print(f"test_audio_staged={len(staged_audio)}")
+print(f"test_audio_missing={len(missing)}")
+
+if missing:
+    print("missing_files=" + "|".join(str(item) for item in missing[:100]))
+    raise SystemExit(11)
+PY
+)" || {
+    status=$?
+    echo "$TEST_AUDIO_VALIDATION_OUTPUT"
+    echo
+    echo "ERROR: Bundle would be incomplete. Some audio files under tests/ were not staged." >&2
+    exit "$status"
+  }
+
+  echo "$TEST_AUDIO_VALIDATION_OUTPUT"
+  TEST_AUDIO_SOURCE_COUNT="$(echo "$TEST_AUDIO_VALIDATION_OUTPUT" | awk -F= '/^test_audio_source=/{print $2}')"
+  TEST_AUDIO_STAGED_COUNT="$(echo "$TEST_AUDIO_VALIDATION_OUTPUT" | awk -F= '/^test_audio_staged=/{print $2}')"
+  TEST_AUDIO_MISSING_COUNT="$(echo "$TEST_AUDIO_VALIDATION_OUTPUT" | awk -F= '/^test_audio_missing=/{print $2}')"
+fi
 
 if [[ "$INCLUDE_ACCEPTANCE_AUDIO" == "1" && -f "$ACCEPTANCE_EXPECTED" ]]; then
   VALIDATION_OUTPUT="$(python3 - "$ACCEPTANCE_EXPECTED" "$ACCEPTANCE_SAMPLES" <<'PY'
@@ -198,7 +285,11 @@ missing = [name for name in filenames if not (samples_dir / name).exists()]
 actual_audio = []
 if samples_dir.exists():
     for path in samples_dir.iterdir():
-        if path.is_file() and path.suffix.lower() in {'.wav', '.aif', '.aiff', '.flac', '.ogg', '.au'}:
+        if (
+            path.is_file()
+            and not path.is_symlink()
+            and path.suffix.lower() in {'.wav', '.aif', '.aiff', '.flac', '.ogg', '.au'}
+        ):
             actual_audio.append(path.name)
 print(f"expected={len(filenames)}")
 print(f"actual={len(actual_audio)}")
@@ -213,7 +304,7 @@ PY
     if [[ "$status" == "12" ]]; then
       echo
       echo "ERROR: Bundle would be incomplete. expected_results.json references locked smoke samples that were not staged." >&2
-      echo "Fix the source tests/acceptance/locked_smoke_v1/samples folder or run INCLUDE_ACCEPTANCE_AUDIO=0 only for non-acceptance code bundles." >&2
+      echo "Fix the source tests/acceptance/locked_smoke_v1/samples folder or run INCLUDE_TEST_AUDIO=0 only for non-acceptance code bundles." >&2
     fi
     exit "$status"
   }
@@ -225,6 +316,77 @@ elif [[ "$INCLUDE_ACCEPTANCE_AUDIO" == "1" && ! -f "$ACCEPTANCE_EXPECTED" ]]; th
   echo "Warning: INCLUDE_ACCEPTANCE_AUDIO=1 but no locked smoke expected_results.json was found in staged project."
 fi
 
+if [[ "$INCLUDE_TEST_AUDIO" == "1" ]]; then
+  REGRESSION_AUDIO_SOURCE="$PROJECT_ROOT/tests/regression_audio"
+  REGRESSION_AUDIO_STAGED="$STAGED_PROJECT/tests/regression_audio"
+
+  REGRESSION_VALIDATION_OUTPUT="$(python3 - "$REGRESSION_AUDIO_SOURCE" "$REGRESSION_AUDIO_STAGED" "$REQUIRE_REGRESSION_AUDIO" <<'PY'
+import sys
+from pathlib import Path
+
+source_dir = Path(sys.argv[1])
+staged_dir = Path(sys.argv[2])
+required = sys.argv[3] == "1"
+exts = {".wav", ".aif", ".aiff", ".flac", ".ogg", ".au", ".mp3", ".m4a", ".aac"}
+
+if not source_dir.exists():
+    print("regression_source=0")
+    print("regression_staged=0")
+    print("regression_missing=0")
+    print("regression_status=source_folder_missing")
+    if required:
+        raise SystemExit(14)
+    raise SystemExit(0)
+
+source_audio = sorted(
+    path.relative_to(source_dir)
+    for path in source_dir.rglob("*")
+    if path.is_file()
+    and not path.is_symlink()
+    and path.suffix.lower() in exts
+)
+
+staged_audio = []
+if staged_dir.exists():
+    staged_audio = sorted(
+        path.relative_to(staged_dir)
+        for path in staged_dir.rglob("*")
+        if path.is_file()
+        and not path.is_symlink()
+        and path.suffix.lower() in exts
+    )
+
+missing = [rel for rel in source_audio if not (staged_dir / rel).exists()]
+
+print(f"regression_source={len(source_audio)}")
+print(f"regression_staged={len(staged_audio)}")
+print(f"regression_missing={len(missing)}")
+print("regression_status=ok" if not missing else "regression_status=missing_files")
+
+if required and not source_audio:
+    print("missing_files=tests/regression_audio exists but contains no audio fixtures")
+    raise SystemExit(15)
+
+if missing:
+    print("missing_files=" + "|".join(str(item) for item in missing[:100]))
+    raise SystemExit(13)
+PY
+)" || {
+    status=$?
+    echo "$REGRESSION_VALIDATION_OUTPUT"
+    echo
+    echo "ERROR: Bundle would be incomplete. tests/regression_audio is required but missing or not fully staged." >&2
+    echo "Either restore tests/regression_audio or run without REQUIRE_REGRESSION_AUDIO=1." >&2
+    exit "$status"
+  }
+
+  echo "$REGRESSION_VALIDATION_OUTPUT"
+  REGRESSION_AUDIO_SOURCE_COUNT="$(echo "$REGRESSION_VALIDATION_OUTPUT" | awk -F= '/^regression_source=/{print $2}')"
+  REGRESSION_AUDIO_STAGED_COUNT="$(echo "$REGRESSION_VALIDATION_OUTPUT" | awk -F= '/^regression_staged=/{print $2}')"
+  REGRESSION_AUDIO_MISSING_COUNT="$(echo "$REGRESSION_VALIDATION_OUTPUT" | awk -F= '/^regression_missing=/{print $2}')"
+  REGRESSION_AUDIO_STATUS="$(echo "$REGRESSION_VALIDATION_OUTPUT" | awk -F= '/^regression_status=/{print $2}')"
+fi
+
 # Write bundle metadata inside the bundle so the receiving AI knows what it got.
 cat > "$STAGED_PROJECT/BUNDLE_CONTENTS_README.txt" <<META
 Aaron Sound Sorter bundle
@@ -232,10 +394,18 @@ Created: $(date)
 Mode: $MODE
 Project root source: $PROJECT_ROOT
 Includes active root brain JSONs: $([[ "$EXCLUDE_BRAINS" == "1" ]] && echo no || echo yes)
-Includes locked smoke/regression audio fixtures: $INCLUDE_ACCEPTANCE_AUDIO
+Includes test audio fixtures: $INCLUDE_TEST_AUDIO
 Locked smoke expected cases: $ACCEPTANCE_EXPECTED_COUNT
 Locked smoke audio fixtures included: $ACCEPTANCE_FIXTURE_COUNT
 Locked smoke missing fixtures: $ACCEPTANCE_MISSING_COUNT
+All non-symlink test audio source fixtures: $TEST_AUDIO_SOURCE_COUNT
+All non-symlink test audio fixtures included: $TEST_AUDIO_STAGED_COUNT
+All test audio missing fixtures: $TEST_AUDIO_MISSING_COUNT
+Regression non-symlink audio source fixtures: $REGRESSION_AUDIO_SOURCE_COUNT
+Regression non-symlink audio fixtures included: $REGRESSION_AUDIO_STAGED_COUNT
+Regression audio missing fixtures: $REGRESSION_AUDIO_MISSING_COUNT
+Regression audio status: $REGRESSION_AUDIO_STATUS
+Regression audio required: $REQUIRE_REGRESSION_AUDIO
 Cleaned before bundling: $([[ "$SKIP_CLEAN" == "1" ]] && echo no || echo yes)
 
 Required first read:
@@ -243,7 +413,7 @@ Required first read:
 
 Default purpose:
 - AI handoff bundle for code review, QA tooling, and architecture work.
-- Includes code, tests, commands, tools, docs, active root brain JSONs, and small QA fixtures.
+- Includes code, tests, commands, tools, docs, active root brain JSONs, and real non-symlink test audio fixtures that exist under tests/.
 - A receiving AI must be able to run ./commands/quality/RUN_LOCKED_SMOKE_ACCEPTANCE.command without Aaron separately adding fixtures.
 
 Excluded by design:
@@ -254,7 +424,8 @@ Excluded by design:
 - virtual environments
 - git metadata
 - large archives
-- general audio files outside checked-in test fixture folders
+- symbolic-link files and folders
+- general audio files outside tests/
 META
 
 cd "$STAGE_DIR"
@@ -271,20 +442,28 @@ $ZIP_OUT
 
 Mode: $MODE
 Includes root active brain JSONs: $([[ "$EXCLUDE_BRAINS" == "1" ]] && echo no || echo yes)
-Includes locked acceptance/regression audio fixtures: $INCLUDE_ACCEPTANCE_AUDIO
+Includes test audio fixtures: $INCLUDE_TEST_AUDIO
 Locked smoke expected cases: $ACCEPTANCE_EXPECTED_COUNT
 Locked smoke audio fixtures included: $ACCEPTANCE_FIXTURE_COUNT
 Locked smoke missing fixtures: $ACCEPTANCE_MISSING_COUNT
+All non-symlink test audio source fixtures: $TEST_AUDIO_SOURCE_COUNT
+All non-symlink test audio fixtures included: $TEST_AUDIO_STAGED_COUNT
+All test audio missing fixtures: $TEST_AUDIO_MISSING_COUNT
+Regression non-symlink audio source fixtures: $REGRESSION_AUDIO_SOURCE_COUNT
+Regression non-symlink audio fixtures included: $REGRESSION_AUDIO_STAGED_COUNT
+Regression audio missing fixtures: $REGRESSION_AUDIO_MISSING_COUNT
+Regression audio status: $REGRESSION_AUDIO_STATUS
 
 When extracted, it creates:
   Aaron_Sound_Sorter/
 
 Useful commands:
-  ./commands/bundle/bundle.sh                         # AI handoff, includes brains, smoke fixtures, cleans first
-  SKIP_CLEAN=1 ./commands/bundle/bundle.sh            # AI handoff, skip clean-for-bundle
-  CODE_ONLY=1 ./commands/bundle/bundle.sh             # source-only, excludes root brains and acceptance audio
-  EXCLUDE_BRAINS=1 ./commands/bundle/bundle.sh        # excludes root brains but keeps acceptance audio unless CODE_ONLY=1
-  INCLUDE_ACCEPTANCE_AUDIO=0 ./commands/bundle/bundle.sh   # excludes locked smoke and regression audio fixtures
+  ./commands/bundle/bundle.sh                              # AI handoff, includes brains, current test audio, cleans first
+  SKIP_CLEAN=1 ./commands/bundle/bundle.sh                 # AI handoff, skip clean-for-bundle
+  CODE_ONLY=1 ./commands/bundle/bundle.sh                  # source-only, excludes root brains and test audio
+  EXCLUDE_BRAINS=1 ./commands/bundle/bundle.sh             # excludes root brains but keeps test audio unless CODE_ONLY=1
+  INCLUDE_TEST_AUDIO=0 ./commands/bundle/bundle.sh         # excludes all test audio fixtures
+  REQUIRE_REGRESSION_AUDIO=1 ./commands/bundle/bundle.sh   # fails if tests/regression_audio is missing or incomplete
 
 DONE
 

@@ -118,6 +118,35 @@ class PhysicsTopFamilyLayer:
                     "physics_top_layer_instrument_role": round(float(instrument_role), 6),
                 },
             )
+        parent_protected_instrument = bool(
+            parent_role_name in {
+                "pitched_music_loop",
+                "pitched_music_phrase",
+                "bass_loop",
+                "vocal_music_phrase",
+            }
+            and "Instruments" in allowed
+            and "Drums" not in allowed
+            and instrument_anchor >= 0.64
+            and instrument_branch_confidence >= 0.50
+        )
+        if parent_protected_instrument:
+            return (
+                "Instruments",
+                max(instrument_anchor, instrument_branch_confidence, instrument_role),
+                {
+                    **drum_evidence,
+                    **instrument_evidence,
+                    **fx_evidence,
+                    "physics_top_layer_source": "parent_protected_instrument_measurement",
+                    "physics_top_layer_parent_role": parent_role_name,
+                    "physics_top_layer_instrument_branch": instrument_branch,
+                    "physics_top_layer_instrument_branch_confidence": round(float(instrument_branch_confidence), 6),
+                    "physics_top_layer_instrument_anchor": round(float(instrument_anchor), 6),
+                    "physics_top_layer_drum_anchor": round(float(drum_anchor), 6),
+                    "physics_top_layer_instrument_role": round(float(instrument_role), 6),
+                },
+            )
         strong_measured_impact_fx = bool(
             fx_branch == "ImpactHit"
             and fx_confidence >= 0.77
@@ -167,6 +196,60 @@ class PhysicsTopFamilyLayer:
                     "physics_top_layer_fx_branch_confidence": round(float(fx_confidence), 6),
                     "physics_top_layer_drum_anchor": round(float(drum_anchor), 6),
                     "physics_top_layer_instrument_anchor": round(float(instrument_anchor), 6),
+                    "physics_top_layer_shape": shape_name,
+                    "physics_top_layer_shape_confidence": round(float(shape_confidence), 6),
+                },
+            )
+        bass_loop_branch_guard = bool(
+            instrument_branch == "Bass"
+            and instrument_branch_confidence >= 0.62
+            and role_value(roles, "bass_loop") >= 0.50
+            and instrument_role >= 0.65
+            and loop_percussive <= 0.08
+            and safe_float(instrument_evidence.get("instrument_subpanel_drum_loop_source_score", 0.0), 0.0) <= 0.36
+        )
+        if bass_loop_branch_guard:
+            return (
+                "Instruments",
+                max(instrument_anchor, instrument_branch_confidence, instrument_role),
+                {
+                    **drum_evidence,
+                    **instrument_evidence,
+                    **fx_evidence,
+                    "physics_top_layer_source": "bass_loop_branch_guard",
+                    "physics_top_layer_instrument_branch": instrument_branch,
+                    "physics_top_layer_instrument_branch_confidence": round(float(instrument_branch_confidence), 6),
+                    "physics_top_layer_instrument_anchor": round(float(instrument_anchor), 6),
+                    "physics_top_layer_drum_anchor": round(float(drum_anchor), 6),
+                    "physics_top_layer_bass_loop_role": round(float(role_value(roles, "bass_loop")), 6),
+                },
+            )
+        nonpercussive_pitched_loop_guard = bool(
+            instrument_role >= 0.75
+            and role_value(roles, "pitched_music_loop") >= 0.78
+            and shape_name in {"bass_phrase", "repeated_phrase_loop", "pitched_phrase", "pitched_phrase_shape", "sustained_pad"}
+            and shape_confidence >= 0.78
+            and number(shape, "pitched_event_ratio", 0.0) >= 0.90
+            and number(shape, "pitch_confidence", 0.0) >= 0.55
+            and loop_percussive <= 0.06
+            and number(shape, "percussive_event_ratio", 0.0) <= 0.08
+            and number(shape, "drumlike_frame_ratio", 0.0) <= 0.08
+            and safe_float(instrument_evidence.get("instrument_branch_Voice", 0.0), 0.0) <= 0.42
+        )
+        if nonpercussive_pitched_loop_guard:
+            return (
+                "Instruments",
+                max(instrument_anchor, instrument_branch_confidence, instrument_role),
+                {
+                    **drum_evidence,
+                    **instrument_evidence,
+                    **fx_evidence,
+                    "physics_top_layer_source": "nonpercussive_pitched_loop_guard",
+                    "physics_top_layer_instrument_branch": instrument_branch,
+                    "physics_top_layer_instrument_branch_confidence": round(float(instrument_branch_confidence), 6),
+                    "physics_top_layer_instrument_anchor": round(float(instrument_anchor), 6),
+                    "physics_top_layer_drum_anchor": round(float(drum_anchor), 6),
+                    "physics_top_layer_pitched_music_loop_role": round(float(role_value(roles, "pitched_music_loop")), 6),
                     "physics_top_layer_shape": shape_name,
                     "physics_top_layer_shape_confidence": round(float(shape_confidence), 6),
                 },
@@ -226,8 +309,17 @@ class PhysicsTopFamilyLayer:
         rhythmic_break_loop = safe_float(
             instrument_evidence.get("instrument_subpanel_rhythmic_break_loop_score", 0.0), 0.0
         )
+        voice_loop_protection = bool(
+            instrument_branch == "Voice"
+            and instrument_branch_confidence >= 0.64
+            and instrument_anchor >= drum_anchor + 0.08
+            and loop_percussive <= 0.12
+            and drum_role <= 0.18
+            and low_drum_role <= 0.20
+        )
         measured_drum_loop_source = bool(
-            (
+            not voice_loop_protection
+            and (
                 drum_loop_source >= 0.50
                 or (
                     drum_loop_source >= 0.30

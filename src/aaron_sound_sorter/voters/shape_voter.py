@@ -496,7 +496,15 @@ def classify_shape(values: Mapping[str, float], *, facts: SharedAudioFacts) -> S
     # fired.  Repeated fast-attacked low/high event streams are structural drum
     # loops at the shape layer; slower attacked multi-instrument loops remain
     # pitched or mixed musical phrases.
-    if rhythmic_break_loop >= 0.62 and true_repetition >= 0.62 and onset_count >= 6.0:
+    rhythmic_break_has_drum_body = bool(
+        max(percussive, drumlike) >= 0.52
+        or (high_event >= 0.42 and high_total >= 0.18)
+        or (
+            low_event >= 0.62
+            and (max(percussive, drumlike) >= 0.18 or pulse_regularity >= 0.38)
+        )
+    )
+    if rhythmic_break_loop >= 0.62 and true_repetition >= 0.62 and onset_count >= 6.0 and rhythmic_break_has_drum_body:
         preferred_drum_shape = "top_loop" if high_event >= 0.42 and high_total >= 0.18 else "beat_loop"
         strongest_transition = max(scores.get("transition_riser", 0.0), scores.get("transition_drop", 0.0))
         scores[preferred_drum_shape] = max(

@@ -114,6 +114,21 @@ def measured_roles_from_features(
             inverse_ramp(high_total, 0.015, 0.10),
             ramp(pitch_confidence, 0.45, 0.88),
         )
+
+        # Do not let the low-pulse drum-loop fallback swallow clean bass lines.
+        # A repeated bass phrase can be very low, sharply articulated, and highly
+        # pitched while still having no drumlike/percussive frames.  The drum-loop
+        # reading should require event/body evidence, or it should back off and
+        # let the bass/pitched-loop roles compete normally.
+        tonal_bass_line_veto = average_strength(
+            ramp(loop_pitched, 0.72, 0.96),
+            ramp(loop_sustained, 0.45, 0.72),
+            ramp(loop_non_event_tonal, 0.42, 0.72),
+            inverse_ramp(loop_percussive, 0.02, 0.18),
+            inverse_ramp(loop_drumlike, 0.02, 0.18),
+        )
+        low_pulse_loop *= 1.0 - 0.82 * ramp(tonal_bass_line_veto, 0.50, 0.88)
+
         low_rhythmic_drum_loop = max(
             low_rhythmic_drum_loop,
             low_pulse_loop * ramp(low_total, 0.70, 0.90),

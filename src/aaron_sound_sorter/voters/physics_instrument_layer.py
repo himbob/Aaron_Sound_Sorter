@@ -1347,8 +1347,22 @@ class PhysicsInstrumentLayer:
         organ_panel_authority = bool(
             keys_sub == "Organ" and keys_sub_score >= 0.76 and keys_sub_margin >= 0.10 and not woodwind_source_signal
         )
+        strong_electric_keys_panel_source = bool(
+            keys_sub == "ElectricPiano"
+            and keys_sub_score >= 0.86
+            and keys_sub_margin >= 0.08
+            and shape_name in {"pitched_phrase", "pitched_phrase_shape", "solo_phrase", "repeated_phrase_loop", "sustained_pad"}
+            and shape_confidence >= 0.80
+            and loop_pitched >= 0.82
+            and event_mid >= 0.55
+            and event_high <= 0.24
+            and flatness <= 0.16
+            and max(percussive_loop, drumlike_loop) <= 0.12
+            and not woodwind_source_signal
+        )
         clean_electric_keys_loop_source = bool(
             electric_keys_panel_source
+            or strong_electric_keys_panel_source
             or (
                 keys_sub == "ElectricPiano"
                 and keys_sub_score >= 0.74
@@ -1421,13 +1435,23 @@ class PhysicsInstrumentLayer:
         ):
             nearest = max(branch_scores[b] for b in ("Woodwinds", "Brass", "Synth", "KeysPiano"))
             branch_scores["Strings"] = max(branch_scores["Strings"], min(0.95, nearest + 0.016))
+        clear_metallic_pitched_hit = bool(
+            mallet_sub_score >= 0.70
+            and max(inharmonicity, strike_inharmonic, settle_inharmonic) >= 0.55
+            and pitch_strength >= 0.55
+            and event_count <= 4.0
+            and max(percussive_loop, drumlike_loop) <= 0.12
+        )
         if (
-            mallet_sub_score >= 0.78
+            (mallet_sub_score >= 0.78 or clear_metallic_pitched_hit)
             and max(inharmonicity, strike_inharmonic, settle_inharmonic) >= 0.25
             and not clean_electric_keys_loop_source
         ):
             nearest = max(branch_scores[b] for b in ("KeysPiano", "PluckedString", "Strings", "Synth", "Woodwinds"))
-            branch_scores["MalletBell"] = max(branch_scores["MalletBell"], min(0.94, nearest + 0.018))
+            lift_margin = 0.032 if clear_metallic_pitched_hit else 0.018
+            branch_scores["MalletBell"] = max(branch_scores["MalletBell"], min(0.94, nearest + lift_margin))
+            if clear_metallic_pitched_hit and not bool(compound["compound_music_prefer_broad_loop"]):
+                branch_scores["MixedInstrument"] = min(branch_scores["MixedInstrument"], branch_scores["MalletBell"] - 0.030)
         if plucked_string_source_signal and not reed_woodwind_source_signal:
             nearest = max(
                 branch_scores[b] for b in ("KeysPiano", "Strings", "Synth", "Woodwinds", "MalletBell", "Bass")
