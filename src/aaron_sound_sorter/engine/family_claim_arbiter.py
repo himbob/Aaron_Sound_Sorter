@@ -850,6 +850,17 @@ class FamilyClaimArbiter:
         except Exception:
             return default
 
+    @staticmethod
+    def _safe_number(value: object, default: float = 0.0) -> float:
+        """Return a numeric debug/score value without crashing arbitration.
+
+        This is intentionally the same coercion policy as _safe_float. Some
+        arbiter branches read optional debug packet fields that may be missing,
+        None, empty strings, or non-numeric strings. Those fields should behave
+        like the provided default, not crash pytest collection or sorting.
+        """
+        return FamilyClaimArbiter._safe_float(value, default)
+
     def _release_shape_review_to_broad_bucket(
         self,
         winning_claim: ConsensusClaim,
