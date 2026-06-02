@@ -81,6 +81,7 @@ def measured_roles_from_features(
     loop_balance = value(feature_values, "loop_tonal_to_percussive_balance")
     loop_sustained = value(feature_values, "loop_sustained_tonal_frame_ratio")
     loop_non_event_tonal = value(feature_values, "loop_non_event_tonal_ratio")
+    low_peak_hz = value(feature_values, "low_peak_frequency_hz")
 
     low_total = min(1.0, sub + bass)
     high_total = min(1.0, presence + air)
@@ -127,6 +128,17 @@ def measured_roles_from_features(
             inverse_ramp(loop_percussive, 0.02, 0.18),
             inverse_ramp(loop_drumlike, 0.02, 0.18),
         )
+        # Only a *voiced* sustained tonal line should veto the low-pulse
+        # drum-loop reading. Repeated tonal kick loops often have high pitch
+        # confidence from autocorrelation, but low voiced-frame ratio and very
+        # fast low-frequency attacks. Without this distinction, a kick-loop can
+        # be misread as a clean bass line before the arbiter ever sees it.
+        voiced_tonal_line_gate = average_strength(
+            ramp(f0_voiced, 0.34, 0.72),
+            inverse_ramp(attack_rise, 0.055, 0.16),
+            inverse_ramp(log_transients, 2.40, 3.35),
+        )
+        tonal_bass_line_veto *= voiced_tonal_line_gate
         low_pulse_loop *= 1.0 - 0.82 * ramp(tonal_bass_line_veto, 0.50, 0.88)
 
         low_rhythmic_drum_loop = max(
@@ -239,6 +251,33 @@ def measured_roles_from_features(
             inverse_ramp(loop_drumlike, 0.03, 0.25),
             inverse_ramp(high_total, 0.08, 0.35),
         )
+    clean_pitched_hit = 0.0
+    if is_single_event_like or is_short_hit_like:
+        # A short chord, synth stab, electric-piano hit, or key stab can be
+        # front-loaded like a drum while still being clean pitched material.
+        # Single-F0 confidence is often weak on chords, so use the frame-shape
+        # evidence that already separates pitched/tonal frames from
+        # percussive/drumlike frames. This is a measured role guard, not a
+        # source-name or category rule.
+        clean_tonal_body = average_strength(
+            ramp(loop_pitched, 0.70, 0.96),
+            ramp(loop_sustained, 0.70, 0.96),
+            ramp(loop_non_event_tonal, 0.70, 0.96),
+            inverse_ramp(max(loop_percussive, loop_drumlike), 0.02, 0.16),
+            inverse_ramp(flatness, 0.04, 0.20),
+            inverse_ramp(high_total, 0.02, 0.18),
+            ramp(attack_rise, 0.045, 0.16),
+        )
+        sub_kick_exception = (
+            sub >= 0.18
+            and (0.0 < low_peak_hz <= 150.0 or low_total >= 0.90)
+            and high_total <= 0.16
+            and f0_voiced <= 0.32
+        )
+        clean_pitched_hit = clean_tonal_body * (0.0 if sub_kick_exception else 1.0)
+        if clean_pitched_hit >= 0.55:
+            pitched_music_phrase = max(pitched_music_phrase, clean_pitched_hit * 0.90)
+
     if phrase_long_enough and pitch_confidence >= 0.45 and f0_voiced >= 0.55 and formant >= 1.05:
         # Sung/rap vocal phrases share the general pitched-phrase shape with
         # sax, reeds, piano, and synth leads.  Formant-like spacing alone is not
@@ -289,8 +328,12 @@ def measured_roles_from_features(
         raw_percussive_one_shot = max(raw_percussive_one_shot, metallic_percussive_hit)
         tonal_phrase_suppression = ramp(pitched_music_phrase, 0.45, 0.85)
         voice_suppression = ramp(voiced_one_shot, 0.55, 0.85)
+        clean_pitched_hit_suppression = ramp(clean_pitched_hit, 0.45, 0.82)
         percussive_one_shot = (
-            raw_percussive_one_shot * (1.0 - 0.85 * tonal_phrase_suppression) * (1.0 - 0.70 * voice_suppression)
+            raw_percussive_one_shot
+            * (1.0 - 0.85 * tonal_phrase_suppression)
+            * (1.0 - 0.70 * voice_suppression)
+            * (1.0 - 0.90 * clean_pitched_hit_suppression)
         )
         low_pitched_hit = average_strength(
             1.0 if is_single_event_like else 0.55,
@@ -301,6 +344,7 @@ def measured_roles_from_features(
             inverse_ramp(high_total, 0.05, 0.30),
             inverse_ramp(f0_voiced, 0.08, 0.42),
         )
+        low_pitched_hit *= 1.0 - 0.95 * clean_pitched_hit_suppression
         percussive_one_shot = max(percussive_one_shot, low_pitched_hit * (1.0 - 0.90 * voice_suppression))
 
     bright_drum_loop = 0.0
@@ -355,6 +399,8 @@ def measured_roles_from_features(
         "loop_sustained_tonal_frame_ratio": round(loop_sustained, 6),
         "loop_non_event_tonal_ratio": round(loop_non_event_tonal, 6),
         "pitched_music_phrase_raw": round(pitched_music_phrase, 6),
+        "clean_pitched_hit_raw": round(clean_pitched_hit, 6),
+        "low_peak_frequency_hz": round(low_peak_hz, 6),
         "low_rhythmic_drum_loop_raw": round(low_rhythmic_drum_loop, 6),
         "vocal_music_phrase_raw": round(vocal_music_phrase, 6),
         "low_pitched_hit_raw": round(low_pitched_hit, 6),

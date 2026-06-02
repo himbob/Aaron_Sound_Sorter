@@ -1105,3 +1105,215 @@ def test_clean_synth_loop_with_incidental_sax_candidate_routes_synth_not_piano_o
 
     assert final.folder_path == "Instruments/Synths/Synth Lead/Loops"
     assert final.consensus_status == "final_measured_synth_loop_invariant"
+
+
+def test_synth_panel_can_correct_weak_sax_leaf_without_filename_evidence() -> None:
+    """Strong synth physics can replace a sax leaf when reed authority is weak."""
+    raw = raw_claim(
+        "Instruments/Woodwinds/Saxophone/Loops",
+        score=8.0,
+        shared=[
+            shared_row("Instruments/Synths/Synth Lead/One Shots", 12.0, brain_rank=2, physics_rank=9),
+            shared_row("Instruments/Woodwinds/Saxophone/Loops", 8.0, brain_rank=5, physics_rank=3),
+        ],
+    )
+    measured = facts(
+        "pitched_phrase",
+        0.98,
+        role="pitched_music_loop",
+        shape_metrics={
+            "low_event_ratio": 0.02,
+            "mid_event_ratio": 0.84,
+            "high_event_ratio": 0.12,
+            "spectral_flatness_mean": 0.14,
+            "spectral_entropy_mean": 0.46,
+            "pitch_confidence": 0.86,
+            "f0_voiced_ratio": 1.0,
+            "pitched_event_ratio": 1.0,
+            "sustained_tonal_frame_ratio": 1.0,
+            "percussive_event_ratio": 0.0,
+            "drumlike_frame_ratio": 0.0,
+        },
+    )
+    measured.evidence["physics_subpanels"] = {
+        "flat": {
+            "synth_lead_score": 0.84,
+            "synth_chord_score": 0.64,
+            "synth_tonal_source_score": 0.62,
+            "woodwind_sax_score": 0.69,
+            "reed_wind_score": 0.56,
+            "reed_wind_authority_score": 0.41,
+        }
+    }
+
+    final = DecisionCoreV2().arbiter.adjudicate(
+        raw_claim=raw,
+        consensus_claims=[],
+        eligibility_claims=[],
+        facts=measured,
+    )
+
+    assert final.folder_path == "Instruments/Synths/Synth Lead/Loops"
+    assert final.consensus_status in {
+        "final_false_sax_leaf_synth_loop_invariant",
+        "final_measured_synth_loop_invariant",
+    }
+
+
+def test_tonal_repeated_phrase_does_not_gain_drum_loop_protection() -> None:
+    """Repeated pitched phrases need drum body before the drum-loop invariant wins."""
+    raw = raw_claim("Instruments/Instrument Loops/Loops", score=8.0)
+    measured = facts(
+        "repeated_phrase_loop",
+        0.86,
+        role="pitched_music_loop",
+        role_strengths={"pitched_music_loop": 0.88, "drum_loop": 0.24},
+        shape_metrics={
+            "low_event_ratio": 0.20,
+            "mid_event_ratio": 0.72,
+            "high_event_ratio": 0.08,
+            "spectral_flatness_mean": 0.40,
+            "spectral_entropy_mean": 0.46,
+            "pitch_confidence": 0.80,
+            "pitched_event_ratio": 1.0,
+            "sustained_tonal_frame_ratio": 0.71,
+            "non_event_tonal_ratio": 0.62,
+            "percussive_event_ratio": 0.0,
+            "drumlike_frame_ratio": 0.13,
+            "onset_count": 16.0,
+            "true_repetition_score": 0.72,
+            "pulse_regularity": 0.30,
+        },
+    )
+    measured.evidence["physics_subpanels"] = {
+        "flat": {
+            "onset_pitched_onset_score": 0.57,
+            "onset_percussive_onset_score": 0.39,
+            "rhythmic_break_loop_score": 0.60,
+        }
+    }
+
+    protected = DecisionCoreV2().arbiter._protect_measured_rhythmic_break_loop(raw, measured)
+
+    assert protected.folder_path == "Instruments/Instrument Loops/Loops"
+    assert protected.source == "strong_consensus"
+
+
+def test_short_synth_hit_keeps_synth_identity_over_weak_reed_one_shot() -> None:
+    """Short clean synth events should not inherit a weak sax physics top path."""
+    raw = raw_claim("Instruments/Woodwinds/Saxophone/Loops", score=8.0)
+    measured = facts(
+        "pitched_phrase",
+        0.98,
+        role="pitched_music_phrase",
+        shape_metrics={
+            "low_event_ratio": 0.02,
+            "mid_event_ratio": 0.86,
+            "high_event_ratio": 0.12,
+            "spectral_flatness_mean": 0.14,
+            "spectral_entropy_mean": 0.45,
+            "pitch_confidence": 0.86,
+            "f0_voiced_ratio": 1.0,
+            "pitched_event_ratio": 1.0,
+            "sustained_tonal_frame_ratio": 1.0,
+            "percussive_event_ratio": 0.0,
+            "drumlike_frame_ratio": 0.0,
+        },
+    )
+    measured.feature_values_by_name["duration_sec"] = 0.73
+    measured.evidence["physics_subpanels"] = {
+        "flat": {
+            "synth_lead_score": 0.84,
+            "synth_chord_score": 0.63,
+            "synth_tonal_source_score": 0.60,
+            "woodwind_sax_score": 0.69,
+            "reed_wind_authority_score": 0.40,
+        }
+    }
+    measured.evidence["physics_vote_result"] = {
+        "top_guesses": [
+            {
+                "folder_path": "Instruments/Woodwinds/Saxophone/One Shots",
+                "label": "Instruments/Woodwinds/Saxophone/One Shots",
+                "rank": 1,
+                "score": 0.50,
+            }
+        ]
+    }
+
+    protected = DecisionCoreV2().arbiter._protect_short_instrument_one_shot_from_loop_bucket(raw, measured)
+
+    assert protected.folder_path == "Instruments/Synths/Synth One Shots"
+    assert protected.source == "final_short_synth_one_shot_invariant"
+
+
+def test_dominant_wet_reed_loop_keeps_sax_depth_after_one_shot_broadening() -> None:
+    """A decisive Woodwinds branch should not flatten a wet sax loop to its parent."""
+    raw = raw_claim(
+        "Instruments/Guitar/Nylon Guitar/One Shots",
+        shared=[
+            shared_row("Instruments/Woodwinds/Saxophone/One Shots", 12.0, brain_rank=5, physics_rank=1),
+            shared_row("Instruments/Guitar/Nylon Guitar/One Shots", 4.0, brain_rank=1, physics_rank=98),
+        ],
+    )
+    measured = facts(
+        "bass_phrase",
+        1.0,
+        role="pitched_music_loop",
+        shape_metrics={
+            "duration_sec": 11.9,
+            "onset_count": 14.0,
+            "onset_span_ratio": 0.81,
+            "true_repetition_score": 0.72,
+            "low_event_ratio": 0.89,
+            "mid_event_ratio": 0.08,
+            "high_event_ratio": 0.03,
+            "spectral_flatness_mean": 0.20,
+            "spectral_entropy_mean": 0.26,
+            "pitch_confidence": 0.88,
+            "f0_voiced_ratio": 0.99,
+            "pitched_event_ratio": 1.0,
+            "sustained_tonal_frame_ratio": 1.0,
+            "percussive_event_ratio": 0.0,
+            "drumlike_frame_ratio": 0.0,
+        },
+    )
+    measured.evidence["physics_layer_decision"] = {
+        "physics_layer_branch": "Woodwinds",
+        "physics_layer_branch_confidence": 0.94,
+        "instrument_branch_Woodwinds": 0.94,
+        "instrument_branch_Synth": 0.68,
+        "instrument_branch_PluckedString": 0.61,
+        "instrument_branch_KeysPiano": 0.50,
+        "instrument_branch_Voice": 0.40,
+        "instrument_woodwind_source_signal": True,
+    }
+    measured.evidence["physics_subpanels"] = {
+        "flat": {
+            "woodwind_sax_score": 0.55,
+            "reed_wind_score": 0.54,
+            "reed_wind_authority_score": 0.41,
+            "synth_tonal_source_score": 0.62,
+            "synth_pad_score": 0.76,
+            "plucked_string_score": 0.52,
+            "plucked_string_authority_score": 0.50,
+            "struck_keys_score": 0.45,
+            "voice_score": 0.22,
+            "human_spoken_voice_score": 0.47,
+        }
+    }
+    measured.evidence["physics_vote_result"] = {
+        "top_guesses": [
+            {
+                "folder_path": "Instruments/Woodwinds/Saxophone/One Shots",
+                "label": "Instruments/Woodwinds/Saxophone/One Shots",
+                "rank": 1,
+                "score": 0.50,
+            }
+        ]
+    }
+
+    protected = DecisionCoreV2().arbiter._protect_instrument_one_shot_leaf_from_measured_loop(raw, measured)
+
+    assert protected.folder_path == "Instruments/Woodwinds/Saxophone/Loops"
+    assert protected.source == "final_measured_branch_loop_broad_bucket"

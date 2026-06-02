@@ -1,3 +1,4 @@
+# v31.138 marker: measured musical-loop depth restoration installed
 # SOURCE-NAME BLINDNESS INVARIANT:
 # This production sorting module must never use producer filenames, source
 # folder names, ZIP member names, path tokens, or sample-pack labels as
@@ -48,7 +49,10 @@ class PlacementResolver:
         if not claim.folder_path:
             return False
         path = claim.folder_path.lower().replace("\\", "/")
-        if claim.source == "final_measured_sax_loop_invariant":
+        if claim.source in {
+            "final_measured_sax_loop_invariant",
+            "final_measured_musical_loop_sax_depth_invariant",
+        }:
             return True
         return bool(claim.source == "final_measured_branch_loop_broad_bucket" and "sax" in path)
 

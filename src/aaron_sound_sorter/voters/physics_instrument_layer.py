@@ -932,6 +932,7 @@ class PhysicsInstrumentLayer:
         keys_sub, keys_sub_score, keys_sub_margin = panel_summary["KeysPiano"]
         wood_sub, wood_sub_score, wood_sub_margin = panel_summary["Woodwinds"]
         pluck_name, pluck_score, pluck_margin = panel_summary["PluckedString"]
+        synth_sub, synth_sub_score, synth_sub_margin = panel_summary["Synth"]
         pluck_family = {"AcousticGuitar", "ElectricGuitar", "NylonOrSoftPluck", "WorldPluck"}
         electric_keys_panel_source = bool(
             keys_sub == "ElectricPiano"
@@ -943,39 +944,159 @@ class PhysicsInstrumentLayer:
             and fa_formant_std >= 240.0
             and max(percussive_loop, drumlike_loop) <= 0.12
         )
+        wide_formant_voice_decoy = bool(
+            fa_formant_std >= 600.0
+            and max(sub_voice, voice_core, rap_voice_texture) >= 0.56
+            and sub_plucked_authority < 0.48
+            and sub_synth_tonal < 0.66
+            and shape_name in {"vocal_phrase", "pitched_phrase", "repeated_phrase_loop", "sustained_pad", "bass_phrase"}
+            and shape_confidence >= 0.72
+            and pitch_strength >= 0.50
+            and high <= 0.22
+            and event_high <= 0.28
+            and max(percussive_loop, drumlike_loop) <= 0.18
+        )
+        keys_reed_decoy_body = bool(
+            keys_sub in {"ElectricPiano", "AcousticPiano", "Organ"}
+            and keys_sub_score >= 0.82
+            and keys_sub_score >= wood_sub_score + 0.08
+            and sub_keys_authority >= sub_reed_authority + 0.08
+            and event_mid >= 0.58
+            and event_high <= 0.08
+            and flatness <= 0.12
+        )
+        synth_lead_air_decoy = bool(
+            (
+                synth_sub in {"SynthLead", "SynthArp"}
+                and synth_sub_score >= 0.82
+                and synth_sub_score >= wood_sub_score + 0.015
+                and sub_synth_tonal >= max(sub_reed_authority, sub_keys_authority) + 0.06
+                and 0.07 <= high <= 0.26
+                and event_count >= 10.0
+                and max(percussive_loop, drumlike_loop) <= 0.14
+            )
+            or (
+                synth_sub in {"SynthLead", "SynthArp"}
+                and synth_sub_score >= 0.84
+                and synth_sub_score >= wood_sub_score - 0.025
+                and sub_synth_tonal >= sub_reed_authority + 0.10
+                and event_count >= 36.0
+                and high >= 0.18
+                and event_high >= 0.18
+                and max(percussive_loop, drumlike_loop) <= 0.14
+            )
+        )
+        bright_articulated_pluck_source = bool(
+            pluck_name in pluck_family
+            and pluck_score >= 0.66
+            and sub_plucked_authority >= max(sub_reed_authority, sub_keys_authority) - 0.02
+            and event_high >= 0.22
+            and high >= 0.24
+            and fa_formant_std >= 300.0
+            and shape_name in {"pitched_phrase", "pitched_phrase_shape", "repeated_phrase_loop", "solo_phrase"}
+            and shape_confidence >= 0.70
+            and pitch_strength >= 0.42
+            and max(percussive_loop, drumlike_loop) <= 0.18
+            and not (low_total >= 0.92 and mid <= 0.08 and high <= 0.030)
+            and not (
+                max(inharmonicity, strike_inharmonic, settle_inharmonic) >= 0.55
+                and max(high, event_high) >= 0.32
+                and panel_summary["MalletBell"][1] >= pluck_score - 0.04
+            )
+        )
+        synth_reed_decoy_body = bool(
+            sub_synth_tonal >= sub_reed_authority + 0.02
+            and wood_sub in {"Sax", "AiryWoodwind"}
+            and wood_sub_margin < 0.055
+            and event_count >= 44.0
+            and 0.14 <= high <= 0.32
+            and event_high >= 0.12
+            and 0.08 <= flatness <= 0.24
+            and max(percussive_loop, drumlike_loop) <= 0.14
+        )
+        strong_synth_identity_source = bool(
+            synth_sub in {"SynthLead", "SynthArp", "SynthPad", "SynthDrone"}
+            and synth_sub_score >= 0.68
+            and synth_sub_score >= wood_sub_score - 0.030
+            and sub_synth_tonal >= sub_reed_authority - 0.020
+            and shape_name in {"pitched_phrase", "pitched_phrase_shape", "repeated_phrase_loop", "sustained_pad"}
+            and shape_confidence >= 0.70
+            and loop_pitched >= 0.88
+            and max(sustained_tonal, non_event_tonal) >= 0.80
+            and max(percussive_loop, drumlike_loop) <= 0.12
+            and (
+                (low_total <= 0.12 and mid >= 0.58 and high <= 0.30 and flatness <= 0.26)
+                or (event_high <= 0.045 and flatness <= 0.090 and mid >= 0.34)
+            )
+        )
+        wet_airy_woodwind_over_voice_source = bool(
+            wood_sub in {"Sax", "AiryWoodwind"}
+            and wood_sub_score >= 0.86
+            and wood_sub_score >= max(sub_voice, voice_core, human_voice_texture, rap_voice_texture) + 0.015
+            and shape_name in {"pitched_phrase", "pitched_phrase_shape", "repeated_phrase_loop", "solo_phrase"}
+            and shape_confidence >= 0.74
+            and pitch_strength >= 0.54
+            and max(percussive_loop, drumlike_loop) <= 0.18
+            and not wide_formant_voice_decoy
+            and not bright_articulated_pluck_source
+            and not synth_reed_decoy_body
+            and not strong_synth_identity_source
+            and not keys_reed_decoy_body
+            and not synth_lead_air_decoy
+        )
         sax_low_high_plucklike_body = bool(high < 0.035 and flatness > 0.090 and fa_presence < 32.0)
         sax_unfocused_decoy_body = bool(fa_formant_std >= 320.0 and pitch_conf < 0.72 and wood_sub_score < 0.82)
         sax_panel_source = bool(
-            wood_sub == "Sax"
-            and wood_sub_score >= 0.74
-            and (wood_sub_margin >= 0.065 or wood_sub_score >= 0.82 or fa_presence >= 32.0)
-            and not sax_low_high_plucklike_body
-            and not sax_unfocused_decoy_body
+            (
+                wood_sub == "Sax"
+                and wood_sub_score >= 0.74
+                and (wood_sub_margin >= 0.065 or wood_sub_score >= 0.82 or fa_presence >= 32.0)
+                and not sax_low_high_plucklike_body
+                and not sax_unfocused_decoy_body
+                and not wide_formant_voice_decoy
+                and not bright_articulated_pluck_source
+                and not synth_reed_decoy_body
+                and not keys_reed_decoy_body
+                and not synth_lead_air_decoy
+            )
+            or wet_airy_woodwind_over_voice_source
         )
         airy_woodwind_source = bool(
-            wood_sub == "AiryWoodwind"
-            and mid >= 0.34
-            and (
-                (
-                    wood_sub_score >= 0.80
-                    and (wood_sub_margin >= 0.075 or fa_presence >= 29.0 or high >= 0.16)
-                    and high >= 0.035
-                )
-                or (
-                    wood_sub_score >= 0.76
-                    and low_total <= 0.14
-                    and mid >= 0.60
-                    and high >= 0.035
-                    and high <= 0.28
-                    and fa_presence >= 30.0
+            (
+                wood_sub == "AiryWoodwind"
+                and mid >= 0.34
+                and not bright_articulated_pluck_source
+                and not synth_reed_decoy_body
+                and not keys_reed_decoy_body
+                and not synth_lead_air_decoy
+                and (
+                    (
+                        wood_sub_score >= 0.80
+                        and (wood_sub_margin >= 0.075 or fa_presence >= 29.0 or high >= 0.16)
+                        and high >= 0.035
+                    )
+                    or (
+                        wood_sub_score >= 0.76
+                        and low_total <= 0.14
+                        and mid >= 0.60
+                        and high >= 0.035
+                        and high <= 0.28
+                        and fa_presence >= 30.0
+                    )
                 )
             )
+            or wet_airy_woodwind_over_voice_source
         )
         other_reed_source = bool(
             wood_sub in {"Clarinet", "Bassoon", "Flute"}
             and wood_sub_score >= 0.80
             and mid >= 0.30
             and (wood_sub_margin >= 0.075 or fa_presence >= 28.0)
+            and not wide_formant_voice_decoy
+            and not bright_articulated_pluck_source
+            and not synth_reed_decoy_body
+            and not keys_reed_decoy_body
+            and not synth_lead_air_decoy
         )
         dark_reed_body_source = bool(
             wood_sub in {"Sax", "Clarinet"}
@@ -987,6 +1108,10 @@ class PhysicsInstrumentLayer:
             and fa_presence >= 29.0
             and event_count <= 18.0
             and max(percussive_loop, drumlike_loop) <= 0.12
+            and not wide_formant_voice_decoy
+            and not bright_articulated_pluck_source
+            and not keys_reed_decoy_body
+            and not synth_lead_air_decoy
         )
         breathy_low_mid_sax_source = bool(
             wood_sub == "Sax"
@@ -999,6 +1124,10 @@ class PhysicsInstrumentLayer:
             and 0.12 <= flatness <= 0.34
             and event_count <= 28.0
             and max(percussive_loop, drumlike_loop) <= 0.12
+            and not wide_formant_voice_decoy
+            and not bright_articulated_pluck_source
+            and not keys_reed_decoy_body
+            and not synth_lead_air_decoy
         )
         focused_reed_phrase_source = bool(
             wood_sub in {"Sax", "Clarinet"}
@@ -1013,6 +1142,11 @@ class PhysicsInstrumentLayer:
             and fa_formant_std <= 190.0
             and event_count <= 72.0
             and max(percussive_loop, drumlike_loop) <= 0.12
+            and not wide_formant_voice_decoy
+            and not bright_articulated_pluck_source
+            and not synth_reed_decoy_body
+            and not keys_reed_decoy_body
+            and not synth_lead_air_decoy
         )
         low_heavy_bass_body = bool(low_total >= 0.92 and mid <= 0.08 and high <= 0.030)
         airy_flute_like_body = bool(high >= 0.30 and low_total <= 0.14 and wood_sub in {"Flute", "AiryWoodwind"})
@@ -1030,7 +1164,15 @@ class PhysicsInstrumentLayer:
                 or (sub_plucked >= 0.54 and pluck_score >= 0.64)
             )
             and shape_name
-            in {"pitched_phrase", "vocal_phrase", "solo_phrase", "repeated_phrase_loop", "bass_phrase", "sustained_pad"}
+            in {
+                "pitched_phrase",
+                "pitched_phrase_shape",
+                "vocal_phrase",
+                "solo_phrase",
+                "repeated_phrase_loop",
+                "bass_phrase",
+                "sustained_pad",
+            }
             and shape_confidence >= 0.64
             and pitch_strength >= 0.40
             and (attack <= 0.18 or (pluck_margin >= 0.12 and event_count >= 6.0))
@@ -1076,7 +1218,12 @@ class PhysicsInstrumentLayer:
             )
         )
         plucked_string_source_signal = bool(
-            articulated_plucked_source_candidate and not strong_woodwind_over_pluck and not non_plucked_tonal_decoy
+            (
+                articulated_plucked_source_candidate
+                and not strong_woodwind_over_pluck
+                and (not non_plucked_tonal_decoy or bright_articulated_pluck_source)
+            )
+            or bright_articulated_pluck_source
         )
         reed_woodwind_source_signal = bool(
             (
@@ -1135,12 +1282,25 @@ class PhysicsInstrumentLayer:
             woodwind_source_signal = True
             reed_woodwind_source_signal = True
             plucked_string_source_signal = False
+        if wet_airy_woodwind_over_voice_source:
+            woodwind_source_signal = True
+            reed_woodwind_source_signal = True
+            plucked_string_source_signal = False
         if clean_tonal_reed_solo_signal or dark_low_mid_reed_loop_signal:
             woodwind_source_signal = True
             reed_woodwind_source_signal = True
             plucked_string_source_signal = False
         if reed_woodwind_source_signal:
             woodwind_source_signal = True
+        if bright_articulated_pluck_source:
+            reed_woodwind_source_signal = False
+            woodwind_source_signal = False
+        if wide_formant_voice_decoy:
+            reed_woodwind_source_signal = False
+            woodwind_source_signal = False
+        if strong_synth_identity_source:
+            reed_woodwind_source_signal = False
+            woodwind_source_signal = False
 
         bass_core = max(bass_core, 0.88 * panel_summary["Bass"][1])
         keys_core = max(keys_core, 0.88 * panel_summary["KeysPiano"][1])
@@ -1152,6 +1312,11 @@ class PhysicsInstrumentLayer:
             reed_core = max(reed_core, 0.96)
             bass_core = min(bass_core, 0.72)
             keys_core = min(keys_core, 0.74)
+        if wet_airy_woodwind_over_voice_source:
+            reed_core = max(reed_core, 0.95)
+            brass_core = min(brass_core, 0.80)
+            keys_core = min(keys_core, 0.76)
+            synth_core = min(synth_core, 0.76)
         synth_core = max(synth_core, 0.86 * panel_summary["Synth"][1])
         mallet_bell_core = max(mallet_bell_core, 0.86 * panel_summary["MalletBell"][1])
         if low_mid_wet_sax_signal:
@@ -1195,6 +1360,12 @@ class PhysicsInstrumentLayer:
             "Strings": strings_core,
             "MalletBell": mallet_bell_core,
         }
+        if strong_synth_identity_source:
+            nearest_non_synth = max(
+                raw_scores[b] for b in ("Woodwinds", "KeysPiano", "PluckedString", "Strings", "Brass", "MalletBell")
+            )
+            raw_scores["Synth"] = max(raw_scores["Synth"], min(0.96, nearest_non_synth + 0.030))
+            raw_scores["Woodwinds"] = min(raw_scores["Woodwinds"], raw_scores["Synth"] - 0.055)
         if clean_bass_phrase:
             raw_scores["Bass"] = max(raw_scores["Bass"], 1.0)
         if woodwind_source_signal:
@@ -1301,6 +1472,10 @@ class PhysicsInstrumentLayer:
             branch_scores["Voice"] = max(branch_scores["Voice"], branch_gate * max(voice_core, 0.78))
             branch_scores["Woodwinds"] = min(branch_scores["Woodwinds"], branch_scores["Voice"] - 0.05)
             branch_scores["Brass"] = min(branch_scores["Brass"], branch_scores["Voice"] - 0.06)
+        if wide_formant_voice_decoy and not woodwind_source_signal and branch_scores["Voice"] >= 0.46:
+            branch_scores["Voice"] = max(branch_scores["Voice"], min(0.92, branch_gate * max(voice_core, 0.74)))
+            branch_scores["Woodwinds"] = min(branch_scores["Woodwinds"], branch_scores["Voice"] - 0.055)
+            branch_scores["Brass"] = min(branch_scores["Brass"], branch_scores["Voice"] - 0.060)
         if woodwind_source_signal:
             branch_scores["Woodwinds"] = max(branch_scores["Woodwinds"], 0.94)
             branch_scores["Voice"] = min(branch_scores["Voice"], branch_scores["Woodwinds"] - 0.04)
@@ -1351,7 +1526,8 @@ class PhysicsInstrumentLayer:
             keys_sub == "ElectricPiano"
             and keys_sub_score >= 0.86
             and keys_sub_margin >= 0.08
-            and shape_name in {"pitched_phrase", "pitched_phrase_shape", "solo_phrase", "repeated_phrase_loop", "sustained_pad"}
+            and shape_name
+            in {"pitched_phrase", "pitched_phrase_shape", "solo_phrase", "repeated_phrase_loop", "sustained_pad"}
             and shape_confidence >= 0.80
             and loop_pitched >= 0.82
             and event_mid >= 0.55
@@ -1451,7 +1627,9 @@ class PhysicsInstrumentLayer:
             lift_margin = 0.032 if clear_metallic_pitched_hit else 0.018
             branch_scores["MalletBell"] = max(branch_scores["MalletBell"], min(0.94, nearest + lift_margin))
             if clear_metallic_pitched_hit and not bool(compound["compound_music_prefer_broad_loop"]):
-                branch_scores["MixedInstrument"] = min(branch_scores["MixedInstrument"], branch_scores["MalletBell"] - 0.030)
+                branch_scores["MixedInstrument"] = min(
+                    branch_scores["MixedInstrument"], branch_scores["MalletBell"] - 0.030
+                )
         if plucked_string_source_signal and not reed_woodwind_source_signal:
             nearest = max(
                 branch_scores[b] for b in ("KeysPiano", "Strings", "Synth", "Woodwinds", "MalletBell", "Bass")
@@ -1569,6 +1747,8 @@ class PhysicsInstrumentLayer:
             "instrument_rap_voice_texture": round(float(rap_voice_texture), 6),
             "instrument_human_voice_texture": round(float(human_voice_texture), 6),
             "instrument_human_voice_phrase_signal": bool(human_voice_phrase_signal),
+            "instrument_wide_formant_voice_decoy": bool(wide_formant_voice_decoy),
+            "instrument_keys_reed_decoy_body": bool(keys_reed_decoy_body),
             "instrument_non_voice_tonal_loop_voice_decoy": bool(non_voice_tonal_loop_voice_decoy),
             "instrument_processed_vocal_shot_signal": bool(processed_vocal_shot_signal),
             "instrument_clean_bass_phrase": bool(clean_bass_phrase),
@@ -1584,6 +1764,11 @@ class PhysicsInstrumentLayer:
             "instrument_reed_woodwind_source_signal": bool(reed_woodwind_source_signal),
             "instrument_woodwind_source_signal": bool(woodwind_source_signal),
             "instrument_articulated_plucked_source_candidate": bool(articulated_plucked_source_candidate),
+            "instrument_bright_articulated_pluck_source": bool(bright_articulated_pluck_source),
+            "instrument_synth_reed_decoy_body": bool(synth_reed_decoy_body),
+            "instrument_strong_synth_identity_source": bool(strong_synth_identity_source),
+            "instrument_synth_lead_air_decoy": bool(synth_lead_air_decoy),
+            "instrument_wet_airy_woodwind_over_voice_source": bool(wet_airy_woodwind_over_voice_source),
             "instrument_non_plucked_tonal_decoy": bool(non_plucked_tonal_decoy),
             "instrument_plucked_string_source_signal": bool(plucked_string_source_signal),
             "instrument_plucked_vs_woodwind_conflict": bool(

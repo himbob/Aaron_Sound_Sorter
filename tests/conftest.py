@@ -39,7 +39,14 @@ def pytest_sessionstart(session) -> None:  # type: ignore[no-untyped-def]
 
 
 def _link_generated_fixture_dir(folder_name: str, samples: dict[str, WaveFactory | str]) -> None:
-    """Create a generated fixture directory and link the test's expected path."""
+    """Create a generated fixture directory and link the test's expected path.
+
+    The fixture materializer should never abort pytest just because a copied
+    private/locked sample has fragile filesystem metadata or disappears during
+    setup. These generated WAVs are test fixtures, so preserving xattrs, chmod
+    bits, or Finder metadata is not useful. Copy audio bytes only, and fall back
+    to deterministic synthetic audio when a private source cannot be copied.
+    """
     expected = PROJECT_ROOT / "tests" / folder_name
     if expected.exists() and not expected.is_symlink():
         return
@@ -49,12 +56,10 @@ def _link_generated_fixture_dir(folder_name: str, samples: dict[str, WaveFactory
     generated.mkdir(parents=True, exist_ok=True)
     for sample_name, source in samples.items():
         target = generated / sample_name
+        target.parent.mkdir(parents=True, exist_ok=True)
         if isinstance(source, str):
             source_path = LOCKED_SMOKE_AUDIO_DIR / source
-            if source_path.exists():
-                shutil.copy2(source_path, target)
-            else:
-                fixtures.write_wav(target, _fallback_for_name(sample_name))
+            _copy_locked_sample_or_write_fallback(source_path, target, sample_name)
         else:
             fixtures.write_wav(target, source(sample_name))
     if expected.is_symlink() or expected.exists():
@@ -63,6 +68,27 @@ def _link_generated_fixture_dir(folder_name: str, samples: dict[str, WaveFactory
         expected.unlink(missing_ok=True)
     expected.parent.mkdir(parents=True, exist_ok=True)
     expected.symlink_to(generated, target_is_directory=True)
+
+
+def _copy_locked_sample_or_write_fallback(source_path: Path, target: Path, sample_name: str) -> None:
+    """Copy fixture audio bytes, or synthesize a stable fallback WAV.
+
+    ``shutil.copy2`` can fail during ``copystat`` on some external/macOS
+    volumes even after the audio payload copied. Fixture setup does not need
+    metadata preservation, so use a plain byte copy through a temporary file and
+    replace atomically.
+    """
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if source_path.exists():
+        temporary_target = target.with_name(f"{target.name}.tmp_copy")
+        try:
+            temporary_target.unlink(missing_ok=True)
+            shutil.copyfile(source_path, temporary_target)
+            temporary_target.replace(target)
+            return
+        except OSError:
+            temporary_target.unlink(missing_ok=True)
+    fixtures.write_wav(target, _fallback_for_name(sample_name))
 
 
 def _fallback_for_name(sample_name: str) -> np.ndarray:

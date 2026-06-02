@@ -77,6 +77,9 @@ class PhysicsDrumLayer:
         subpanel_flat = physics_subpanel_flat(facts)
         sub_drum_loop_source = safe_float(subpanel_flat.get("drum_loop_source_score", 0.0), 0.0)
         sub_rhythmic_break_loop = safe_float(subpanel_flat.get("rhythmic_break_loop_score", 0.0), 0.0)
+        sub_onset_pitched = safe_float(subpanel_flat.get("onset_pitched_onset_score", 0.0), 0.0)
+        sub_onset_percussive = safe_float(subpanel_flat.get("onset_percussive_onset_score", 0.0), 0.0)
+        sub_synth_tonal = safe_float(subpanel_flat.get("synth_tonal_source_score", 0.0), 0.0)
         fa = first_arrival(facts)
         shape_name = str(shape.get("primary_shape", ""))
         shape_confidence = number(shape, "confidence", 0.0)
@@ -392,6 +395,24 @@ class PhysicsDrumLayer:
                 min(0.94, 0.58 + 0.30 * sub_rhythmic_break_loop),
             )
 
+        tonal_synth_or_arp_loop_decoy = bool(
+            shape_name in {"beat_loop", "repeated_phrase_loop", "bass_phrase", "pitched_phrase", "pitched_phrase_shape"}
+            and shape_confidence >= 0.78
+            and max(loop_pitched, pitch_conf, f0_voiced) >= 0.78
+            and max(sustained_tonal, non_event_tonal) >= 0.82
+            and max(loop_percussive, loop_drumlike) <= 0.08
+            and sub_onset_pitched >= sub_onset_percussive + 0.20
+            and (
+                sub_synth_tonal >= 0.58
+                or role_value(roles, "pitched_music_phrase") >= 0.78
+                or role_value(roles, "pitched_music_loop") >= 0.78
+            )
+            and not low_sub_kick_exception
+        )
+        if tonal_synth_or_arp_loop_decoy:
+            branch_scores["DrumLoop"] = min(branch_scores["DrumLoop"], 0.34)
+            drum_anchor = min(drum_anchor, 0.46)
+
         clap_source = safe_float(subpanel_flat.get("drum_clap_source_score", 0.0), 0.0)
         snare_source = safe_float(subpanel_flat.get("drum_snare_source_score", 0.0), 0.0)
         rim_source = safe_float(subpanel_flat.get("drum_rim_stick_source_score", 0.0), 0.0)
@@ -495,6 +516,7 @@ class PhysicsDrumLayer:
             "drum_anchor_clean_tonal_solo_penalty": round(float(clean_tonal_solo_penalty), 6),
             "drum_anchor_clean_tonal_solo_phrase": bool(clean_tonal_solo_phrase),
             "drum_anchor_low_sub_kick_exception": bool(low_sub_kick_exception),
+            "drum_anchor_tonal_synth_or_arp_loop_decoy": bool(tonal_synth_or_arp_loop_decoy),
             "drum_anchor_shape_name": shape_name,
             "drum_anchor_shape_confidence": round(float(shape_confidence), 6),
             "drum_low_body": round(float(low_body), 6),
