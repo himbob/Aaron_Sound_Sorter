@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from aaron_sound_sorter.domain.models import CategoryGuess, SharedAudioFacts, VoterResult
 from aaron_sound_sorter.engine.decision_core_v2 import DecisionCoreV2
 from aaron_sound_sorter.engine.eligibility import EligibilityDecision
@@ -857,6 +859,62 @@ def test_repeated_phrase_loop_with_physics_voice_branch_stays_voice() -> None:
 
     assert final.folder_path == "Instruments/Voice/Vocal Loops/Loops"
     assert final.consensus_status == "final_measured_voice_invariant"
+
+
+def test_short_voice_hit_beats_tonal_stab_synth_fallback() -> None:
+    """Voice branch evidence must win before a drum leaf becomes Synth Chord."""
+    raw = raw_claim(
+        "Drums/Cymbals/Crash Cymbal/One Shots",
+        score=7.0,
+        shared=[shared_row("Drums/Cymbals/Crash Cymbal/One Shots", 7.0, brain_rank=1, physics_rank=9)],
+    )
+    measured = facts(
+        "hit_with_tail",
+        0.73,
+        role="voiced_one_shot",
+        role_strengths={"voiced_one_shot": 0.74},
+        shape_metrics={
+            "duration_sec": 0.82,
+            "onset_count": 1.0,
+            "sustained_tonal_frame_ratio": 0.58,
+            "f0_voiced_ratio": 0.83,
+            "percussive_event_ratio": 0.04,
+            "drumlike_frame_ratio": 0.03,
+        },
+    )
+    measured = replace(
+        measured,
+        is_loop_like=False,
+        is_single_event_like=True,
+        is_short_hit_like=True,
+        is_long=False,
+    )
+    measured.evidence.update(
+        {
+            "duration_sec": 0.82,
+            "voice_score": 0.63,
+            "human_spoken_voice_score": 0.71,
+            "human_breath_mouth_score": 0.86,
+            "synth_tonal_source_score": 0.41,
+            "synth_chord_score": 0.14,
+        }
+    )
+    measured.evidence["physics_subpanels"] = {
+        "flat": {
+            "voice_score": 0.63,
+            "human_spoken_voice_score": 0.71,
+            "human_breath_mouth_score": 0.86,
+            "synth_tonal_source_score": 0.41,
+            "synth_chord_score": 0.14,
+            "drum_hit_score": 0.34,
+            "pitched_metal_percussion_score": 0.50,
+        }
+    }
+
+    arbiter = DecisionCoreV2().arbiter
+    tonal_stab_claim = arbiter._protect_measured_tonal_chord_stab(raw, measured)
+    assert tonal_stab_claim.folder_path == "Instruments/Voice/Phrase/One Shots"
+    assert tonal_stab_claim.source == "final_measured_voice_before_tonal_stab_invariant"
 
 
 def test_physics_fx_role_layer_can_rescue_transition_from_instrument_loop() -> None:

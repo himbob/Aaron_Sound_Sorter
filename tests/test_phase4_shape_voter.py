@@ -625,3 +625,45 @@ def test_decisive_top_family_gate_needs_shape_or_role_support() -> None:
 
     assert decision.final_label == "Instruments/Voice/Phrase/One Shots"
     assert decision.consensus_status == "final_shape_review_voice_phrase_invariant"
+
+
+def test_shape_voter_routes_fast_pitched_repetition_away_from_drums() -> None:
+    """Repeated pitched attacks are musical phrase structure, not drum proof."""
+    physics = _physics(
+        duration=4.0,
+        log_transient_count=np.log1p(14.0),
+        event_rate_hz=2.0,
+        onset_span_ratio=0.88,
+        onset_interval_regularity=0.20,
+        temporal_centroid_ratio=0.44,
+        attack_rise_time_norm=0.05,
+        tail_energy_ratio=0.35,
+        pitch_confidence=0.78,
+        f0_voiced_ratio=0.70,
+        harmonic_energy_ratio=0.70,
+        harmonic_to_noise_ratio=0.62,
+        loop_pitched_event_ratio=0.82,
+        loop_sustained_tonal_frame_ratio=0.70,
+        loop_non_event_tonal_ratio=0.66,
+        loop_tonal_to_percussive_balance=0.72,
+        loop_percussive_event_ratio=0.18,
+        loop_drumlike_frame_ratio=0.08,
+        loop_mean_event_low_ratio=0.18,
+        loop_mean_event_high_ratio=0.20,
+        loop_mean_event_noise_ratio=0.12,
+        spectral_flatness_mean=0.07,
+        spectral_entropy_mean=0.28,
+    )
+    facts = build_shared_audio_facts(physics)
+    facts.evidence["onset_pitched_onset_score"] = 0.72
+    facts.evidence["onset_percussive_onset_score"] = 0.28
+    facts.evidence["plucked_string_authority_score"] = 0.62
+    facts.evidence["synth_tonal_source_score"] = 0.58
+
+    shape = ShapeVoter().vote(physics, facts, {}).diagnostics["shape_vote"]
+    scores = dict(shape["shape_scores"])
+
+    assert shape["primary_shape"] == "pitched_repetition_phrase"
+    assert scores["pitched_repetition_phrase"] > scores["beat_loop"]
+    assert "Instruments" in shape_compatible_tops(shape["primary_shape"])
+    assert "Drums" not in shape_compatible_tops(shape["primary_shape"])

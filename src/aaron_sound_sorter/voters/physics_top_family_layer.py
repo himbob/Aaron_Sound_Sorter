@@ -230,7 +230,15 @@ class PhysicsTopFamilyLayer:
             instrument_evidence.get("instrument_subpanel_rhythmic_break_loop_score", 0.0), 0.0
         )
         tonal_arp_loop_decoy = bool(
-            shape_name in {"beat_loop", "bass_phrase", "repeated_phrase_loop", "pitched_phrase", "pitched_phrase_shape"}
+            shape_name
+            in {
+                "beat_loop",
+                "bass_phrase",
+                "repeated_phrase_loop",
+                "pitched_repetition_phrase",
+                "pitched_phrase",
+                "pitched_phrase_shape",
+            }
             and shape_confidence >= 0.78
             and max(role_value(roles, "pitched_music_loop"), role_value(roles, "pitched_music_phrase")) >= 0.78
             and number(shape, "pitched_event_ratio", 0.0) >= 0.90
@@ -244,7 +252,14 @@ class PhysicsTopFamilyLayer:
             and safe_float(instrument_evidence.get("instrument_subpanel_synth_tonal_source_score", 0.0), 0.0) >= 0.56
         )
         tonal_instrument_loop_veto = bool(
-            shape_name in {"bass_phrase", "repeated_phrase_loop", "pitched_phrase", "pitched_phrase_shape"}
+            shape_name
+            in {
+                "bass_phrase",
+                "repeated_phrase_loop",
+                "pitched_repetition_phrase",
+                "pitched_phrase",
+                "pitched_phrase_shape",
+            }
             and number(shape, "sustained_tonal_frame_ratio", 0.0) >= 0.92
             and number(shape, "non_event_tonal_ratio", 0.0) >= 0.92
             and number(shape, "pitched_event_ratio", 0.0) >= 0.90
@@ -268,6 +283,7 @@ class PhysicsTopFamilyLayer:
                 "beat_loop",
                 "bass_phrase",
                 "repeated_phrase_loop",
+                "pitched_repetition_phrase",
                 "pitched_phrase",
                 "pitched_phrase_shape",
                 "sustained_pad",

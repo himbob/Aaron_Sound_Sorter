@@ -80,6 +80,14 @@ class PhysicsDrumLayer:
         sub_onset_pitched = safe_float(subpanel_flat.get("onset_pitched_onset_score", 0.0), 0.0)
         sub_onset_percussive = safe_float(subpanel_flat.get("onset_percussive_onset_score", 0.0), 0.0)
         sub_synth_tonal = safe_float(subpanel_flat.get("synth_tonal_source_score", 0.0), 0.0)
+        sub_hand_drum_membrane = safe_float(subpanel_flat.get("hand_drum_membrane_score", 0.0), 0.0)
+        sub_pitched_metal_percussion = safe_float(subpanel_flat.get("pitched_metal_percussion_score", 0.0), 0.0)
+        sub_struck_wood = safe_float(subpanel_flat.get("struck_wood_score", 0.0), 0.0)
+        sub_compact_struck_percussion = safe_float(subpanel_flat.get("compact_struck_tonal_percussion_score", 0.0), 0.0)
+        sub_struck_percussion_exception = bool(subpanel_flat.get("struck_percussion_guard_exception"))
+        sub_hand_drum_material = bool(subpanel_flat.get("hand_drum_material_evidence"))
+        sub_pitched_metal_material = bool(subpanel_flat.get("pitched_metal_material_evidence"))
+        sub_struck_wood_material = bool(subpanel_flat.get("struck_wood_material_evidence"))
         fa = first_arrival(facts)
         shape_name = str(shape.get("primary_shape", ""))
         shape_confidence = number(shape, "confidence", 0.0)
@@ -389,6 +397,25 @@ class PhysicsDrumLayer:
             scale=0.96,
             floor=0.34,
         )
+        if sub_hand_drum_material and sub_hand_drum_membrane >= 0.52 and sub_compact_struck_percussion >= 0.42:
+            branch_scores["TomOrConga"] = max(
+                branch_scores.get("TomOrConga", 0.0),
+                min(0.88, 0.40 + 0.54 * sub_hand_drum_membrane),
+            )
+        if sub_struck_wood_material and sub_struck_wood >= 0.54 and sub_compact_struck_percussion >= 0.42:
+            branch_scores["RimOrStick"] = max(
+                branch_scores.get("RimOrStick", 0.0),
+                min(0.88, 0.40 + 0.54 * sub_struck_wood),
+            )
+        if (
+            sub_pitched_metal_material
+            and sub_pitched_metal_percussion >= 0.52
+            and sub_compact_struck_percussion >= 0.38
+        ):
+            branch_scores["MetallicPercussion"] = max(
+                branch_scores.get("MetallicPercussion", 0.0),
+                min(0.90, 0.40 + 0.56 * sub_pitched_metal_percussion),
+            )
         if sub_rhythmic_break_loop >= 0.62 and sub_drum_loop_source >= 0.30:
             branch_scores["DrumLoop"] = max(
                 branch_scores.get("DrumLoop", 0.0),
@@ -435,6 +462,15 @@ class PhysicsDrumLayer:
             )
             branch_scores["Snare"] = min(branch_scores.get("Snare", 0.0), branch_scores["Clap"] - 0.025)
             branch_scores["RimOrStick"] = min(branch_scores.get("RimOrStick", 0.0), branch_scores["Clap"] - 0.035)
+        if (
+            snare_source >= 0.74
+            and snare_source >= safe_float(subpanel_flat.get("drum_metallic_percussion_source_score", 0.0), 0.0) + 0.08
+        ):
+            branch_scores["Snare"] = max(
+                branch_scores.get("Snare", 0.0),
+                branch_scores.get("MetallicPercussion", 0.0) + 0.025,
+                min(0.92, 0.42 + 0.52 * snare_source),
+            )
 
         # Calibration note: this decoy guard should be retuned against clean
         # tom/conga and guitar-loop validation sets before changing thresholds.
@@ -461,7 +497,8 @@ class PhysicsDrumLayer:
         # human/synth/reed stabs after the drum layer has already lied.
         voiced_non_drum_phrase_decoy = bool(
             (
-                shape_name in {"vocal_phrase", "solo_phrase", "pitched_phrase", "sustained_pad", "hit_with_tail"}
+                shape_name
+                in {"vocal_phrase", "solo_phrase", "pitched_phrase", "sustained_pad", "hit_with_tail", "single_hit"}
                 or voiced_role >= 0.55
             )
             and shape_confidence >= 0.60
@@ -478,6 +515,7 @@ class PhysicsDrumLayer:
             )
             >= 0.50
             and not low_sub_kick_exception
+            and not sub_struck_percussion_exception
         )
         if voiced_non_drum_phrase_decoy:
             for branch_name in (
@@ -561,6 +599,10 @@ class PhysicsDrumLayer:
             "drum_source_panel_metallic_percussion": round(
                 float(safe_float(subpanel_flat.get("drum_metallic_percussion_source_score", 0.0), 0.0)), 6
             ),
+            "drum_source_panel_compact_struck_tonal_percussion": round(float(sub_compact_struck_percussion), 6),
+            "drum_source_panel_hand_drum_membrane": round(float(sub_hand_drum_membrane), 6),
+            "drum_source_panel_pitched_metal_percussion": round(float(sub_pitched_metal_percussion), 6),
+            "drum_source_panel_struck_wood": round(float(sub_struck_wood), 6),
             "drum_source_panel_drum_loop": round(float(sub_drum_loop_source), 6),
             "drum_source_panel_rhythmic_break_loop": round(float(sub_rhythmic_break_loop), 6),
         }

@@ -539,6 +539,71 @@ def build_low_level_physics_subpanels(feature_values: dict[str, float]) -> dict[
         + 0.12 * ramp(high, 0.08, 0.34)
         + 0.08 * ramp(loop_event_noise, 0.16, 0.64)
     )
+    clean_low_bass_phrase_decoy = bool(
+        low_total >= 0.88
+        and high <= 0.08
+        and mid <= 0.18
+        and loop_panel["role_phrase_score"] >= loop_panel["role_one_shot_score"] + 0.18
+        and max(clean_tone, pitch_conf, loop_pitched) >= 0.64
+        and max(loop_percussive, loop_drumlike) <= 0.08
+    )
+    clean_tonal_music_hit_decoy = bool(
+        max(loop_pitched, loop_sustained, loop_non_event_tonal) >= 0.92
+        and max(loop_percussive, loop_drumlike) <= 0.08
+        and clean_tone >= 0.52
+        and metallic_noise_score <= 0.48
+        and high <= 0.16
+        and low_total >= 0.54
+    )
+
+    compact_struck_tonal_percussion_score = clamp01(
+        0.22 * loop_panel["role_one_shot_score"]
+        + 0.20 * fast_attack
+        + 0.16 * early_centroid
+        + 0.14 * ramp(max(pitch_conf, attack_pitch, body_pitch, peak_stability), 0.24, 0.78)
+        + 0.12 * ramp(max(inharmonicity, spectral_peak_count / 20.0, metallic_noise_score), 0.10, 0.66)
+        + 0.10 * inverse_ramp(max(loop_panel["role_loop_score"], repeated_events), 0.08, 0.52)
+        + 0.10 * inverse_ramp(max(loop_sustained, loop_non_event_tonal), 0.10, 0.78)
+    )
+    hand_drum_membrane_score = clamp01(
+        0.24 * compact_struck_tonal_percussion_score
+        + 0.20 * drum_hit_score
+        + 0.18 * ramp(bass + mid, 0.34, 0.88)
+        + 0.14 * ramp(max(pitch_conf, body_pitch, harmonic, fundamental), 0.22, 0.76)
+        + 0.12 * inverse_ramp(high, 0.04, 0.42)
+        + 0.10 * inverse_ramp(sub, 0.08, 0.56)
+        + 0.08 * inverse_ramp(tail, 0.06, 0.58)
+        - 0.12 * ramp(metallic_noise_score, 0.52, 0.90)
+        - 0.08 * ramp(air, 0.10, 0.34)
+    )
+    pitched_metal_percussion_score = clamp01(
+        0.24 * compact_struck_tonal_percussion_score
+        + 0.24 * metallic_noise_score
+        + 0.18 * ramp(max(inharmonicity, spectral_peak_count / 18.0, peak_stability), 0.10, 0.62)
+        + 0.14 * ramp(max(pitch_conf, attack_pitch, body_pitch, harmonic), 0.30, 0.84)
+        + 0.10 * ramp(max(high, attack_high, tail_high), 0.08, 0.58)
+        + 0.08 * inverse_ramp(max(loop_sustained, loop_non_event_tonal), 0.12, 0.88)
+        - 0.08 * ramp(voice_score, 0.72, 0.96)
+    )
+    struck_wood_score = clamp01(
+        0.28 * compact_struck_tonal_percussion_score
+        + 0.22 * fast_attack
+        + 0.18 * ramp(mid + presence, 0.30, 0.92)
+        + 0.14 * inverse_ramp(tail, 0.02, 0.28)
+        + 0.10 * inverse_ramp(max(flatness, entropy), 0.16, 0.62)
+        + 0.08 * ramp(max(pitch_conf, peak_stability), 0.16, 0.56)
+        + 0.08 * inverse_ramp(low_total, 0.04, 0.48)
+        - 0.10 * ramp(metallic_noise_score, 0.46, 0.86)
+    )
+    pitched_mallet_instrument_score = clamp01(
+        0.24 * compact_struck_tonal_percussion_score
+        + 0.20 * keys_panel["struck_keys_score"]
+        + 0.18 * ramp(max(pitch_conf, body_pitch, harmonic), 0.38, 0.90)
+        + 0.14 * ramp(peak_stability, 0.08, 0.54)
+        + 0.12 * ramp(max(inharmonicity, spectral_peak_count / 20.0), 0.08, 0.54)
+        + 0.10 * inverse_ramp(max(loop_percussive, loop_drumlike), 0.08, 0.44)
+        + 0.08 * ramp(max(loop_panel["role_phrase_score"], loop_panel["role_one_shot_score"]), 0.32, 0.86)
+    )
 
     # Source-blind anti-drum guard for voiced/reed/synth stabs.
     # Vocal FX hits, dry sax notes, and synth stabs can have a sharp attack and
@@ -563,7 +628,37 @@ def build_low_level_physics_subpanels(feature_values: dict[str, float]) -> dict[
         >= 0.55
         and not low_sub_kick_exception
     )
-    if tonal_voiced_non_drum_hit_guard:
+    pitched_metal_material_evidence = bool(
+        pitched_metal_percussion_score >= 0.54
+        and (metallic_noise_score >= 0.48 or (max(attack_high, high, tail_high) >= 0.18 and low_total <= 0.82))
+        and not clean_low_bass_phrase_decoy
+        and not clean_tonal_music_hit_decoy
+    )
+    hand_drum_material_evidence = bool(
+        hand_drum_membrane_score >= 0.54
+        and high <= 0.42
+        and not clean_tonal_music_hit_decoy
+        and (
+            max(loop_sustained, loop_non_event_tonal) <= 0.54
+            or (hand_drum_membrane_score >= 0.82 and compact_struck_tonal_percussion_score >= 0.70)
+        )
+    )
+    struck_wood_material_evidence = bool(
+        struck_wood_score >= 0.56
+        and tail <= 0.34
+        and max(loop_sustained, loop_non_event_tonal) <= 0.46
+        and metallic_noise_score <= 0.58
+    )
+    struck_percussion_guard_exception = bool(
+        (pitched_metal_material_evidence or hand_drum_material_evidence or struck_wood_material_evidence)
+        and compact_struck_tonal_percussion_score >= 0.42
+        and fast_attack >= 0.32
+        and loop_panel["role_one_shot_score"] >= 0.46
+        and max(loop_panel["role_loop_score"], repeated_events) <= 0.58
+        and not clean_low_bass_phrase_decoy
+        and not clean_tonal_music_hit_decoy
+    )
+    if tonal_voiced_non_drum_hit_guard and not struck_percussion_guard_exception:
         drum_hit_score = min(drum_hit_score, 0.34)
 
     bowed_string_score = clamp01(
@@ -650,7 +745,8 @@ def build_low_level_physics_subpanels(feature_values: dict[str, float]) -> dict[
     )
     if tonal_voiced_non_drum_hit_guard:
         closed_hat_source_score = min(closed_hat_source_score, 0.34)
-        cymbal_source_score = min(cymbal_source_score, 0.34)
+        if not pitched_metal_material_evidence:
+            cymbal_source_score = min(cymbal_source_score, 0.34)
     tom_conga_source_score = clamp01(
         0.24 * drum_hit_score
         + 0.22 * ramp(bass + mid, 0.36, 0.88)
@@ -668,8 +764,10 @@ def build_low_level_physics_subpanels(feature_values: dict[str, float]) -> dict[
         + 0.10 * drum_hit_score
     )
     if tonal_voiced_non_drum_hit_guard:
-        rim_stick_source_score = min(rim_stick_source_score, 0.34)
-        tom_conga_source_score = min(tom_conga_source_score, 0.36)
+        if not struck_wood_material_evidence:
+            rim_stick_source_score = min(rim_stick_source_score, 0.34)
+        if not hand_drum_material_evidence:
+            tom_conga_source_score = min(tom_conga_source_score, 0.36)
         if high <= 0.34:
             cymbal_source_score = min(cymbal_source_score, 0.34)
     shaker_tambourine_source_score = clamp01(
@@ -682,8 +780,17 @@ def build_low_level_physics_subpanels(feature_values: dict[str, float]) -> dict[
     )
     guiro_scrape_source_score = scrape_rasp_score
     metallic_percussion_source_score = metallic_noise_score
-    if tonal_voiced_non_drum_hit_guard:
+    if tonal_voiced_non_drum_hit_guard and not pitched_metal_material_evidence:
         metallic_percussion_source_score = min(metallic_percussion_source_score, 0.34)
+    if not tonal_voiced_non_drum_hit_guard or hand_drum_material_evidence:
+        tom_conga_source_score = max(tom_conga_source_score, clamp01(0.84 * hand_drum_membrane_score))
+    if not tonal_voiced_non_drum_hit_guard or struck_wood_material_evidence:
+        rim_stick_source_score = max(rim_stick_source_score, clamp01(0.86 * struck_wood_score))
+    if not tonal_voiced_non_drum_hit_guard or pitched_metal_material_evidence:
+        metallic_percussion_source_score = max(
+            metallic_percussion_source_score,
+            clamp01(0.90 * pitched_metal_percussion_score),
+        )
 
     # Drum-loop evidence cannot depend only on frame labels such as
     # ``loop_percussive_event_ratio`` or ``loop_drumlike_frame_ratio``.  Real
@@ -716,6 +823,24 @@ def build_low_level_physics_subpanels(feature_values: dict[str, float]) -> dict[
         - 0.10 * slow_attack
     )
     rhythmic_break_loop_score = max(rhythmic_break_loop_score, rhythmic_transient_loop_score)
+    pitched_repetition_phrase_score = clamp01(
+        0.22 * repeated_events
+        + 0.18 * ramp(max(pitch_conf, body_pitch, loop_event_pitch), 0.42, 0.90)
+        + 0.16 * ramp(max(loop_pitched, loop_tonal_balance), 0.48, 0.95)
+        + 0.14 * ramp(max(loop_sustained, loop_non_event_tonal), 0.45, 0.90)
+        + 0.12 * ramp(onset_panel["pitched_onset_score"] - onset_panel["percussive_onset_score"], 0.04, 0.30)
+        + 0.10 * max(plucked_panel["plucked_string_score"], keys_panel["struck_keys_score"], clean_tone)
+        + 0.08 * inverse_ramp(max(loop_percussive, loop_drumlike), 0.10, 0.36)
+        - 0.06 * noisy_air
+    )
+    pitched_repetition_drum_decoy = bool(
+        pitched_repetition_phrase_score >= 0.58
+        and max(loop_percussive, loop_drumlike) <= 0.34
+        and onset_panel["pitched_onset_score"] >= onset_panel["percussive_onset_score"] - 0.02
+        and not (sub >= 0.55 and 0.0 < low_peak_hz <= 135.0 and f0_voiced <= 0.20)
+    )
+    if pitched_repetition_drum_decoy:
+        rhythmic_break_loop_score *= 1.0 - 0.45 * ramp(pitched_repetition_phrase_score, 0.58, 0.86)
     drum_loop_source_score = clamp01(
         0.22 * loop_panel["role_loop_score"]
         + 0.18 * ramp(loop_percussive, 0.12, 0.84)
@@ -729,7 +854,13 @@ def build_low_level_physics_subpanels(feature_values: dict[str, float]) -> dict[
         - 0.06 * keys_panel["struck_keys_score"]
         - 0.06 * reed_panel["reed_wind_score"]
         - 0.08 * loop_panel["delay_tail_likelihood"]
+        - 0.12 * pitched_repetition_phrase_score
     )
+    if pitched_repetition_drum_decoy:
+        drum_loop_source_score = min(
+            drum_loop_source_score,
+            max(0.20, 0.44 - 0.22 * ramp(pitched_repetition_phrase_score, 0.58, 0.86)),
+        )
 
     reverse_fx_score = clamp01(
         0.30 * onset_panel["swell_onset_score"]
@@ -1223,7 +1354,18 @@ def build_low_level_physics_subpanels(feature_values: dict[str, float]) -> dict[
         "drum_hit_score": drum_hit_score,
         "drum_loop_source_score": drum_loop_source_score,
         "rhythmic_break_loop_score": rhythmic_break_loop_score,
+        "pitched_repetition_phrase_score": pitched_repetition_phrase_score,
+        "pitched_repetition_drum_decoy": pitched_repetition_drum_decoy,
         "tonal_voiced_non_drum_hit_guard": tonal_voiced_non_drum_hit_guard,
+        "struck_percussion_guard_exception": struck_percussion_guard_exception,
+        "pitched_metal_material_evidence": pitched_metal_material_evidence,
+        "hand_drum_material_evidence": hand_drum_material_evidence,
+        "struck_wood_material_evidence": struck_wood_material_evidence,
+        "compact_struck_tonal_percussion_score": compact_struck_tonal_percussion_score,
+        "hand_drum_membrane_score": hand_drum_membrane_score,
+        "pitched_metal_percussion_score": pitched_metal_percussion_score,
+        "struck_wood_score": struck_wood_score,
+        "pitched_mallet_instrument_score": pitched_mallet_instrument_score,
         "metallic_noise_score": metallic_noise_score,
         "scrape_rasp_score": scrape_rasp_score,
         "fx_motion_score": fx_motion_score,

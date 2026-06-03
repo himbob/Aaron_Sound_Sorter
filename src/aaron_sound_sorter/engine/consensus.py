@@ -41,6 +41,29 @@ def is_voice_phrase_shape(shape_name: str) -> bool:
     return str(shape_name or "") in VOICE_PHRASE_SHAPES
 
 
+def _measured_voice_source_strength(facts: SharedAudioFacts) -> float:
+    """Return low-level Human/Voice source strength without using filenames."""
+    evidence = facts.evidence if isinstance(facts.evidence, dict) else {}
+    values = []
+    for key in ("human_spoken_voice_score", "voice_score", "voice_vocal_source_score", "human_voice_score"):
+        try:
+            values.append(float(evidence.get(key, 0.0) or 0.0))
+        except (TypeError, ValueError):
+            pass
+    flat = (
+        evidence.get("physics_subpanels", {}).get("flat", {})
+        if isinstance(evidence.get("physics_subpanels"), dict)
+        else {}
+    )
+    if isinstance(flat, dict):
+        for key in ("human_spoken_voice_score", "voice_score", "voice_vocal_source_score", "human_voice_score"):
+            try:
+                values.append(float(flat.get(key, 0.0) or 0.0))
+            except (TypeError, ValueError):
+                pass
+    return max(values) if values else 0.0
+
+
 class ConsensusRunner:
     """Choose the best shared category from BrainVoter and PhysicsVoter."""
 
@@ -431,6 +454,30 @@ class ConsensusRunner:
             )
 
         if compatible_shared:
+            if primary == "pitched_repetition_phrase" and _measured_voice_source_strength(facts) >= 0.66:
+                voice_shared = [row for row in compatible_shared if _is_human_voice_candidate_row(row)]
+                if voice_shared:
+                    voice_shared.sort(
+                        key=lambda row: (
+                            -_candidate_voice_fit(row),
+                            float(row.get("combined_rank_score", 9999.0)),
+                            int(row.get("physics_rank", 9999)),
+                            int(row.get("brain_rank", 9999)),
+                            str(row.get("label", "")),
+                        )
+                    )
+                    rescued = voice_shared[0]
+                    return claim_from_candidate_row(
+                        row=rescued,
+                        source="shape_pitched_repetition_voice_identity_guard",
+                        reason=(
+                            "measured pitched-repetition shape kept its low-level Human/Voice source "
+                            "identity instead of broad Instrument Loops"
+                        ),
+                        shared=shared,
+                        can_override=True,
+                        strength=max(confidence, 0.90),
+                    )
             broad_loop = _best_broad_instrument_loop_row(compatible_shared)
             if broad_loop is not None and primary in {"pitched_phrase", "sustained_pad"}:
                 # v31.90: ShapeVoter is a structural witness, not a leaf sorter.

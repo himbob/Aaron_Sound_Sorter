@@ -527,6 +527,9 @@ class FamilyClaimArbiter:
             self._shape_number(facts, "percussive_event_ratio"),
             self._measured_score(facts, "onset_percussive_onset_score"),
         )
+        pitched_onset_score = self._measured_score(facts, "onset_pitched_onset_score")
+        percussive_onset_score = self._measured_score(facts, "onset_percussive_onset_score")
+        pitched_repetition_score = self._measured_score(facts, "pitched_repetition_phrase_score")
         drum_family = max(
             self._measured_score(facts, "drum_loop_source_score"),
             self._measured_score(facts, "drum_hit_score"),
@@ -709,12 +712,31 @@ class FamilyClaimArbiter:
                 strength=max(0.92, winning_claim.strength),
                 is_real_candidate=winning_claim.is_real_candidate,
             )
+        pitched_repetition_guard = bool(
+            (shape == "pitched_repetition_phrase" or pitched_repetition_score >= 0.58)
+            and pitched_onset_score >= percussive_onset_score - 0.02
+            and self._shape_number(facts, "pitched_event_ratio") >= 0.48
+            and max(
+                self._measured_role_value(facts, "pitched_music_loop"),
+                self._measured_role_value(facts, "pitched_music_phrase"),
+                self._measured_score(facts, "synth_tonal_source_score"),
+                self._measured_score(facts, "plucked_string_authority_score"),
+                self._measured_score(facts, "struck_keys_authority_score"),
+            )
+            >= 0.42
+            and drum_family <= 0.46
+        )
         rhythmic_body = bool(
             shape_confidence >= 0.84
             and event_count >= 8.0
             and repeat >= 0.40
             and pulse >= 0.32
-            and (percussive_event >= 0.40 or drum_family >= 0.46 or candidate_supported)
+            and not pitched_repetition_guard
+            and (
+                percussive_event >= 0.46
+                or drum_family >= 0.50
+                or (candidate_supported and percussive_onset_score >= pitched_onset_score - 0.04)
+            )
         )
         if not rhythmic_body:
             return winning_claim
@@ -817,6 +839,23 @@ class FamilyClaimArbiter:
         shape = _shape_vote_from_facts(facts)
         if shape not in {"solo_phrase", "echo_tail_hit", "hit_with_tail", "single_hit"}:
             return winning_claim
+        if self._facts_support_voice_before_tonal_stab(facts, winning_claim):
+            return claim_from_folder_path(
+                folder_path="Instruments/Voice/Phrase/One Shots",
+                source="final_measured_voice_before_tonal_stab_invariant",
+                reason=(
+                    "final tonal-stab invariant deferred to measured Voice branch "
+                    "evidence before creating a synthetic chord one-shot claim"
+                ),
+                shared=winning_claim.shared_candidates,
+                raw_candidate_score=winning_claim.raw_candidate_score,
+                brain_rank=winning_claim.brain_rank,
+                physics_rank=winning_claim.physics_rank,
+                shared_winner=winning_claim.shared_winner or winning_claim.folder_path,
+                can_override=True,
+                strength=max(0.94, winning_claim.strength),
+                is_real_candidate=winning_claim.is_real_candidate,
+            )
         tonal_source = max(
             self._measured_score(facts, "synth_tonal_source_score", "synth_chord_score"),
             self._measured_score(facts, "struck_keys_score", "struck_keys_authority_score"),
@@ -855,6 +894,100 @@ class FamilyClaimArbiter:
             is_real_candidate=winning_claim.is_real_candidate,
         )
 
+    def _facts_support_voice_before_tonal_stab(
+        self,
+        facts: SharedAudioFacts | None,
+        winning_claim: ConsensusClaim,
+    ) -> bool:
+        """Return True when measured Voice evidence outranks tonal-stab fallback.
+
+        The tonal-stab invariant is allowed to rescue clean short pitched sounds
+        from drum leaves. It must not turn a measured human voice branch into a
+        Synth Chord just because the short event is tonal. This check uses only
+        structured physics-layer metadata and source-blind subpanel scores.
+        """
+        if facts is None:
+            return False
+        layer = self._physics_layer(facts)
+        branch_name = ""
+        branch_confidence = 0.0
+        layer_voice_branch_score = 0.0
+        layer_human_voice_texture = 0.0
+        layer_rap_voice_texture = 0.0
+        if isinstance(layer, dict):
+            branch_name = str(layer.get("instrument_branch_selected") or layer.get("physics_layer_branch") or "")
+            branch_confidence = self._safe_float(
+                layer.get("instrument_branch_selected_confidence", layer.get("physics_layer_branch_confidence")),
+                0.0,
+            )
+            layer_voice_branch_score = self._safe_float(layer.get("instrument_branch_Voice"), 0.0)
+            layer_human_voice_texture = self._safe_float(layer.get("instrument_human_voice_texture"), 0.0)
+            layer_rap_voice_texture = self._safe_float(layer.get("instrument_rap_voice_texture"), 0.0)
+        physics_top_path = self._top_physics_guess_path(facts)
+        if not physics_top_path and isinstance(getattr(facts, "evidence", None), dict):
+            physics_top_row = facts.evidence.get("physics_vote_1")
+            if isinstance(physics_top_row, dict):
+                physics_top_path = (
+                    str(physics_top_row.get("folder_path") or physics_top_row.get("label") or "")
+                    .lower()
+                    .replace("\\", "/")
+                )
+        physics_top_voice = physics_top_path.startswith("instruments/voice/")
+        measured_roles = (
+            facts.evidence.get("measured_roles", {}) if isinstance(getattr(facts, "evidence", None), dict) else {}
+        )
+        detected_role = detected_parent_role_name(measured_roles if isinstance(measured_roles, dict) else {})
+        measured_voice_one_shot = bool(
+            detected_role == "voiced_one_shot" or self._measured_role_value(facts, "voiced_one_shot") >= 0.62
+        )
+        if self._facts_have_hard_clean_keys_authority(facts, winning_claim):
+            return False
+        voice_panel = max(
+            self._measured_score(facts, "voice_score"),
+            self._measured_score(facts, "human_spoken_voice_score"),
+            self._measured_score(facts, "human_breath_mouth_score"),
+            layer_voice_branch_score,
+        )
+        vocal_articulation = max(
+            self._measured_score(facts, "human_spoken_voice_score"),
+            self._measured_score(facts, "human_breath_mouth_score"),
+            layer_human_voice_texture,
+            layer_rap_voice_texture,
+        )
+        synth_panel = max(
+            self._measured_score(facts, "synth_tonal_source_score"),
+            self._measured_score(facts, "synth_chord_score"),
+        )
+        measured_voice_profile = bool(
+            voice_panel >= 0.62
+            and vocal_articulation >= 0.70
+            and self._shape_number(facts, "f0_voiced_ratio") >= 0.72
+            and self._shape_number(facts, "percussive_event_ratio") <= 0.10
+            and self._shape_number(facts, "drumlike_frame_ratio") <= 0.10
+        )
+        measured_voice_over_material_noise = bool(
+            measured_voice_profile
+            and physics_top_voice
+            and self._measured_score(facts, "drum_hit_score") <= 0.46
+            and self._measured_score(facts, "drum_loop_source_score") <= 0.20
+            and voice_panel >= synth_panel + 0.12
+        )
+        if self._facts_have_struck_percussion_voice_conflict(facts, winning_claim) and not (
+            (measured_voice_profile and self._facts_support_short_true_voice_one_shot(facts))
+            or measured_voice_over_material_noise
+        ):
+            return False
+        if not (
+            (branch_name == "Voice" and branch_confidence >= 0.62)
+            or physics_top_voice
+            or measured_voice_one_shot
+            or measured_voice_profile
+        ):
+            return False
+        if voice_panel < 0.58 or vocal_articulation < 0.62:
+            return False
+        return bool(not (synth_panel >= 0.62 and synth_panel >= voice_panel + 0.14))
+
     def _facts_support_strong_drum_one_shot(self, facts: SharedAudioFacts | None) -> bool:
         """Return True for short non-loop sounds with a strong measured drum anchor."""
         if facts is None or not isinstance(getattr(facts, "evidence", None), dict):
@@ -869,6 +1002,8 @@ class FamilyClaimArbiter:
         if facts.is_loop_like and duration > 1.25 and event_count > 4.0:
             return False
         if self._facts_support_clean_tonal_instrument_phrase(facts):
+            return False
+        if self._facts_support_clean_low_tonal_instrument_hit(facts):
             return False
         if self._facts_support_non_drum_voiced_phrase_hit(facts):
             return False
@@ -898,6 +1033,8 @@ class FamilyClaimArbiter:
         )
         if clean_tonal_non_drum_hit:
             return False
+        if self._facts_support_material_struck_drum_one_shot(facts):
+            return True
         if (
             duration <= 0.20
             and facts.is_short_hit_like
@@ -964,6 +1101,146 @@ class FamilyClaimArbiter:
             return True
         return bool(percussive_role and anchor >= 0.54 and shape_confidence >= 0.64 and facts.is_short_hit_like)
 
+    def _facts_support_clean_low_tonal_instrument_hit(self, facts: SharedAudioFacts | None) -> bool:
+        """Return True when a short low tonal hit is better explained as Bass/Synth.
+
+        This prevents the final drum one-shot firewall from overriding
+        PhysicsVoter when the top physics branch is an instrument bass hit with
+        clean tone, strong pitch evidence, and no measured drumlike/percussive
+        frames. It is intentionally source-name blind and only reads measured
+        subpanel, shape, and PhysicsVoter result data.
+        """
+        if facts is None:
+            return False
+        physics_top_path = self._top_physics_guess_path(facts)
+        if not (physics_top_path.startswith("instruments/bass/") or physics_top_path.startswith("instruments/synths/")):
+            return False
+        shape = _shape_vote_from_facts(facts)
+        if shape not in {"bass_phrase", "pitched_phrase", "solo_phrase", "hit_with_tail", "single_hit"}:
+            return False
+        duration = _feature_number_from_facts(facts, "duration_sec")
+        if duration <= 0.0 or duration > 1.75:
+            return False
+        low_tonal_source = max(
+            self._measured_score(facts, "bass_sub_score"),
+            self._measured_score(facts, "bass_synth_score"),
+            self._measured_score(facts, "low_end_source_score"),
+            self._measured_score(facts, "synth_tonal_source_score"),
+            self._measured_score(facts, "physics_subpanel_clean_tone"),
+        )
+        drum_body = max(
+            self._measured_score(facts, "drum_hit_score"),
+            self._measured_score(facts, "drum_kick_source_score"),
+            self._measured_score(facts, "drum_snare_source_score"),
+            self._measured_score(facts, "drum_clap_source_score"),
+            self._measured_score(facts, "drum_tom_conga_source_score"),
+            self._measured_score(facts, "drum_rim_stick_source_score"),
+            self._measured_score(facts, "drum_cymbal_source_score"),
+        )
+        material_flags = bool(
+            self._subpanel_bool(facts, "pitched_metal_material_evidence")
+            or self._subpanel_bool(facts, "hand_drum_material_evidence")
+            or self._subpanel_bool(facts, "struck_wood_material_evidence")
+            or self._subpanel_bool(facts, "struck_percussion_guard_exception")
+        )
+        return bool(
+            low_tonal_source >= 0.60
+            and drum_body <= 0.52
+            and not material_flags
+            and self._shape_number(facts, "pitched_event_ratio") >= 0.85
+            and self._shape_number(facts, "pitch_confidence") >= 0.70
+            and self._shape_number(facts, "low_event_ratio") >= 0.70
+            and self._shape_number(facts, "percussive_event_ratio") <= 0.08
+            and self._shape_number(facts, "drumlike_frame_ratio") <= 0.08
+            and self._measured_score(facts, "physics_subpanel_noisy_air") <= 0.30
+        )
+
+    def _facts_support_material_struck_drum_one_shot(self, facts: SharedAudioFacts | None) -> bool:
+        """Return True for struck membrane/wood/metal hits with drum corroboration."""
+        if facts is None:
+            return False
+        shape = _shape_vote_from_facts(facts)
+        voice_panel = max(
+            self._subpanel_score(facts, "voice_score"),
+            self._subpanel_score(facts, "human_spoken_voice_score"),
+            self._subpanel_score(facts, "human_breath_mouth_score"),
+        )
+        repeated_percussion_loop_conflict = bool(
+            shape in {"beat_loop", "top_loop", "drum_loop", "repeated_phrase_loop"}
+            and max(
+                self._subpanel_score(facts, "drum_shaker_tambourine_source_score"),
+                self._subpanel_score(facts, "drum_loop_source_score"),
+            )
+            >= 0.70
+            and self._subpanel_score(facts, "role_loop_score") >= 0.45
+            and not self._facts_support_short_true_voice_one_shot(facts)
+        )
+        material_phrase_percussion_conflict = bool(
+            shape
+            in {
+                "bass_phrase",
+                "pitched_repetition_phrase",
+                "repeated_phrase_loop",
+                "solo_phrase",
+            }
+            and max(
+                self._subpanel_score(facts, "drum_metallic_percussion_source_score"),
+                self._subpanel_score(facts, "hand_drum_membrane_score"),
+                self._subpanel_score(facts, "struck_wood_score"),
+                self._subpanel_score(facts, "pitched_metal_percussion_score"),
+            )
+            >= 0.56
+            and voice_panel < 0.58
+            and not self._facts_support_short_true_voice_one_shot(facts)
+        )
+        if repeated_percussion_loop_conflict or material_phrase_percussion_conflict:
+            return True
+        if shape not in {"single_hit", "hit_with_tail", "echo_tail_hit", "solo_phrase", "foley_action"}:
+            return False
+        struck_material = max(
+            self._subpanel_score(facts, "hand_drum_membrane_score"),
+            self._subpanel_score(facts, "pitched_metal_percussion_score"),
+            self._subpanel_score(facts, "struck_wood_score"),
+        )
+        material_flag = bool(
+            self._subpanel_bool(facts, "hand_drum_material_evidence")
+            or self._subpanel_bool(facts, "pitched_metal_material_evidence")
+            or self._subpanel_bool(facts, "struck_wood_material_evidence")
+            or self._subpanel_bool(facts, "struck_percussion_guard_exception")
+        )
+        drum_source = max(
+            self._subpanel_score(facts, "drum_hit_score"),
+            self._subpanel_score(facts, "drum_tom_conga_source_score"),
+            self._subpanel_score(facts, "drum_rim_stick_source_score"),
+            self._subpanel_score(facts, "drum_metallic_percussion_source_score"),
+            self._subpanel_score(facts, "drum_cymbal_source_score"),
+        )
+        if not (material_flag and struck_material >= 0.56 and drum_source >= 0.48):
+            return False
+        if self._facts_have_physics_drum_candidate(facts, max_rank=3, max_score=8.0):
+            return True
+        return self._facts_have_internal_candidate(
+            facts,
+            (
+                "drum",
+                "percussion",
+                "tom",
+                "conga",
+                "bongo",
+                "tabla",
+                "cymbal",
+                "hat",
+                "rim",
+                "stick",
+                "bell",
+                "metallic",
+                "world",
+            ),
+            top_family="Drums",
+            max_rank=6,
+            max_score=8.0,
+        )
+
     def _facts_or_candidates_support_drum_one_shot(
         self,
         facts: SharedAudioFacts | None,
@@ -973,7 +1250,24 @@ class FamilyClaimArbiter:
         """Require some non-physics agreement before a final drum rescue can fire."""
         if raw_claim.family == "Drums" or winning_claim.family == "Drums":
             return True
-        fragments = ("drum", "kick", "snare", "tom", "percussion", "clap", "hat", "cymbal", "rim", "stick")
+        fragments = (
+            "drum",
+            "kick",
+            "snare",
+            "tom",
+            "percussion",
+            "clap",
+            "hat",
+            "cymbal",
+            "rim",
+            "stick",
+            "conga",
+            "bongo",
+            "tabla",
+            "bell",
+            "metallic",
+            "world",
+        )
         if self._shared_candidate_has_top_family(
             winning_claim,
             fragments,
@@ -1227,11 +1521,20 @@ class FamilyClaimArbiter:
             self._subpanel_score(facts, "human_breath_mouth_score"),
         )
         measured_voice_shape_release = bool(
-            shape in {"vocal_phrase", "pitched_phrase", "pitched_phrase_shape"}
+            shape in {"vocal_phrase", "pitched_phrase", "pitched_phrase_shape", "pitched_repetition_phrase"}
             and not strong_concrete_fx
-            and voice_panel_score >= 0.78
-            and self._subpanel_score(facts, "human_spoken_voice_score") >= 0.74
+            and voice_panel_score >= (0.68 if shape == "pitched_repetition_phrase" else 0.78)
+            and self._subpanel_score(facts, "human_spoken_voice_score")
+            >= (0.68 if shape == "pitched_repetition_phrase" else 0.74)
             and self._shape_number(facts, "f0_voiced_ratio") >= 0.70
+            and not (
+                shape == "pitched_repetition_phrase"
+                and (
+                    self._shape_number(facts, "onset_count") > 48.0
+                    or self._shape_number(facts, "onset_density_hz") > 4.8
+                    or self._shape_number(facts, "high_event_ratio") > 0.22
+                )
+            )
             and self._shape_number(facts, "percussive_event_ratio") <= 0.18
             and self._shape_number(facts, "drumlike_frame_ratio") <= 0.18
             and (
@@ -1531,6 +1834,8 @@ class FamilyClaimArbiter:
         """
         if facts is None:
             return False
+        if self._facts_have_struck_percussion_voice_conflict(facts, winning_claim):
+            return False
         measured_roles = (
             facts.evidence.get("measured_roles", {}) if isinstance(getattr(facts, "evidence", None), dict) else {}
         )
@@ -1585,6 +1890,65 @@ class FamilyClaimArbiter:
             max_physics_rank=8,
         )
         return bool(fx_voice_or_design or not direct_instrument_voice)
+
+    def _facts_have_struck_percussion_voice_conflict(
+        self,
+        facts: SharedAudioFacts | None,
+        winning_claim: ConsensusClaim | None,
+    ) -> bool:
+        """Return True when material percussion evidence should block voice claims."""
+        if facts is None:
+            return False
+        shape = _shape_vote_from_facts(facts)
+        if shape not in {"single_hit", "hit_with_tail", "echo_tail_hit", "solo_phrase", "foley_action"}:
+            return False
+        material_evidence = bool(
+            self._subpanel_bool(facts, "pitched_metal_material_evidence")
+            or self._subpanel_bool(facts, "hand_drum_material_evidence")
+            or self._subpanel_bool(facts, "struck_wood_material_evidence")
+            or self._subpanel_bool(facts, "struck_percussion_guard_exception")
+        )
+        struck_material = max(
+            self._subpanel_score(facts, "pitched_metal_percussion_score"),
+            self._subpanel_score(facts, "hand_drum_membrane_score"),
+            self._subpanel_score(facts, "struck_wood_score"),
+        )
+        drum_source = max(
+            self._subpanel_score(facts, "drum_hit_score"),
+            self._subpanel_score(facts, "drum_tom_conga_source_score"),
+            self._subpanel_score(facts, "drum_rim_stick_source_score"),
+            self._subpanel_score(facts, "drum_metallic_percussion_source_score"),
+            self._subpanel_score(facts, "drum_cymbal_source_score"),
+        )
+        if not (material_evidence and struck_material >= 0.56 and drum_source >= 0.50):
+            return False
+        has_drum_candidate = self._facts_have_physics_drum_candidate(facts, max_rank=3, max_score=8.0)
+        if not has_drum_candidate and winning_claim is not None:
+            has_drum_candidate = self._shared_candidate_has_top_family(
+                winning_claim,
+                ("drum", "percussion", "tom", "conga", "bongo", "tabla", "cymbal", "hat", "rim", "stick", "bell"),
+                top_family="Drums",
+                max_score=18.0,
+                max_brain_rank=8,
+                max_physics_rank=8,
+            )
+        if not has_drum_candidate:
+            return False
+        direct_voice_candidate = (
+            False
+            if winning_claim is None
+            else self._shared_candidate_has_top_family(
+                winning_claim,
+                ("voice", "vocal", "choir", "spoken"),
+                top_family="Instruments",
+                max_score=10.0,
+                max_brain_rank=4,
+                max_physics_rank=4,
+            )
+        )
+        if direct_voice_candidate and self._facts_support_short_true_voice_one_shot(facts):
+            return False
+        return True
 
     def _brain_voice_one_shot_folder(self, facts: SharedAudioFacts | None) -> str:
         """Return a safe Voice one-shot folder when brain lanes strongly agree.
@@ -1749,6 +2113,14 @@ class FamilyClaimArbiter:
 
     def _subpanel_score(self, facts: SharedAudioFacts | None, name: str) -> float:
         return self._safe_float(self._physics_subpanel_flat(facts).get(name), 0.0)
+
+    def _subpanel_bool(self, facts: SharedAudioFacts | None, name: str) -> bool:
+        value = self._physics_subpanel_flat(facts).get(name)
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            return value.strip().lower() in {"true", "1", "yes"}
+        return bool(value)
 
     def _measured_score(self, facts: SharedAudioFacts | None, *names: str) -> float:
         """Return the strongest source-name-blind score for any supplied metric name."""
@@ -2637,6 +3009,7 @@ class FamilyClaimArbiter:
             and self._shape_number(facts, "percussive_event_ratio") <= 0.25
             and self._shape_number(facts, "drumlike_frame_ratio") <= 0.25
             and not self._facts_have_hard_clean_keys_authority(facts, winning_claim)
+            and not self._facts_have_struck_percussion_voice_conflict(facts, winning_claim)
         ):
             return review_claim(
                 label="_TO_REVIEW/Measured Role Conflict",
@@ -2974,6 +3347,24 @@ class FamilyClaimArbiter:
                 return winning_claim
         except Exception:
             pass
+        if not measured_branch_folder:
+            physics_path = self._top_physics_guess_path(facts)
+            measured_keys_repetition_loop = bool(
+                physics_path.startswith("instruments/keys/")
+                and (
+                    measured_shape == "pitched_repetition_phrase"
+                    or _shape_vote_from_facts(facts) == "pitched_repetition_phrase"
+                )
+                and self._shape_number(facts, "low_event_ratio") >= 0.18
+                and self._shape_number(facts, "mid_event_ratio") >= 0.55
+                and self._shape_number(facts, "high_event_ratio") <= 0.08
+                and self._shape_number(facts, "spectral_flatness_mean") <= 0.08
+                and self._shape_number(facts, "percussive_event_ratio") <= 0.12
+                and self._shape_number(facts, "drumlike_frame_ratio") <= 0.12
+                and not self._facts_support_synth_loop(facts, winning_claim)
+            )
+            if measured_keys_repetition_loop:
+                measured_branch_folder = "Instruments/Keys/Electric Piano/Loops"
         if not measured_branch_folder:
             return winning_claim
         if self._norm_claim_path(measured_branch_folder) == path:
@@ -3473,6 +3864,7 @@ class FamilyClaimArbiter:
                     "sustained_pad",
                     "bass_phrase",
                     "repeated_phrase_loop",
+                    "pitched_repetition_phrase",
                     "compound_musical_loop",
                     "mixed_instrument_loop",
                     "instrument_plus_fx_loop",
@@ -6176,7 +6568,6 @@ class FamilyClaimArbiter:
         sustained_tonal = self._shape_number(facts, "sustained_tonal_frame_ratio")
         non_event_tonal = self._shape_number(facts, "non_event_tonal_ratio")
         pitched_event = self._shape_number(facts, "pitched_event_ratio")
-        f0_voiced = self._shape_number(facts, "f0_voiced_ratio")
         non_voice = (
             max(
                 self._measured_role_value(facts, "vocal_music_phrase"),
@@ -6218,14 +6609,45 @@ class FamilyClaimArbiter:
                 self._measured_score(facts, "drum_loop_source_score"),
                 self._measured_score(facts, "rhythmic_break_loop_score"),
             )
+        low_event_has_drum_loop_corroboration = bool(
+            low_event >= 0.88
+            and (
+                max(
+                    role_strength(roles, "drum_loop"),
+                    role_strength(roles, "low_rhythmic_drum_loop"),
+                    role_strength(roles, "percussive_drum_loop"),
+                )
+                >= 0.40
+                or self._measured_score(facts, "drum_loop_source_score") >= 0.24
+                or max(percussive_event, drumlike_event) >= 0.12
+                or (layer_drum_branch == "DrumLoop" and layer_drum_confidence >= 0.50)
+            )
+        )
+        clean_measured_bass_phrase_veto = bool(
+            shape == "bass_phrase"
+            and shape_confidence >= 0.88
+            and self._facts_have_decisive_bass_branch_authority(facts)
+            and percussive_event <= 0.08
+            and drumlike_event <= 0.08
+            and self._measured_score(facts, "drum_loop_source_score") <= 0.18
+        )
+        if clean_measured_bass_phrase_veto:
+            return False
         sustained_tonal_instrument_veto = bool(
-            shape in {"bass_phrase", "repeated_phrase_loop", "pitched_phrase", "pitched_phrase_shape"}
+            shape
+            in {
+                "bass_phrase",
+                "repeated_phrase_loop",
+                "pitched_repetition_phrase",
+                "pitched_phrase",
+                "pitched_phrase_shape",
+            }
             and sustained_tonal >= 0.92
             and non_event_tonal >= 0.92
             and pitched_event >= 0.90
             and percussive_event <= 0.08
             and drumlike_event <= 0.08
-            and not (low_event >= 0.88 and (f0_voiced <= 0.35 or low_event >= 0.90))
+            and not low_event_has_drum_loop_corroboration
         )
         if sustained_tonal_instrument_veto:
             return False
@@ -6242,7 +6664,7 @@ class FamilyClaimArbiter:
             and high_event <= 0.35
             and pitched_onset_score >= 0.32
             and pitched_onset_score >= percussive_onset_score + 0.10
-            and not (low_event >= 0.88 and (f0_voiced <= 0.35 or low_event >= 0.90))
+            and not low_event_has_drum_loop_corroboration
             and role_strength(roles, "drum_loop") < 0.82
         )
         if tonal_nonpercussive_instrument_loop_veto:
@@ -6262,7 +6684,15 @@ class FamilyClaimArbiter:
         if weak_non_low_repeated_phrase:
             return False
         tonal_synth_or_arp_loop_veto = bool(
-            shape in {"beat_loop", "repeated_phrase_loop", "bass_phrase", "pitched_phrase", "pitched_phrase_shape"}
+            shape
+            in {
+                "beat_loop",
+                "repeated_phrase_loop",
+                "pitched_repetition_phrase",
+                "bass_phrase",
+                "pitched_phrase",
+                "pitched_phrase_shape",
+            }
             and shape_confidence >= 0.78
             and max(
                 self._measured_role_value(facts, "pitched_music_phrase"),
@@ -6314,7 +6744,15 @@ class FamilyClaimArbiter:
         )
         transition_shaped_drum_loop = self._facts_support_rhythmic_drum_loop_over_transition(facts)
         strong_pitched_nonpercussive_loop = bool(
-            shape in {"pitched_phrase", "pitched_phrase_shape", "sustained_pad", "vocal_phrase", "bass_phrase"}
+            shape
+            in {
+                "pitched_phrase",
+                "pitched_phrase_shape",
+                "pitched_repetition_phrase",
+                "sustained_pad",
+                "vocal_phrase",
+                "bass_phrase",
+            }
             and shape_confidence >= 0.70
             and pitched_event >= 0.50
             and sustained_tonal >= 0.50
@@ -6489,6 +6927,8 @@ class FamilyClaimArbiter:
     ) -> bool:
         if facts is None:
             return False
+        if self._facts_have_struck_percussion_voice_conflict(facts, winning_claim):
+            return False
         drum_loop_role = max(
             self._measured_role_value(facts, "drum_loop"),
             self._measured_role_value(facts, "low_rhythmic_drum_loop"),
@@ -6637,7 +7077,14 @@ class FamilyClaimArbiter:
         )
         source_safe_voice_shape = bool(
             (
-                shape in {"pitched_phrase_shape", "pitched_phrase", "bass_phrase", "vocal_phrase"}
+                shape
+                in {
+                    "pitched_phrase_shape",
+                    "pitched_phrase",
+                    "bass_phrase",
+                    "vocal_phrase",
+                    "pitched_repetition_phrase",
+                }
                 and shape_confidence >= 0.82
             )
             or pitched_phrase_shape_score >= 0.64
@@ -6693,7 +7140,24 @@ class FamilyClaimArbiter:
                 or getattr(facts, "is_loop_like", False)
             )
         )
-        if voice_loop_panel:
+        pitched_repetition_voice_panel = bool(
+            shape == "pitched_repetition_phrase"
+            and shape_confidence >= 0.82
+            and f0_voiced >= 0.70
+            and self._subpanel_score(facts, "human_spoken_voice_score") >= 0.68
+            and voice_panel_score >= 0.66
+            and onset_count <= 48.0
+            and self._shape_number(facts, "onset_density_hz") <= 4.8
+            and self._shape_number(facts, "high_event_ratio") <= 0.22
+            and self._shape_number(facts, "percussive_event_ratio") <= 0.18
+            and self._shape_number(facts, "drumlike_frame_ratio") <= 0.18
+            and (
+                direct_voice_candidate
+                or physics_voice_branch_candidate
+                or self._subpanel_score(facts, "human_spoken_voice_score") >= 0.70
+            )
+        )
+        if voice_loop_panel or pitched_repetition_voice_panel:
             return True
         single_hit_voice_panel = bool(
             shape == "single_hit"
@@ -8795,7 +9259,15 @@ class FamilyClaimArbiter:
             or (best_fx_score < 10.0 and best_fx_score + 4.0 < best_instrument_score and instrument_support_count < 2)
         )
         return bool(
-            shape in {"pitched_phrase", "pitched_phrase_shape", "sustained_pad", "vocal_phrase", "bass_phrase"}
+            shape
+            in {
+                "pitched_phrase",
+                "pitched_phrase_shape",
+                "pitched_repetition_phrase",
+                "sustained_pad",
+                "vocal_phrase",
+                "bass_phrase",
+            }
             and shape_confidence >= 0.70
             and self._measured_role_value(facts, "pitched_music_loop") >= 0.68
             and self._shape_number(facts, "pitched_event_ratio") >= 0.58

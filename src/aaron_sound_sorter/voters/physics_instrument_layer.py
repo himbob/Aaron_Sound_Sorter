@@ -502,6 +502,7 @@ class PhysicsInstrumentLayer:
                 "mixed_instrument_loop",
                 "compound_musical_loop",
                 "repeated_phrase_loop",
+                "pitched_repetition_phrase",
                 "sustained_pad",
                 "bass_phrase",
                 "",
@@ -539,6 +540,7 @@ class PhysicsInstrumentLayer:
                 "mixed_instrument_loop",
                 "compound_musical_loop",
                 "repeated_phrase_loop",
+                "pitched_repetition_phrase",
                 "sustained_pad",
                 "bass_phrase",
                 "",
@@ -934,6 +936,13 @@ class PhysicsInstrumentLayer:
         pluck_name, pluck_score, pluck_margin = panel_summary["PluckedString"]
         synth_sub, synth_sub_score, synth_sub_margin = panel_summary["Synth"]
         pluck_family = {"AcousticGuitar", "ElectricGuitar", "NylonOrSoftPluck", "WorldPluck"}
+        synth_repetition_keys_decoy = bool(
+            shape_name == "pitched_repetition_phrase"
+            and sub_synth_tonal >= sub_keys_authority + 0.10
+            and synth_sub_score >= keys_sub_score - 0.10
+            and loop_pitched >= 0.80
+            and max(percussive_loop, drumlike_loop) <= 0.12
+        )
         electric_keys_panel_source = bool(
             keys_sub == "ElectricPiano"
             and keys_sub_score >= 0.78
@@ -943,6 +952,7 @@ class PhysicsInstrumentLayer:
             and flatness <= 0.075
             and fa_formant_std >= 240.0
             and max(percussive_loop, drumlike_loop) <= 0.12
+            and not synth_repetition_keys_decoy
         )
         wide_formant_voice_decoy = bool(
             fa_formant_std >= 600.0
@@ -1235,7 +1245,15 @@ class PhysicsInstrumentLayer:
                 or other_reed_source
             )
             and shape_name
-            in {"pitched_phrase", "vocal_phrase", "solo_phrase", "repeated_phrase_loop", "bass_phrase", "sustained_pad"}
+            in {
+                "pitched_phrase",
+                "vocal_phrase",
+                "solo_phrase",
+                "pitched_repetition_phrase",
+                "repeated_phrase_loop",
+                "bass_phrase",
+                "sustained_pad",
+            }
             and shape_confidence >= 0.68
             and pitch_strength >= 0.44
             and (mid + high) >= 0.24

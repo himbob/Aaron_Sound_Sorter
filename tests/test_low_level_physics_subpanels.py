@@ -259,6 +259,93 @@ def test_new_category_coverage_panels_expose_drum_fx_texture_human_animal_scores
     assert flat["human_applause_crowd_score"] > 0.20
 
 
+def test_compact_pitched_metal_percussion_survives_tonal_voice_guard() -> None:
+    facts = make_facts(
+        log_transient_count=float(np.log1p(1.0)),
+        onset_span_ratio=0.10,
+        onset_interval_regularity=0.90,
+        event_rate_hz=0.4,
+        attack_rise_time_norm=0.018,
+        temporal_centroid_ratio=0.18,
+        tail_energy_ratio=0.20,
+        pitch_confidence=0.78,
+        attack_pitch_confidence=0.78,
+        body_pitch_confidence=0.74,
+        f0_voiced_ratio=0.76,
+        loop_pitched_event_ratio=0.82,
+        loop_mean_event_pitch_confidence=0.78,
+        loop_sustained_tonal_frame_ratio=0.12,
+        loop_non_event_tonal_ratio=0.10,
+        loop_percussive_event_ratio=0.04,
+        loop_drumlike_frame_ratio=0.02,
+        harmonic_energy_ratio=0.54,
+        fundamental_dominance_ratio=0.36,
+        inharmonicity=0.52,
+        spectral_peak_count=10.0,
+        spectral_peak_stability=0.44,
+        spectral_flatness_mean=0.18,
+        spectral_entropy_mean=0.42,
+        mid_ratio_500_2000hz=0.36,
+        presence_ratio_2000_8000hz=0.28,
+        air_ratio_gt_8000hz=0.08,
+        attack_high_ratio=0.24,
+        tail_high_ratio=0.20,
+        noise_burst_duration_ms=90.0,
+    )
+    flat = facts.evidence["physics_subpanels"]["flat"]
+
+    assert flat["struck_percussion_guard_exception"] is True
+    assert flat["pitched_metal_material_evidence"] is True
+    assert flat["pitched_metal_percussion_score"] >= 0.54
+    assert flat["drum_metallic_percussion_source_score"] >= 0.48
+    assert flat["drum_hit_score"] > 0.34
+
+
+def test_clean_voiced_solo_hit_still_gets_drum_panels_capped() -> None:
+    facts = make_facts(
+        log_transient_count=float(np.log1p(1.0)),
+        onset_span_ratio=0.08,
+        onset_interval_regularity=0.95,
+        event_rate_hz=0.3,
+        attack_rise_time_norm=0.07,
+        temporal_centroid_ratio=0.30,
+        tail_energy_ratio=0.62,
+        pitch_confidence=0.88,
+        attack_pitch_confidence=0.86,
+        body_pitch_confidence=0.88,
+        f0_voiced_ratio=0.92,
+        loop_pitched_event_ratio=0.92,
+        loop_mean_event_pitch_confidence=0.86,
+        loop_sustained_tonal_frame_ratio=0.90,
+        loop_non_event_tonal_ratio=0.88,
+        loop_percussive_event_ratio=0.03,
+        loop_drumlike_frame_ratio=0.02,
+        harmonic_energy_ratio=0.72,
+        fundamental_dominance_ratio=0.62,
+        formant_like_peak_spacing=0.68,
+        spectral_peak_count=5.0,
+        spectral_peak_stability=0.28,
+        spectral_flatness_mean=0.10,
+        spectral_entropy_mean=0.32,
+        mid_ratio_500_2000hz=0.36,
+        presence_ratio_2000_8000hz=0.26,
+        air_ratio_gt_8000hz=0.06,
+        body_noise_ratio=0.24,
+        tail_noise_ratio=0.18,
+        noise_burst_duration_ms=40.0,
+    )
+    flat = facts.evidence["physics_subpanels"]["flat"]
+
+    assert flat["tonal_voiced_non_drum_hit_guard"] is True
+    assert flat["struck_percussion_guard_exception"] is False
+    assert flat["pitched_metal_material_evidence"] is False
+    assert flat["hand_drum_material_evidence"] is False
+    assert flat["struck_wood_material_evidence"] is False
+    assert flat["drum_hit_score"] <= 0.34
+    assert flat["drum_metallic_percussion_source_score"] <= 0.34
+    assert flat["drum_tom_conga_source_score"] <= 0.42
+
+
 def test_texture_motion_panel_identifies_long_noisy_moving_bed_without_drums() -> None:
     facts = make_facts(
         log_transient_count=float(np.log1p(2.0)),
@@ -411,3 +498,90 @@ def test_all_current_brain_category_panels_are_present() -> None:
     for spec in ALL_CATEGORY_SPECS:
         assert spec.score_key in flat, spec.category_path
         assert 0.0 <= float(flat[spec.score_key]) <= 1.0
+
+
+def test_pitched_repetition_subpanel_suppresses_weak_drum_loop_source() -> None:
+    """Tonal repeated phrases should not become drum loops from repetition alone."""
+    facts = make_facts(
+        log_transient_count=float(np.log1p(14.0)),
+        onset_span_ratio=0.88,
+        onset_interval_regularity=0.20,
+        event_rate_hz=2.0,
+        attack_rise_time_norm=0.05,
+        temporal_centroid_ratio=0.44,
+        tail_energy_ratio=0.35,
+        pitch_confidence=0.78,
+        f0_voiced_ratio=0.70,
+        body_pitch_confidence=0.76,
+        loop_pitched_event_ratio=0.82,
+        loop_mean_event_pitch_confidence=0.78,
+        loop_sustained_tonal_frame_ratio=0.70,
+        loop_non_event_tonal_ratio=0.66,
+        loop_tonal_to_percussive_balance=0.72,
+        loop_percussive_event_ratio=0.18,
+        loop_drumlike_frame_ratio=0.08,
+        loop_mean_event_low_ratio=0.18,
+        loop_mean_event_high_ratio=0.20,
+        loop_mean_event_noise_ratio=0.12,
+        harmonic_energy_ratio=0.70,
+        harmonic_to_noise_ratio=0.62,
+        harmonic_peak_count=7.0,
+        spectral_peak_stability=0.38,
+        fundamental_dominance_ratio=0.52,
+        spectral_flatness_mean=0.07,
+        spectral_entropy_mean=0.28,
+        mid_ratio_500_2000hz=0.42,
+        presence_ratio_2000_8000hz=0.20,
+        sub_bass_ratio_lt_150hz=0.08,
+        bass_ratio_150_500hz=0.12,
+        attack_high_ratio=0.18,
+        attack_zcr=0.10,
+    )
+    flat = facts.evidence["physics_subpanels"]["flat"]
+
+    assert flat["pitched_repetition_drum_decoy"] is True
+    assert flat["pitched_repetition_phrase_score"] >= 0.70
+    assert flat["onset_pitched_onset_score"] > flat["onset_percussive_onset_score"]
+    assert flat["drum_loop_source_score"] <= 0.22
+
+
+def test_real_drum_loop_subpanel_survives_pitched_repetition_guard() -> None:
+    """Percussive distributed loops should remain strong drum-loop candidates."""
+    facts = make_facts(
+        log_transient_count=float(np.log1p(20.0)),
+        onset_span_ratio=0.90,
+        onset_interval_regularity=0.16,
+        event_rate_hz=3.0,
+        attack_rise_time_norm=0.025,
+        temporal_centroid_ratio=0.50,
+        tail_energy_ratio=0.28,
+        pitch_confidence=0.20,
+        f0_voiced_ratio=0.12,
+        loop_pitched_event_ratio=0.12,
+        loop_mean_event_pitch_confidence=0.10,
+        loop_sustained_tonal_frame_ratio=0.10,
+        loop_non_event_tonal_ratio=0.08,
+        loop_tonal_to_percussive_balance=0.08,
+        loop_percussive_event_ratio=0.72,
+        loop_drumlike_frame_ratio=0.66,
+        loop_mean_event_low_ratio=0.40,
+        loop_mean_event_high_ratio=0.34,
+        loop_mean_event_noise_ratio=0.50,
+        harmonic_energy_ratio=0.18,
+        harmonic_to_noise_ratio=0.15,
+        spectral_flatness_mean=0.42,
+        spectral_entropy_mean=0.68,
+        body_noise_ratio=0.50,
+        tail_noise_ratio=0.36,
+        mid_ratio_500_2000hz=0.24,
+        presence_ratio_2000_8000hz=0.32,
+        sub_bass_ratio_lt_150hz=0.16,
+        bass_ratio_150_500hz=0.20,
+        attack_high_ratio=0.34,
+        attack_zcr=0.28,
+    )
+    flat = facts.evidence["physics_subpanels"]["flat"]
+
+    assert flat["pitched_repetition_drum_decoy"] is False
+    assert flat["drum_loop_source_score"] >= 0.65
+    assert flat["rhythmic_break_loop_score"] >= 0.75

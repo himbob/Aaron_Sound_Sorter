@@ -29,6 +29,7 @@ from aaron_sound_sorter.voters.base import Voter, clamp01
 
 SHAPE_TOP = "_SHAPE_DIAGNOSTIC"
 PITCHED_PHRASE_SHAPE = "pitched_phrase_shape"
+PITCHED_REPETITION_PHRASE = "pitched_repetition_phrase"
 
 
 @dataclass(frozen=True)
@@ -194,6 +195,12 @@ def classify_shape(values: Mapping[str, float], *, facts: SharedAudioFacts) -> S
     zcr = v(values, "zcr_mean")
     flux = v(values, "spectral_flux_mean")
     flux_var = v(values, "spectral_flux_variance")
+    tonal_balance = v(values, "loop_tonal_to_percussive_balance")
+    pitched_onset = evidence_number(facts, "onset_pitched_onset_score")
+    percussive_onset = evidence_number(facts, "onset_percussive_onset_score")
+    plucked_authority = evidence_number(facts, "plucked_string_authority_score")
+    synth_source = evidence_number(facts, "synth_tonal_source_score")
+    keys_authority = evidence_number(facts, "struck_keys_authority_score")
     duration = float(facts.evidence.get("duration_sec", 0.0) or 0.0) if isinstance(facts.evidence, dict) else 0.0
 
     low_total = clamp01(v(values, "sub_bass_ratio_lt_150hz") + v(values, "bass_ratio_150_500hz"))
@@ -452,6 +459,22 @@ def classify_shape(values: Mapping[str, float], *, facts: SharedAudioFacts) -> S
     if max(layered_loop, instrument_plus_fx) >= 0.66 and band_spread >= 0.45:
         repeated_phrase_score *= 0.80
     scores["repeated_phrase_loop"] = repeated_phrase_score
+    pitched_repetition_body = clamp01(
+        0.22 * true_repetition
+        + 0.20 * tonal_presence
+        + 0.16 * ramp(max(pitched, pitch_conf, f0_voiced), 0.45, 0.88)
+        + 0.14 * ramp(max(sustained_tonal, non_event_tonal, tonal_balance), 0.48, 0.92)
+        + 0.12 * ramp(max(pitched_onset - percussive_onset, tonal_balance), 0.04, 0.38)
+        + 0.10 * ramp(max(plucked_authority, synth_source, keys_authority), 0.32, 0.70)
+        + 0.08 * inverse_ramp(max(percussive, drumlike), 0.12, 0.36)
+        + 0.08 * inverse_ramp(flatness, 0.10, 0.40)
+        - 0.08 * noise_wash
+    )
+    if onset_count < 3.0 or true_repetition < 0.32:
+        pitched_repetition_body *= 0.45
+    if max(percussive, drumlike) >= 0.42 and pitched_onset < percussive_onset + 0.06:
+        pitched_repetition_body *= 0.55
+    scores[PITCHED_REPETITION_PHRASE] = pitched_repetition_body
     scores["solo_phrase"] = clamp01(
         0.52 * solo_isolation
         + 0.24 * tonal_presence
@@ -502,10 +525,19 @@ def classify_shape(values: Mapping[str, float], *, facts: SharedAudioFacts) -> S
         and max(sustained_tonal, non_event_tonal) >= 0.82
         and max(percussive, drumlike) <= 0.08
     )
+    pitched_repetition_drum_decoy = bool(
+        scores.get(PITCHED_REPETITION_PHRASE, 0.0) >= 0.60
+        and max(pitched_onset, tonal_balance, pitched, pitch_conf) >= max(percussive_onset, percussive, drumlike) + 0.04
+        and max(plucked_authority, synth_source, keys_authority, tonal_presence) >= 0.42
+        and max(percussive, drumlike) <= 0.38
+    )
     rhythmic_break_has_drum_body = bool(
-        max(percussive, drumlike) >= 0.52
-        or (high_event >= 0.42 and high_total >= 0.18)
-        or (low_event >= 0.62 and max(percussive, drumlike) >= 0.18 and not clean_tonal_low_arp_body)
+        not pitched_repetition_drum_decoy
+        and (
+            max(percussive, drumlike) >= 0.52
+            or (high_event >= 0.42 and high_total >= 0.18 and percussive_onset >= pitched_onset - 0.04)
+            or (low_event >= 0.62 and max(percussive, drumlike) >= 0.18 and not clean_tonal_low_arp_body)
+        )
     )
     if rhythmic_break_loop >= 0.62 and true_repetition >= 0.62 and onset_count >= 6.0 and rhythmic_break_has_drum_body:
         preferred_drum_shape = "top_loop" if high_event >= 0.42 and high_total >= 0.18 else "beat_loop"
@@ -616,6 +648,17 @@ def v(values: Mapping[str, float], name: str, default: float = 0.0) -> float:
         return float(default)
 
 
+def evidence_number(facts: SharedAudioFacts, name: str, default: float = 0.0) -> float:
+    """Read a finite numeric value from the shared evidence dictionary."""
+    evidence = getattr(facts, "evidence", {})
+    if not isinstance(evidence, Mapping):
+        return float(default)
+    try:
+        return float(evidence.get(name, default) or default)
+    except Exception:
+        return float(default)
+
+
 def expm1_safe(value: float) -> float:
     import math
 
@@ -650,6 +693,7 @@ def shape_compatible_tops(primary_shape: str) -> list[str]:
         "bass_phrase",
         "pitched_phrase",
         PITCHED_PHRASE_SHAPE,
+        PITCHED_REPETITION_PHRASE,
         "sustained_pad",
         "solo_phrase",
         "layered_phrase",
