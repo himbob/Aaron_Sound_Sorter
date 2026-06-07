@@ -36,6 +36,17 @@ class ClaimBroadeningMixin:
             ):
                 return False
         if _path_has_any(normalized, ("human and voice", "voice", "vocal")):
+            if (
+                normalized.startswith("instruments/voice")
+                and eligibility.role_name
+                in {
+                    "vocal_one_shot",
+                    "voiced_one_shot",
+                }
+                and eligibility.confidence >= 0.78
+                and self._has_nearby_voice_candidate(raw)
+            ):
+                return True
             broad_top = normalized.split("/", 1)[0]
             raw_path = _norm_path(raw.folder_path)
             if raw.final_top.lower() == broad_top:
@@ -62,6 +73,24 @@ class ClaimBroadeningMixin:
                 _candidate_role_strength(candidate, "voiced_one_shot"),
             )
             if role_support >= 0.75:
+                return True
+        return False
+
+    @staticmethod
+    def _has_nearby_voice_candidate(raw: ConsensusClaim) -> bool:
+        """Return True for nearby internal Human/Voice candidate evidence."""
+        raw_score = raw.raw_candidate_score
+        for candidate in raw.shared_candidates or []:
+            candidate_path = _norm_path(str(candidate.get("folder_path") or candidate.get("label") or ""))
+            if not _path_has_any(
+                candidate_path, ("human and voice", "voice", "vocal", "vox", "choir", "spoken", "breath")
+            ):
+                continue
+            try:
+                candidate_score = float(candidate.get("combined_rank_score", 9999.0) or 9999.0)
+            except Exception:
+                candidate_score = 9999.0
+            if raw_score is None or candidate_score <= raw_score + 12.0:
                 return True
         return False
 

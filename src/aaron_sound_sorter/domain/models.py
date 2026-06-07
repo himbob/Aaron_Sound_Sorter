@@ -98,6 +98,7 @@ class ConsensusDecision:
     physics_rank: int | None = None
     combined_rank_score: float | None = None
     shared_candidates: list[dict[str, Any]] = field(default_factory=list)
+    authority_trace: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

@@ -20,7 +20,7 @@ _UNCACHED_READ_AUDIO = read_audio
 _READ_AUDIO_CACHE_LOCK = threading.Lock()
 _READ_AUDIO_CACHE: dict[tuple[str, int, int], tuple[np.ndarray, int]] = {}
 _READ_AUDIO_CACHE_ORDER: list[tuple[str, int, int]] = []
-_READ_AUDIO_CACHE_MAX_ITEMS = 16
+_READ_AUDIO_CACHE_MAX_ITEMS = 64
 
 
 def read_audio(path: Path) -> Tuple[np.ndarray, int]:

@@ -80,14 +80,14 @@ class LayeredPhysicsScorer:
 
     def apply(self, folder_path: str, score: float, decision: PhysicsLayerDecision) -> tuple[float, dict[str, Any]]:
         folder = normalized_path(folder_path)
-        top_family = folder.split("/", 1)[0] if folder else ""
+        candidate_top_family = folder.split("/", 1)[0] if folder else ""
         adjusted = float(score)
         reasons: list[str] = []
         top_family_gate = (
             0.68 if decision.top_family == "Drums" else (0.74 if decision.top_family == "Instruments" else 0.78)
         )
         if decision.top_family in {"Drums", "Instruments", "FX"} and decision.top_confidence >= top_family_gate:
-            if top_family != decision.top_family:
+            if candidate_top_family != decision.top_family:
                 penalty = 0.52 if decision.top_family == "Instruments" else 0.40
                 if decision.top_family == "Instruments":
                     source = str(decision.evidence.get("physics_top_layer_source", ""))
@@ -118,7 +118,11 @@ class LayeredPhysicsScorer:
                         penalty = 0.50
                 adjusted += penalty
                 reasons.append(f"top_family_mismatch:+{penalty:.2f}")
-        if top_family == "FX" and not bool(decision.evidence.get("fx_role_allows_fx")):
+        if (
+            candidate_top_family == "FX"
+            and decision.top_family != "FX"
+            and not bool(decision.evidence.get("fx_role_allows_fx"))
+        ):
             fx_shape = str(decision.evidence.get("fx_shape_primary") or "")
             fx_conflict = safe_float(decision.evidence.get("fx_role_conflict_strength", 0.0), 0.0)
             non_fx_shape = fx_shape in {
@@ -251,6 +255,18 @@ class LayeredPhysicsScorer:
             return adjusted, reasons
         compatible = fx_candidate_matches_branch(folder, branch)
         broad_fx = candidate_is_broad_fx(folder)
+        human_voice_signal = max(
+            safe_float(decision.evidence.get("instrument_subpanel_voice_score"), 0.0),
+            safe_float(decision.evidence.get("instrument_subpanel_human_spoken_voice_score"), 0.0),
+            safe_float(decision.evidence.get("instrument_subpanel_human_breath_mouth_score"), 0.0),
+            safe_float(decision.evidence.get("instrument_human_voice_texture"), 0.0),
+            safe_float(decision.evidence.get("fx_formant_motion"), 0.0),
+        )
+        if branch == "HumanCreatureFX" and folder.startswith("FX/Animals") and human_voice_signal >= 0.62:
+            penalty = 0.42
+            adjusted += penalty
+            reasons.append(f"human_voice_signal_blocks_animal_fx_leaf:+{penalty:.2f}")
+            return adjusted, reasons
         if compatible:
             target = max(0.12, 0.66 - 0.46 * min(1.0, confidence))
             if branch == "ImpactHit":

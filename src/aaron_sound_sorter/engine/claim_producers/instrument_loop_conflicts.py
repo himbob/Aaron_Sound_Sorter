@@ -8,8 +8,11 @@ from __future__ import annotations
 
 from aaron_sound_sorter.domain.models import SharedAudioFacts
 from aaron_sound_sorter.engine.decision_helpers import (
+    _direct_body_role_strength_from_facts,
+    _measured_role_from_facts,
     _norm_path,
     _path_has_any,
+    _role_strength_from_facts,
     _shape_confidence_from_facts,
     _shape_metric_from_facts,
 )
@@ -35,6 +38,15 @@ class InstrumentLoopConflictMixin:
             return None
         if not self._has_high_tonal_non_drum_loop_body(facts):
             return None
+        # Pattern 1 Fix: Honor drum detection—don't override if measured_role is drum-like
+        measured_role = _measured_role_from_facts(facts)
+        if measured_role in {"low_rhythmic_drum_loop", "percussive_drum_loop"}:
+            measured_strength = max(
+                _role_strength_from_facts(facts, measured_role),
+                _direct_body_role_strength_from_facts(facts, measured_role),
+            )
+            if measured_strength >= 0.70:
+                return None  # Honor drum detection; don't override
         broad_eligibility = EligibilityDecision(
             role_name="pitched_music_loop",
             confidence=max(float(eligibility.confidence or 0.0), 0.78),

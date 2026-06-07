@@ -21,6 +21,7 @@ from aaron_sound_sorter.engine.decision_helpers import (
     _path_has_any,
     _role_strength_from_facts,
     _shape_blocks_percussion_loop_rescue,
+    _shape_metric_from_facts,
 )
 from aaron_sound_sorter.engine.family_claims import ConsensusClaim
 
@@ -68,6 +69,12 @@ class DrumFxRescueMixin:
             and self._low_rhythmic_drum_strength(context) >= 0.75
             and context.shape != "vocal_phrase"
         ):
+            # Pattern 3 Fix: Guard against synth bass—too sustained/pitched for pure drum redirect
+            sustain_ratio = _shape_metric_from_facts(context.facts, "sustain_ratio")
+            pitch_confidence = _shape_metric_from_facts(context.facts, "pitch_confidence")
+            if sustain_ratio >= 0.50 and pitch_confidence >= 0.72:
+                return None  # Too sustained/pitched for pure drum redirect
+            
             return self._redirect_from_raw(
                 context.raw,
                 "Drums/Drum Loops/Loops",
@@ -87,10 +94,11 @@ class DrumFxRescueMixin:
             if evidence.best_drum_loop is not None
             else self._best_candidate_score(context.raw, include_top={"Drums"}, include_fragments=())
         )
+        # Pattern 2 Fix: Unify voice thresholds to 0.75 to eliminate blind zone (0.70-0.75)
         voice_is_structural = bool(
-            evidence.best_voice_candidate_role_strength >= 0.70
-            or evidence.measured_voice_strength >= 0.72
-            or evidence.direct_voice_strength >= 0.72
+            evidence.best_voice_candidate_role_strength >= 0.75
+            or evidence.measured_voice_strength >= 0.75
+            or evidence.direct_voice_strength >= 0.75
         )
         voice_blocks_generic_instrument = bool(
             voice_is_structural

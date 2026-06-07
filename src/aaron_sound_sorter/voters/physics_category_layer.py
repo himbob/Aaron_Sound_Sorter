@@ -99,11 +99,7 @@ class PhysicsCategoryLayer:
             return score, [], evidence
 
         candidate_top = folder.split("/", 1)[0] if folder else ""
-        if (
-            decision.top_family in {"Drums", "Instruments", "FX"}
-            and candidate_top != decision.top_family
-            and decision.top_confidence >= 0.66
-        ):
+        if self.cross_family_category_match_is_blocked(candidate_top, decision):
             evidence.update(
                 {
                     "physics_category_candidate_path": match.candidate_path,
@@ -302,6 +298,73 @@ class PhysicsCategoryLayer:
             decision.top_family in {"Drums", "Instruments", "FX"}
             and decision.top_confidence >= 0.66
             and decision.branch_confidence >= 0.46
+        )
+
+    def cross_family_category_match_is_blocked(self, candidate_top: str, decision: PhysicsLayerDecision) -> bool:
+        """Return whether a measured top-family decision blocks leaf boosting.
+
+        Category panels are useful only inside the family that the lower physics
+        layers have selected.  When a measured FX action/texture decision is
+        slightly below the normal top-confidence threshold, exact Drum or
+        Instrument panel scores must not become a back door that reclassifies
+        crackly textures or sweeps as snares, rims, or bass notes.
+        """
+        if decision.top_family not in {"Drums", "Instruments", "FX"}:
+            return False
+        if candidate_top == decision.top_family:
+            return False
+        if decision.top_confidence >= 0.66:
+            return True
+        if decision.top_family != "FX":
+            return False
+
+        branch = str(decision.branch or "")
+        shape = str(decision.evidence.get("physics_top_layer_shape") or decision.evidence.get("fx_shape_primary") or "")
+        fx_shape_supported = shape in {
+            "texture_bed",
+            "noise_texture",
+            "static_bed",
+            "mechanical_motion",
+            "hybrid_fx_motion",
+            "transition_riser",
+            "transition_downlifter",
+            "transition_drop",
+            "impact",
+            "impact_with_tail",
+            "hit_with_tail",
+            "glitch_stutter",
+            "ui_blip",
+            "siren_alarm_tone",
+            "whoosh_sweep",
+            "reverse_swell",
+            "foley_action",
+        }
+        texture_branch = branch in {
+            "TextureAmbience",
+            "MachineMechanical",
+            "DesignedNoiseHybrid",
+            "FoleyMaterial",
+            "SmallObjectCluster",
+            "HumanCreatureFX",
+        }
+        action_branch = branch in {
+            "RiserBuild",
+            "DropDownlifter",
+            "WhooshSweep",
+            "ReverseSwell",
+            "ImpactHit",
+            "GlitchStutter",
+            "BlipBeep",
+            "SirenAlarm",
+            "RadioElectrical",
+        }
+        return bool(
+            fx_shape_supported
+            and decision.top_confidence >= 0.56
+            and (
+                (texture_branch and decision.branch_confidence >= 0.76)
+                or (action_branch and decision.branch_confidence >= 0.70)
+            )
         )
 
     def spec_matches_branch(self, spec: CategoryPanelSpec, branch: str) -> bool:

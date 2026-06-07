@@ -61,12 +61,83 @@ def infer_parent_eligibility(facts: SharedAudioFacts) -> EligibilityDecision:
     loop_pitched = _num(feature_values.get("loop_pitched_event_ratio"), 0.0)
     loop_sustained = _num(feature_values.get("loop_sustained_tonal_frame_ratio"), 0.0)
     loop_non_event_tonal = _num(feature_values.get("loop_non_event_tonal_ratio"), 0.0)
+    flatness = _num(feature_values.get("spectral_flatness_mean"), 0.0)
+    entropy = _num(feature_values.get("spectral_entropy_mean"), 0.0)
+    body_noise = _num(feature_values.get("body_noise_ratio"), flatness)
+    tail_noise = _num(feature_values.get("tail_noise_ratio"), body_noise)
+    loop_noisy = _num(feature_values.get("loop_noisy_event_ratio"), 0.0)
     shape_vote = evidence.get("shape_vote", {})
     if not isinstance(shape_vote, dict):
         shape_vote = {}
+
+    def _fact_score(name: str, default: float = 0.0) -> float:
+        return _num(evidence.get(name), _num(feature_values.get(name), default))
+
     primary_shape = str(shape_vote.get("primary_shape", ""))
     shape_confidence = _num(shape_vote.get("confidence"), 0.0)
-    tonal_alert_siren_score = _num(evidence.get("tonal_alert_siren_score"), 0.0)
+    event_low_ratio = _num(
+        shape_vote.get("low_event_ratio"),
+        _fact_score("loop_mean_event_low_ratio", _fact_score("low_event_ratio")),
+    )
+    event_mid_ratio = _num(
+        shape_vote.get("mid_event_ratio"),
+        _fact_score("loop_mean_event_mid_ratio", _fact_score("mid_event_ratio")),
+    )
+    event_high_ratio = _num(
+        shape_vote.get("high_event_ratio"),
+        _fact_score("loop_mean_event_high_ratio", _fact_score("high_event_ratio")),
+    )
+    tonal_alert_siren_score = _fact_score("tonal_alert_siren_score")
+    fx_motion_score = _fact_score("fx_motion_score")
+    fx_transition_authority_score = _fact_score("fx_transition_authority_score")
+    role_phrase_score = _fact_score("role_phrase_score")
+    synth_tonal_source_score = _fact_score("synth_tonal_source_score")
+    struck_keys_score = _fact_score("struck_keys_score")
+    keys_tonal_decay_score = _fact_score("keys_tonal_decay_score")
+    keys_chord_density_score = _fact_score("keys_chord_density_score")
+    voice_choir_score = _fact_score("voice_choir_score")
+    fx_formant_score = _fact_score("fx_formant_score")
+    reed_noise_score = _fact_score("reed_reed_noise_score")
+    reed_formant_score = _fact_score("reed_formant_envelope_score")
+    reed_breath_score = _fact_score("reed_breath_attack_score")
+    pitched_onset_score = _fact_score("onset_pitched_onset_score")
+    compact_struck_tonal_percussion_score = _fact_score("compact_struck_tonal_percussion_score")
+    pitched_metal_percussion_score = _fact_score("pitched_metal_percussion_score")
+    pitched_mallet_instrument_score = _fact_score("pitched_mallet_instrument_score")
+    drum_kick_source_score = _fact_score("drum_kick_source_score")
+    pitch_conf = _num(feature_values.get("pitch_confidence"), _num(shape_vote.get("pitch_confidence"), pitch_conf))
+    f0_voiced = _num(feature_values.get("f0_voiced_ratio"), _num(shape_vote.get("f0_voiced_ratio"), f0_voiced))
+    loop_percussive = _num(
+        feature_values.get("loop_percussive_event_ratio"),
+        _num(shape_vote.get("percussive_event_ratio"), loop_percussive),
+    )
+    loop_drumlike = _num(
+        feature_values.get("loop_drumlike_frame_ratio"),
+        _num(shape_vote.get("drumlike_frame_ratio"), loop_drumlike),
+    )
+    loop_pitched = _num(
+        feature_values.get("loop_pitched_event_ratio"),
+        _num(shape_vote.get("pitched_event_ratio"), loop_pitched),
+    )
+    loop_sustained = _num(
+        feature_values.get("loop_sustained_tonal_frame_ratio"),
+        _num(shape_vote.get("sustained_tonal_frame_ratio"), _num(shape_vote.get("sustain_ratio"), loop_sustained)),
+    )
+    loop_non_event_tonal = _num(
+        feature_values.get("loop_non_event_tonal_ratio"),
+        _num(shape_vote.get("non_event_tonal_ratio"), loop_non_event_tonal),
+    )
+    flatness = _num(
+        feature_values.get("spectral_flatness_mean"),
+        _num(shape_vote.get("spectral_flatness_mean"), flatness),
+    )
+    entropy = _num(
+        feature_values.get("spectral_entropy_mean"),
+        _num(shape_vote.get("spectral_entropy_mean"), entropy),
+    )
+    low_total = max(low_total, event_low_ratio)
+    high_total = max(high_total, event_high_ratio)
+    mid_total_value = max(mid_total_value, event_mid_ratio)
 
     # A real transition FX needs more than a rising/falling centroid.
     # Drum loops with bass can show spectral slope over time, but they usually
@@ -97,6 +168,39 @@ def infer_parent_eligibility(facts: SharedAudioFacts) -> EligibilityDecision:
         and loop_drumlike <= 0.12
         and loop_percussive <= 0.12
         and voice_identity_score < 0.45
+    )
+    sustained_chord_or_pad_loop = (
+        duration >= 2.0
+        and primary_shape
+        in {
+            "beat_loop",
+            "repeated_phrase_loop",
+            "pitched_repetition_phrase",
+            "sustained_pad",
+            "hybrid_fx_motion",
+        }
+        and shape_confidence >= 0.70
+        and loop_sustained >= 0.72
+        and loop_non_event_tonal >= 0.70
+        and loop_drumlike <= 0.12
+        and loop_percussive <= 0.32
+        and low_total <= 0.62
+        and high_total <= 0.46
+        and max(fx_motion_score, fx_transition_authority_score) < 0.35
+        and not (struck_keys_score >= 0.54 and keys_tonal_decay_score >= 0.70)
+        and not (synth_tonal_source_score >= 0.50 and _role(roles, "pitched_music_loop") >= 0.70)
+        and max(
+            loop_pitched,
+            f0_voiced,
+            synth_tonal_source_score,
+            struck_keys_score,
+            keys_chord_density_score,
+            keys_tonal_decay_score,
+            pitched_mallet_instrument_score,
+            voice_choir_score,
+            fx_formant_score,
+        )
+        >= 0.35
     )
     short_front_loaded_tonal_hit = (
         duration <= 1.25
@@ -157,6 +261,37 @@ def infer_parent_eligibility(facts: SharedAudioFacts) -> EligibilityDecision:
         )
         and _num(feature_values.get("spectral_flatness_mean"), 0.0) >= 0.08
         and _num(feature_values.get("spectral_flatness_mean"), 0.0) <= 0.25
+    )
+    texture_noise_strength = max(flatness, entropy, body_noise, tail_noise, loop_noisy)
+    texture_shape_has_human_voice_identity = (
+        primary_shape in {"texture_bed", "noise_texture", "static_bed"}
+        and f0_voiced >= 0.70
+        and voice_identity_score >= 0.55
+        and loop_drumlike <= 0.18
+        and loop_percussive <= 0.22
+        and (formant >= 0.45 or (mid_total_value + high_total) >= 0.58)
+    )
+    strong_measured_texture_fx = (
+        primary_shape in {"texture_bed", "noise_texture", "static_bed"}
+        and shape_confidence >= 0.78
+        and duration >= 0.45
+        and texture_noise_strength >= 0.55
+        and not texture_shape_has_human_voice_identity
+        and not (
+            loop_pitched >= 0.86
+            and loop_sustained >= 0.74
+            and loop_non_event_tonal >= 0.72
+            and loop_percussive <= 0.10
+            and loop_drumlike <= 0.10
+            and flatness <= 0.22
+        )
+        and not (
+            low_total >= 0.62
+            and loop_pitched >= 0.82
+            and loop_sustained >= 0.70
+            and loop_non_event_tonal >= 0.68
+            and high_total <= 0.12
+        )
     )
 
     clean_tonal_low_loop = (
@@ -289,9 +424,32 @@ def infer_parent_eligibility(facts: SharedAudioFacts) -> EligibilityDecision:
         and _num(feature_values.get("spectral_flatness_mean"), 0.0) <= 0.16
         and _num(feature_values.get("event_rate_hz"), event_rate) >= 4.0
     )
+    bright_airy_reed_loop = (
+        duration >= 1.5
+        and primary_shape == "pitched_repetition_phrase"
+        and shape_confidence >= 0.84
+        and pitch_conf >= 0.74
+        and f0_voiced >= 0.86
+        and loop_pitched >= 0.92
+        and loop_sustained >= 0.80
+        and loop_non_event_tonal >= 0.80
+        and loop_percussive <= 0.08
+        and loop_drumlike <= 0.08
+        and event_count <= 32.0
+        and event_rate <= 3.25
+        and event_high_ratio >= 0.42
+        and event_mid_ratio <= 0.38
+        and event_low_ratio <= 0.28
+        and reed_noise_score >= 0.78
+        and reed_formant_score >= 0.74
+        and reed_breath_score >= 0.62
+        and pitched_onset_score >= 0.70
+        and 0.10 <= flatness <= 0.34
+        and high_total >= 0.18
+    )
     sax_like_reed_loop = (
-        (high_reed_loop or low_mid_reed_loop or dry_mid_reed_loop)
-        and voice_identity_score < 0.45
+        (high_reed_loop or low_mid_reed_loop or dry_mid_reed_loop or bright_airy_reed_loop)
+        and (voice_identity_score < 0.45 or bright_airy_reed_loop)
         and not processed_vocal_loop_or_stab
         and not choppy_music_like_loop
     )
@@ -305,7 +463,7 @@ def infer_parent_eligibility(facts: SharedAudioFacts) -> EligibilityDecision:
         and loop_percussive <= 0.18
         and loop_drumlike <= 0.24
         and low_total <= 0.72
-        and high_total <= 0.42
+        and (high_total <= 0.42 or bright_airy_reed_loop)
         and (sax_like_reed_loop or _num(feature_values.get("spectral_flatness_mean"), 0.0) <= 0.34)
         and (
             sax_like_reed_loop
@@ -421,6 +579,87 @@ def infer_parent_eligibility(facts: SharedAudioFacts) -> EligibilityDecision:
         )
     )
 
+    sustained_tonal_instrument_loop = (
+        duration >= 2.0
+        and loop_sustained >= 0.74
+        and loop_non_event_tonal >= 0.70
+        and loop_drumlike <= 0.12
+        and voice_identity_score < 0.62
+        and not processed_vocal_loop_or_stab
+        and not reed_like_sustained_loop
+        and pitched_music_loop < 0.58
+        and bass_loop < 0.62
+        and not pitched_percussion_loop
+        and not pitched_percussion_conflict_loop
+        and not (struck_keys_score >= 0.54 and keys_tonal_decay_score >= 0.70)
+        and not (synth_tonal_source_score >= 0.50 and pitched_music_loop >= 0.70)
+        and (
+            loop_pitched >= 0.58 or pitch_conf >= 0.55 or synth_tonal_source_score >= 0.46 or struck_keys_score >= 0.48
+        )
+        and not (
+            primary_shape in {"transition_riser", "transition_drop"}
+            and shape_confidence >= 0.86
+            and loop_non_event_tonal <= 0.40
+        )
+    )
+    if sustained_tonal_instrument_loop:
+        return EligibilityDecision(
+            role_name="sustained_tonal_instrument_loop",
+            confidence=max(pitched_music_loop, role_phrase_score, shape_confidence, 0.76),
+            allowed_top_families=("Instruments", "_TO_REVIEW"),
+            blocked_path_fragments=(
+                "FX",
+                "Animals",
+                "Dog",
+                "Bird",
+                "Cat",
+                "Door",
+                "Doors",
+                "Riser",
+                "Risers",
+                "Natural Ambience",
+                "Ocean",
+                "Water",
+                "Drums",
+                "Percussion",
+                "Tom",
+                "Kick",
+                "Snare",
+                "Clap",
+            ),
+            broad_folder_path="Instruments/Instrument Loops/Loops",
+            reason="measured sustained tonal instrument loop; FX animal/foley/transition and drum leaves are not eligible",
+        )
+
+    if sustained_chord_or_pad_loop:
+        return EligibilityDecision(
+            role_name="sustained_chord_or_pad_loop",
+            confidence=max(shape_confidence, role_phrase_score, 0.76),
+            allowed_top_families=("Instruments", "_TO_REVIEW"),
+            blocked_path_fragments=(
+                "Drums",
+                "Drum Loops",
+                "Kick",
+                "Tom",
+                "Snare",
+                "Clap",
+                "Percussion",
+                "FX",
+                "Riser",
+                "Risers",
+                "Animals",
+                "Dog",
+                "Bird",
+                "Cat",
+                "Machines",
+                "Door",
+                "Doors",
+                "Natural Ambience",
+            ),
+            broad_folder_path="Instruments/Instrument Loops/Loops",
+            reason="measured sustained tonal chord/pad loop; drum-loop and broad FX leaves are not eligible",
+        )
+
     # Real transition FX can look like repeated bright drum events because they
     # are noisy, rising/falling, and segmented.  If the shape voter finds a
     # strong transition envelope, protect it before drum-loop gates fire.
@@ -510,6 +749,43 @@ def infer_parent_eligibility(facts: SharedAudioFacts) -> EligibilityDecision:
             ),
             broad_folder_path="FX/Designed Noise FX/Alarm/Long FX",
             reason="measured repeated tonal alert/siren-like FX; drum, instrument, animal, and ambience leaves are not eligible",
+        )
+
+    # Noisy, source-ambiguous texture beds often contain many crackly or
+    # wave-like micro-events.  Those events can look like bright drum loops in
+    # coarse loop ratios, but the shape and spectrum are texture behavior, not
+    # drum-source identity.  Protect the parent role before drum-loop broadening
+    # so lower PhysicsVoter FX texture evidence is not overwritten later.
+    if strong_measured_texture_fx:
+        texture_broad_path = "FX/Textures/Noise and Static"
+        if primary_shape == "texture_bed" and texture_noise_strength < 0.72:
+            texture_broad_path = "FX/Textures/Natural Ambience"
+        return EligibilityDecision(
+            role_name="fx_texture_bed",
+            confidence=max(shape_confidence, min(0.88, 0.62 + 0.26 * texture_noise_strength)),
+            allowed_top_families=("FX", "_TO_REVIEW"),
+            blocked_path_fragments=(
+                "Drums",
+                "Drum Loops",
+                "Percussion",
+                "Snares",
+                "Claps",
+                "Rims",
+                "Hi Hats",
+                "Instruments",
+                "Bass",
+                "Guitar",
+                "Keys",
+                "Synths",
+                "Voice",
+                "Woodwinds",
+                "Animals",
+                "Bird",
+                "Dog",
+                "Cat",
+            ),
+            broad_folder_path=texture_broad_path,
+            reason="measured noisy texture bed; crackle/micro-event energy is texture behavior, not drum-loop identity",
         )
 
     if pitched_percussion_loop:
@@ -652,6 +928,55 @@ def infer_parent_eligibility(facts: SharedAudioFacts) -> EligibilityDecision:
         and _num(feature_values.get("attack_rise_time_norm"), attack_rise) <= 0.18
         and _num(feature_values.get("temporal_centroid_ratio"), temporal_centroid) <= 0.28
     )
+    human_voice_source_score = max(
+        _fact_score("voice_score"),
+        _fact_score("human_spoken_voice_score"),
+        _fact_score("human_breath_mouth_score"),
+        _fact_score("fx_formant_score"),
+    )
+    clean_tonal_stab_voice_decoy = bool(
+        duration <= 2.75
+        and event_count <= 4.0
+        and pitch_conf >= 0.62
+        and loop_pitched >= 0.85
+        and loop_sustained >= 0.75
+        and loop_non_event_tonal >= 0.75
+        and loop_percussive <= 0.08
+        and loop_drumlike <= 0.08
+        and high_total <= 0.08
+        and human_voice_source_score < 0.58
+        and _num(feature_values.get("spectral_flatness_mean"), 0.0) <= 0.20
+        and _num(feature_values.get("attack_rise_time_norm"), attack_rise) <= 0.18
+        and _num(feature_values.get("temporal_centroid_ratio"), temporal_centroid) <= 0.28
+    )
+    pitched_metal_tonal_hit = bool(
+        duration <= 2.75
+        and event_count <= 4.0
+        and pitch_conf >= 0.86
+        and f0_voiced >= 0.72
+        and loop_pitched >= 0.85
+        and loop_percussive <= 0.08
+        and loop_drumlike <= 0.08
+        and compact_struck_tonal_percussion_score >= 0.72
+        and pitched_metal_percussion_score >= 0.61
+        and pitched_mallet_instrument_score >= 0.70
+        and drum_kick_source_score <= 0.52
+        and low_total <= 0.30
+        and high_total <= 0.16
+    )
+    short_tonal_synth_phrase = bool(
+        0.35 <= duration <= 1.75
+        and 4.0 <= event_count <= 14.0
+        and pitch_conf >= 0.68
+        and loop_pitched >= 0.85
+        and loop_sustained >= 0.75
+        and loop_non_event_tonal >= 0.75
+        and loop_percussive <= 0.08
+        and loop_drumlike <= 0.08
+        and synth_tonal_source_score >= 0.50
+        and human_voice_source_score < 0.48
+        and primary_shape in {"pitched_repetition_phrase", "repeated_phrase_loop", "pitched_phrase_shape"}
+    )
 
     low_kick_hit = (
         duration <= 1.25
@@ -665,6 +990,7 @@ def infer_parent_eligibility(facts: SharedAudioFacts) -> EligibilityDecision:
         duration >= 0.35
         and event_count <= 6.0
         and low_total <= 0.32
+        and not clean_tonal_stab_voice_decoy
         and loop_drumlike <= 0.12
         and loop_percussive <= 0.12
         and (
@@ -770,6 +1096,7 @@ def infer_parent_eligibility(facts: SharedAudioFacts) -> EligibilityDecision:
         and f0_voiced >= 0.82
         and (pitch_conf >= 0.30 or loop_pitched >= 0.75)
         and low_total <= 0.32
+        and not clean_tonal_stab_voice_decoy
         and loop_drumlike <= 0.12
         and loop_percussive <= 0.12
         and (
@@ -808,7 +1135,7 @@ def infer_parent_eligibility(facts: SharedAudioFacts) -> EligibilityDecision:
             broad_folder_path="FX/Human and Voice FX",
             reason="measured formant-rich vocal one-shot/phrase; machine, animal, drum, and ambience leaves are not eligible",
         )
-    if voiced_one_shot >= 0.62 and strong_vocal_identity:
+    if voiced_one_shot >= 0.62 and strong_vocal_identity and not clean_tonal_stab_voice_decoy:
         return EligibilityDecision(
             role_name="vocal_one_shot",
             confidence=max(voiced_one_shot, 0.74),
@@ -834,7 +1161,57 @@ def infer_parent_eligibility(facts: SharedAudioFacts) -> EligibilityDecision:
             broad_folder_path="FX/Human and Voice FX",
             reason="measured voiced one-shot; machine, animal, drum, and ambience leaves are not eligible",
         )
-    if clean_short_pitched_tonal_hit and not strong_vocal_identity:
+    if pitched_metal_tonal_hit and not strong_vocal_identity:
+        return EligibilityDecision(
+            role_name="pitched_metal_tonal_hit",
+            confidence=max(0.78, pitched_metal_percussion_score, pitched_mallet_instrument_score),
+            allowed_top_families=("Drums", "_TO_REVIEW"),
+            blocked_path_fragments=(
+                "Kick",
+                "Tom",
+                "Snare",
+                "Clap",
+                "Rim",
+                "Stick",
+                "Instruments",
+                "Voice",
+                "Human",
+                "Animals",
+                "Dog",
+                "Bird",
+                "Cat",
+                "FX",
+                "Loops",
+            ),
+            broad_folder_path="Drums/Percussion/Bells and Metallic Percussion/One Shots",
+            reason="measured short pitched metallic hit; kick, tom, voice, animal, FX, and loop leaves are not eligible",
+        )
+    if short_tonal_synth_phrase and not strong_vocal_identity:
+        return EligibilityDecision(
+            role_name="short_tonal_synth_phrase",
+            confidence=max(0.78, shape_confidence, synth_tonal_source_score),
+            allowed_top_families=("Instruments", "_TO_REVIEW"),
+            blocked_path_fragments=(
+                "Drums",
+                "Percussion",
+                "Kick",
+                "Tom",
+                "Snare",
+                "Clap",
+                "FX",
+                "Animals",
+                "Dog",
+                "Bird",
+                "Cat",
+                "Voice",
+                "Human",
+                "Riser",
+                "Door",
+            ),
+            broad_folder_path="Instruments/Synths/Synth Lead/One Shots",
+            reason="measured short tonal synth phrase; drum, voice, animal, foley, and transition leaves are not eligible",
+        )
+    if (clean_short_pitched_tonal_hit or clean_tonal_stab_voice_decoy) and not strong_vocal_identity:
         return EligibilityDecision(
             role_name="short_pitched_instrument_hit",
             confidence=0.76,
@@ -964,7 +1341,7 @@ def infer_parent_eligibility(facts: SharedAudioFacts) -> EligibilityDecision:
         )
 
     # Vocal stabs/shouts: allow broad human/voice buckets, block animal/drum leaves.
-    if voiced_one_shot >= 0.62:
+    if voiced_one_shot >= 0.62 and not clean_tonal_stab_voice_decoy:
         return EligibilityDecision(
             role_name="vocal_one_shot",
             confidence=voiced_one_shot,
@@ -986,6 +1363,87 @@ def infer_parent_eligibility(facts: SharedAudioFacts) -> EligibilityDecision:
             blocked_path_fragments=("Drums/Kick", "Drums/Drum Loops", "FX", "Animals", "Bird", "Dog"),
             broad_folder_path="Instruments/Bass/Bass Loops",
             reason="measured bass loop; kick/drum/FX leaves are not eligible",
+        )
+
+    clean_keys_loop = (
+        duration >= 3.0
+        and primary_shape == "pitched_repetition_phrase"
+        and shape_confidence >= 0.82
+        and loop_pitched >= 0.86
+        and loop_sustained >= 0.78
+        and loop_non_event_tonal >= 0.78
+        and loop_percussive <= 0.10
+        and loop_drumlike <= 0.10
+        and event_mid_ratio >= 0.60
+        and event_low_ratio <= 0.36
+        and event_high_ratio <= 0.24
+        and flatness <= 0.09
+        and keys_tonal_decay_score >= 0.72
+        and struck_keys_score >= 0.54
+        and (keys_chord_density_score >= 0.42 or event_count >= 12.0)
+    )
+    if clean_keys_loop:
+        return EligibilityDecision(
+            role_name="keys_loop",
+            confidence=max(pitched_music_loop, shape_confidence, role_phrase_score, 0.82),
+            allowed_top_families=("Instruments", "_TO_REVIEW"),
+            blocked_path_fragments=(
+                "Drums",
+                "Percussion",
+                "FX",
+                "Animals",
+                "Dog",
+                "Bird",
+                "Cat",
+                "Voice",
+                "Human",
+                "Woodwinds",
+                "Saxophone",
+                "Brass",
+                "Guitar",
+            ),
+            broad_folder_path="Instruments/Keys/Electric Piano/Loops",
+            reason="measured clean mid-band struck-keys loop; sax, guitar, voice, drum, and FX leaves are not eligible",
+        )
+
+    clean_synth_loop = (
+        duration >= 3.0
+        and primary_shape == "pitched_repetition_phrase"
+        and shape_confidence >= 0.80
+        and loop_pitched >= 0.86
+        and loop_sustained >= 0.78
+        and loop_non_event_tonal >= 0.78
+        and loop_percussive <= 0.10
+        and loop_drumlike <= 0.10
+        and synth_tonal_source_score >= 0.58
+        and event_low_ratio >= 0.58
+        and event_mid_ratio <= 0.34
+        and event_high_ratio <= 0.14
+        and not clean_keys_loop
+    )
+    if clean_synth_loop:
+        return EligibilityDecision(
+            role_name="synth_loop",
+            confidence=max(pitched_music_loop, shape_confidence, role_phrase_score, 0.80),
+            allowed_top_families=("Instruments", "_TO_REVIEW"),
+            blocked_path_fragments=(
+                "Drums",
+                "Percussion",
+                "FX",
+                "Animals",
+                "Dog",
+                "Bird",
+                "Cat",
+                "Voice",
+                "Human",
+                "Woodwinds",
+                "Saxophone",
+                "Brass",
+                "Guitar",
+                "Keys Coins",
+            ),
+            broad_folder_path="Instruments/Synths/Synth Loops",
+            reason="measured low-heavy synthetic pitched loop; sax, voice, drum, foley, and FX leaves are not eligible",
         )
 
     # Long pitched material or sustained melodic phrases: broad instrument loop/phrase.
@@ -1087,6 +1545,7 @@ def infer_parent_eligibility(facts: SharedAudioFacts) -> EligibilityDecision:
         (drum_loop >= 0.30 or drum_loop_by_facts or rhythmic_dominant_loop)
         and not clean_sustained_tonal_non_drum_loop
         and not clean_low_tonal_non_drum_loop
+        and not sustained_chord_or_pad_loop
     ):
         confidence = max(drum_loop, 0.72 if (drum_loop_by_facts or rhythmic_dominant_loop) else 0.60)
         return EligibilityDecision(

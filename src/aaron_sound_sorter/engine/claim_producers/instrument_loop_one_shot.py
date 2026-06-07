@@ -32,6 +32,9 @@ class InstrumentOneShotLoopMixin:
         role_name = str(eligibility.role_name or "")
         if role_name not in LOOP_PHRASE_ROLES and role_name != "pitched_percussion_conflict_loop":
             return None
+        # Pattern 4 Fix: Don't broaden drum one-shots—honor drum role
+        if role_name in {"percussive_drum_one_shot", "struck_drum_one_shot", "protected_percussive_one_shot"}:
+            return None
         raw_path = _norm_path(raw.folder_path)
         if not self._raw_path_is_loopish_one_shot_leaf(raw, raw_path):
             return None

@@ -257,7 +257,14 @@ def _shape_metric_from_facts(facts: SharedAudioFacts | None, metric_name: str) -
     for container_name in ("shape_vote", "shape_vote_json"):
         container = facts.evidence.get(container_name)
         if isinstance(container, dict):
-            return _safe_float(container.get(metric_name))
+            value = _safe_float(container.get(metric_name))
+            if value:
+                return value
+    result = facts.evidence.get("shape_vote_result")
+    if isinstance(result, dict):
+        guesses = result.get("guesses")
+        if isinstance(guesses, list) and guesses and isinstance(guesses[0], dict):
+            return _safe_float(guesses[0].get(metric_name))
     return 0.0
 
 
@@ -276,6 +283,19 @@ def _shape_vote_from_facts(facts: SharedAudioFacts | None) -> str:
         )
         if value:
             return str(value)
+    result = facts.evidence.get("shape_vote_result")
+    if isinstance(result, dict):
+        guesses = result.get("guesses")
+        if isinstance(guesses, list) and guesses and isinstance(guesses[0], dict):
+            first_guess = guesses[0]
+            value = (
+                first_guess.get("primary_shape")
+                or first_guess.get("shape")
+                or first_guess.get("shape_vote")
+                or first_guess.get("label")
+            )
+            if value:
+                return str(value)
     for key in ("detected_shape", "shape_label"):
         value = facts.evidence.get(key)
         if value:

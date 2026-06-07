@@ -208,8 +208,18 @@ def measured_roles_from_features(
             ramp(log_crest, 1.70, 2.45),
         )
         percussive_hit_veto = max(ultra_front_loaded_hit, metallic_noise_hit)
+        clean_tonal_stab_veto = average_strength(
+            ramp(pitch_confidence, 0.72, 0.95),
+            ramp(loop_pitched, 0.88, 1.0),
+            ramp(loop_sustained, 0.88, 1.0),
+            ramp(loop_non_event_tonal, 0.88, 1.0),
+            inverse_ramp(high_total, 0.03, 0.16),
+            inverse_ramp(flatness, 0.14, 0.26),
+            inverse_ramp(log_transients, 1.00, 1.65),
+        )
         protected_voice_identity = max(formant_identity, formant_light_voice_identity * 0.85)
         protected_voice_identity *= 1.0 - 0.80 * ramp(percussive_hit_veto, 0.45, 0.85)
+        protected_voice_identity *= 1.0 - 0.78 * ramp(clean_tonal_stab_veto, 0.58, 0.90)
         raw_voiced_one_shot = average_strength(
             ramp(f0_voiced, 0.70, 0.95),
             ramp(pitch_confidence, 0.35, 0.68),
@@ -218,6 +228,7 @@ def measured_roles_from_features(
             inverse_ramp(low_total, 0.12, 0.40),
         )
         raw_voiced_one_shot *= 1.0 - 0.72 * ramp(percussive_hit_veto, 0.55, 0.95)
+        raw_voiced_one_shot *= 1.0 - 0.85 * ramp(clean_tonal_stab_veto, 0.58, 0.90)
         # Resonant percussion can create a stable autocorrelation pitch.  Do
         # not let that alone become a voice/instrument one-shot when the
         # envelope is still a sharp, front-loaded hit.  Strong formant spacing
@@ -251,6 +262,36 @@ def measured_roles_from_features(
             inverse_ramp(loop_drumlike, 0.03, 0.25),
             inverse_ramp(high_total, 0.08, 0.35),
         )
+    # Short synth/key phrases can contain several clean pitched events without
+    # enough voiced-frame continuity to satisfy the long-phrase gate above.
+    # Treat that as musical phrase evidence when the body is tonal, repeated,
+    # and non-drumlike. This keeps short repeated stabs out of FX/Human or
+    # percussion conflict paths without making one-event pitched hits loops.
+    short_repeated_tonal_phrase = 0.0
+    if not is_long:
+        low_sub_hit_exception = bool(
+            low_total >= 0.88
+            and (0.0 < low_peak_hz <= 95.0)
+            and f0_voiced <= 0.25
+            and high_total <= 0.08
+            and attack_rise <= 0.04
+            and tail_energy <= 0.22
+        )
+        short_repeated_tonal_phrase = average_strength(
+            ramp(log_transients, 1.75, 2.55),
+            ramp(pitch_confidence, 0.56, 0.84),
+            ramp(loop_pitched, 0.82, 0.98),
+            ramp(loop_sustained, 0.72, 0.96),
+            ramp(loop_non_event_tonal, 0.72, 0.96),
+            inverse_ramp(loop_percussive, 0.02, 0.14),
+            inverse_ramp(loop_drumlike, 0.02, 0.14),
+            inverse_ramp(high_total, 0.05, 0.24),
+            inverse_ramp(flatness, 0.16, 0.38),
+        )
+        if low_sub_hit_exception:
+            short_repeated_tonal_phrase = 0.0
+        if short_repeated_tonal_phrase >= 0.58:
+            pitched_music_phrase = max(pitched_music_phrase, short_repeated_tonal_phrase * 0.92)
     clean_pitched_hit = 0.0
     if is_single_event_like or is_short_hit_like:
         # A short chord, synth stab, electric-piano hit, or key stab can be
@@ -399,6 +440,7 @@ def measured_roles_from_features(
         "loop_sustained_tonal_frame_ratio": round(loop_sustained, 6),
         "loop_non_event_tonal_ratio": round(loop_non_event_tonal, 6),
         "pitched_music_phrase_raw": round(pitched_music_phrase, 6),
+        "short_repeated_tonal_phrase_raw": round(short_repeated_tonal_phrase, 6),
         "clean_pitched_hit_raw": round(clean_pitched_hit, 6),
         "low_peak_frequency_hz": round(low_peak_hz, 6),
         "low_rhythmic_drum_loop_raw": round(low_rhythmic_drum_loop, 6),

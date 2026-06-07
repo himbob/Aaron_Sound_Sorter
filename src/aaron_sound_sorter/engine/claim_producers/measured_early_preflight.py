@@ -111,10 +111,11 @@ class EarlyPreflightMixin:
                 "bass-loop claim blocked weak Human/Voice false positive",
             )
 
+        # Pattern 2 Fix: Unify voice threshold to 0.75
         if (
             raw.final_top == "FX"
             and "human and voice" in context.raw_path
-            and max(context.full_voice_strength, context.direct_voice_strength) >= 0.70
+            and max(context.full_voice_strength, context.direct_voice_strength) >= 0.75
         ):
             direct_pitched_strength = max(
                 _direct_body_role_strength_from_facts(context.facts, "pitched_music_phrase"),
@@ -129,8 +130,9 @@ class EarlyPreflightMixin:
             ):
                 return raw
 
+        # Pattern 2 Fix: Unify voice threshold to 0.75
         if (
-            context.direct_voice_strength >= 0.70
+            context.direct_voice_strength >= 0.75
             and raw.final_top == "Drums"
             and _path_has_any(context.raw_path, ("percussion", "rim", "clap", "snare", "tom", "cymbal"))
         ):

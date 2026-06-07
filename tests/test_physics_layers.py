@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from aaron_sound_sorter.domain.models import SharedAudioFacts
+from aaron_sound_sorter.voters.physics_layer_types import PhysicsLayerDecision
 from aaron_sound_sorter.voters.physics_layers import LayeredPhysicsScorer
 
 
@@ -1064,6 +1065,35 @@ def test_layered_physics_fx_texture_is_fx_role_not_conflict() -> None:
         "fx_TextureAmbience_branch_target" in item for item in texture_evidence["physics_layer_adjustment_reasons"]
     )
     assert "top_family_mismatch:+0.40" in piano_evidence["physics_layer_adjustment_reasons"]
+
+
+def test_human_voice_signal_blocks_animal_fx_leaf_boost() -> None:
+    scorer = LayeredPhysicsScorer()
+    decision = PhysicsLayerDecision(
+        top_family="FX",
+        top_confidence=0.74,
+        branch="HumanCreatureFX",
+        branch_confidence=0.82,
+        leaf_strategy="profile_leaf_with_fx_role_safeguard",
+        evidence={
+            "instrument_subpanel_voice_score": 0.64,
+            "instrument_subpanel_human_spoken_voice_score": 0.71,
+            "instrument_subpanel_human_breath_mouth_score": 0.82,
+            "instrument_human_voice_texture": 0.75,
+            "fx_formant_motion": 0.59,
+            "physics_category_panel_flat": {},
+        },
+    )
+
+    animal_score, animal_evidence = scorer.apply("FX/Animals and Creatures/Bird/One Shots", 0.30, decision)
+    human_score, human_evidence = scorer.apply("FX/Human and Voice FX/Mouth Sounds/One Shots", 0.80, decision)
+
+    assert animal_score > 0.70
+    assert human_score < 0.39
+    assert "human_voice_signal_blocks_animal_fx_leaf:+0.42" in animal_evidence["physics_layer_adjustment_reasons"]
+    assert any(
+        "fx_HumanCreatureFX_branch_target" in reason for reason in human_evidence["physics_layer_adjustment_reasons"]
+    )
 
 
 def test_layered_physics_hybrid_motion_loop_can_be_transition_fx() -> None:

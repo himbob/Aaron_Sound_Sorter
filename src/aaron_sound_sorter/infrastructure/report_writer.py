@@ -218,6 +218,14 @@ def write_manifest(path: Path, file_results: list[SortFileResult]) -> None:
         "folder_path",
         "consensus_status",
         "decision_reason",
+        "raw_consensus_claim",
+        "raw_consensus_family",
+        "winner_after_pick",
+        "winner_after_pick_family",
+        "post_mutator_count",
+        "post_mutators_fired_json",
+        "final_claim_source",
+        "authority_trace_json",
         "brain_ensemble_mode",
         "brain_ensemble_version",
         "brain_ensemble_vote_1",
@@ -581,6 +589,16 @@ def manifest_row(result: SortFileResult) -> dict[str, str]:
         outlier_digest=outlier_digest if isinstance(outlier_digest, dict) else {},
     )
     final_agreement = lane_agreement.get("final_agreement", {}) if isinstance(lane_agreement, dict) else {}
+    authority_trace = result.decision.authority_trace if isinstance(result.decision.authority_trace, dict) else {}
+    post_mutators = authority_trace.get("post_mutators_fired", [])
+    if not isinstance(post_mutators, list):
+        post_mutators = []
+    raw_trace = authority_trace.get("raw_claim", {}) if isinstance(authority_trace.get("raw_claim", {}), dict) else {}
+    pick_trace = (
+        authority_trace.get("winner_after_pick", {})
+        if isinstance(authority_trace.get("winner_after_pick", {}), dict)
+        else {}
+    )
     return {
         "source_path": str(result.source_path),
         "placed_path": str(result.placed_path or ""),
@@ -591,6 +609,14 @@ def manifest_row(result: SortFileResult) -> dict[str, str]:
         "folder_path": result.decision.folder_path,
         "consensus_status": result.decision.consensus_status,
         "decision_reason": result.decision.reason,
+        "raw_consensus_claim": str(raw_trace.get("path", "")),
+        "raw_consensus_family": str(raw_trace.get("family", "")),
+        "winner_after_pick": str(pick_trace.get("path", "")),
+        "winner_after_pick_family": str(pick_trace.get("family", "")),
+        "post_mutator_count": str(len(post_mutators)),
+        "post_mutators_fired_json": json.dumps(post_mutators, sort_keys=True, default=str),
+        "final_claim_source": str(authority_trace.get("final_source", result.decision.consensus_status)),
+        "authority_trace_json": json.dumps(authority_trace, sort_keys=True, default=str),
         "brain_ensemble_mode": str(ensemble_diag.get("architecture", "")),
         "brain_ensemble_version": str(ensemble_diag.get("ensemble_version", "")),
         "brain_ensemble_vote_1": str(ensemble_top_guess.get("label", "")),

@@ -632,9 +632,19 @@ class PhysicsFXRoleLayer:
             "HumanCreatureFX",
             "SirenAlarm",
         }
+        strong_transition_action = bool(
+            branch in {"RiserBuild", "DropDownlifter", "WhooshSweep", "ReverseSwell"}
+            and action_strength >= 0.78
+            and strongest >= 0.78
+            and role_strength >= 0.66
+            and conflict < 0.60
+            and max(transition_shape_support, spectral_motion, sub_transition_authority) >= 0.38
+            and not transition_loop_guard_blocks_fx
+        )
         allow_fx = bool(
             (
                 role_strength >= 0.70
+                or strong_transition_action
                 or (transition_shape_support >= 0.68 and role_strength >= 0.60 and conflict < 0.38)
                 or (branch == "ImpactHit" and role_strength >= 0.64 and impact_envelope >= 0.70 and conflict < 0.50)
                 or (

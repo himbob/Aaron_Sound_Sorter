@@ -77,6 +77,8 @@ class PhysicsTopFamilyLayer:
         )
         loop_percussive = number(values, "loop_percussive_event_ratio", number(shape, "percussive_event_ratio", 0.0))
         event_low = number(values, "loop_mean_event_low_ratio", number(shape, "low_event_ratio", 0.0))
+        event_count = number(shape, "onset_count", 0.0)
+        tail_ratio = number(values, "tail_energy_ratio", number(shape, "tail_ratio", 0.0))
         drum_role = max(
             role_value(roles, "percussive_one_shot"),
             role_value(roles, "bright_drum_loop"),
@@ -184,7 +186,21 @@ class PhysicsTopFamilyLayer:
             )
             and not (instrument_anchor >= 0.72 and fx_action < 0.78)
         )
-        if strong_measured_impact_fx or strong_measured_transition_fx:
+        strong_measured_texture_fx = bool(
+            fx_branch in {"TextureAmbience", "MachineMechanical", "DesignedNoiseHybrid", "HumanCreatureFX"}
+            and shape_name in {"texture_bed", "noise_texture", "static_bed", "mechanical_motion", "hybrid_fx_motion"}
+            and shape_confidence >= 0.78
+            and safe_float(fx_evidence.get("fx_non_action_strength", 0.0), 0.0) >= 0.76
+            and safe_float(fx_evidence.get("fx_texture_bed_strength", 0.0), 0.0) >= 0.66
+            and safe_float(fx_evidence.get("fx_vs_instrument_conflict", 1.0), 1.0) < 0.54
+            and safe_float(fx_evidence.get("fx_repeated_rhythmic_loop_conflict", 0.0), 0.0) < 0.70
+            and not (
+                drum_branch in {"Kick", "Snare", "Clap", "Hat", "Cymbal"}
+                and shape_name not in {"texture_bed", "noise_texture", "static_bed"}
+                and drum_anchor >= 0.84
+            )
+        )
+        if strong_measured_impact_fx or strong_measured_transition_fx or strong_measured_texture_fx:
             return (
                 "FX",
                 fx_confidence,
@@ -209,7 +225,25 @@ class PhysicsTopFamilyLayer:
             and loop_percussive <= 0.08
             and safe_float(instrument_evidence.get("instrument_subpanel_drum_loop_source_score", 0.0), 0.0) <= 0.36
         )
-        if bass_loop_branch_guard:
+        clean_low_bass_phrase = bool(
+            instrument_branch == "Bass"
+            and instrument_branch_confidence >= 0.62
+            and shape_name == "bass_phrase"
+            and shape_confidence >= 0.88
+            and event_low >= 0.88
+            and number(shape, "mid_event_ratio", 0.0) <= 0.15
+            and number(shape, "high_event_ratio", 0.0) <= 0.08
+            and number(shape, "pitched_event_ratio", 0.0) >= 0.90
+            and number(shape, "pitch_confidence", 0.0) >= 0.70
+            and max(
+                number(shape, "sustained_tonal_frame_ratio", 0.0),
+                number(shape, "non_event_tonal_ratio", 0.0),
+            )
+            >= 0.86
+            and loop_percussive <= 0.08
+            and number(shape, "drumlike_frame_ratio", 0.0) <= 0.08
+        )
+        if bass_loop_branch_guard or clean_low_bass_phrase:
             return (
                 "Instruments",
                 max(instrument_anchor, instrument_branch_confidence, instrument_role),
@@ -217,7 +251,9 @@ class PhysicsTopFamilyLayer:
                     **drum_evidence,
                     **instrument_evidence,
                     **fx_evidence,
-                    "physics_top_layer_source": "bass_loop_branch_guard",
+                    "physics_top_layer_source": (
+                        "clean_low_bass_phrase_guard" if clean_low_bass_phrase else "bass_loop_branch_guard"
+                    ),
                     "physics_top_layer_instrument_branch": instrument_branch,
                     "physics_top_layer_instrument_branch_confidence": round(float(instrument_branch_confidence), 6),
                     "physics_top_layer_instrument_anchor": round(float(instrument_anchor), 6),
@@ -225,10 +261,68 @@ class PhysicsTopFamilyLayer:
                     "physics_top_layer_bass_loop_role": round(float(role_value(roles, "bass_loop")), 6),
                 },
             )
+        measured_low_kick_hit = bool(
+            bool(drum_evidence.get("drum_anchor_low_sub_kick_exception"))
+            and drum_branch == "Kick"
+            and drum_branch_confidence >= 0.50
+            and event_low >= 0.82
+            and number(shape, "high_event_ratio", 0.0) <= 0.10
+            and tail_ratio <= 0.42
+            and event_count <= 5.0
+            and max(loop_percussive, number(shape, "drumlike_frame_ratio", 0.0)) <= 0.12
+            and not clean_low_bass_phrase
+        )
+        if measured_low_kick_hit:
+            return (
+                "Drums",
+                max(drum_anchor, drum_branch_confidence),
+                {
+                    **drum_evidence,
+                    **instrument_evidence,
+                    **fx_evidence,
+                    "physics_top_layer_source": "measured_low_kick_hit_layer",
+                    "physics_top_layer_drum_branch": drum_branch,
+                    "physics_top_layer_drum_branch_confidence": round(float(drum_branch_confidence), 6),
+                    "physics_top_layer_drum_anchor": round(float(drum_anchor), 6),
+                    "physics_top_layer_event_low": round(float(event_low), 6),
+                    "physics_top_layer_tail_ratio": round(float(tail_ratio), 6),
+                    "physics_top_layer_instrument_branch": instrument_branch,
+                    "physics_top_layer_instrument_branch_confidence": round(float(instrument_branch_confidence), 6),
+                    "physics_top_layer_instrument_anchor": round(float(instrument_anchor), 6),
+                },
+            )
         drum_loop_source = safe_float(instrument_evidence.get("instrument_subpanel_drum_loop_source_score", 0.0), 0.0)
         rhythmic_break_loop = safe_float(
             instrument_evidence.get("instrument_subpanel_rhythmic_break_loop_score", 0.0), 0.0
         )
+        strong_repeated_event_drum_loop = bool(
+            shape_name in {"beat_loop", "top_loop", "repeated_phrase_loop", "pitched_repetition_phrase"}
+            and shape_confidence >= 0.72
+            and drum_loop_source >= 0.68
+            and event_count >= 8.0
+            and (event_low >= 0.55 or number(shape, "high_event_ratio", 0.0) >= 0.45)
+            and not clean_low_bass_phrase
+        )
+        if strong_repeated_event_drum_loop:
+            return (
+                "Drums",
+                max(drum_anchor, drum_branch_confidence, drum_loop_source, repeated_loop_score),
+                {
+                    **drum_evidence,
+                    **instrument_evidence,
+                    **fx_evidence,
+                    "physics_top_layer_source": "strong_repeated_event_drum_loop_layer",
+                    "physics_top_layer_drum_branch": drum_branch,
+                    "physics_top_layer_drum_branch_confidence": round(float(drum_branch_confidence), 6),
+                    "physics_top_layer_drum_anchor": round(float(drum_anchor), 6),
+                    "physics_top_layer_drum_loop_source_score": round(float(drum_loop_source), 6),
+                    "physics_top_layer_repeated_loop_score": round(float(repeated_loop_score), 6),
+                    "physics_top_layer_event_low": round(float(event_low), 6),
+                    "physics_top_layer_instrument_branch": instrument_branch,
+                    "physics_top_layer_instrument_branch_confidence": round(float(instrument_branch_confidence), 6),
+                    "physics_top_layer_instrument_anchor": round(float(instrument_anchor), 6),
+                },
+            )
         tonal_arp_loop_decoy = bool(
             shape_name
             in {
@@ -265,11 +359,11 @@ class PhysicsTopFamilyLayer:
             and number(shape, "pitched_event_ratio", 0.0) >= 0.90
             and loop_percussive <= 0.08
             and number(shape, "drumlike_frame_ratio", 0.0) <= 0.08
-            and not (event_low >= 0.88 and (number(shape, "f0_voiced_ratio", 0.0) <= 0.35 or event_low >= 0.90))
         )
         measured_rhythmic_drum_loop_body = bool(
             drum_branch == "DrumLoop"
             and not tonal_arp_loop_decoy
+            and not clean_low_bass_phrase
             and drum_branch_confidence >= 0.50
             and rhythmic_break_loop >= 0.56
             and repeated_loop_score >= 0.62
@@ -384,6 +478,7 @@ class PhysicsTopFamilyLayer:
         )
         measured_drum_loop_source = bool(
             not voice_loop_protection
+            and not clean_low_bass_phrase
             and not tonal_instrument_loop_veto
             and not tonal_arp_loop_decoy
             and (

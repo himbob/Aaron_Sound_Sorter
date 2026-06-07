@@ -201,6 +201,26 @@ def classify_shape(values: Mapping[str, float], *, facts: SharedAudioFacts) -> S
     plucked_authority = evidence_number(facts, "plucked_string_authority_score")
     synth_source = evidence_number(facts, "synth_tonal_source_score")
     keys_authority = evidence_number(facts, "struck_keys_authority_score")
+    measured_fx_motion = evidence_number(facts, "fx_motion_score")
+    measured_transition = evidence_number(facts, "fx_transition_authority_score")
+    measured_texture = max(
+        evidence_number(facts, "texture_bed_score"),
+        evidence_number(facts, "texture_water_ocean_score"),
+        evidence_number(facts, "texture_rain_score"),
+        evidence_number(facts, "texture_wind_score"),
+        evidence_number(facts, "texture_fire_score"),
+        evidence_number(facts, "texture_thunder_score"),
+        evidence_number(facts, "texture_noise_static_score"),
+    )
+    measured_fx_tail = max(
+        evidence_number(facts, "fx_impact_score"),
+        evidence_number(facts, "fx_reverse_score"),
+        evidence_number(facts, "fx_whoosh_sweep_score"),
+        evidence_number(facts, "fx_riser_build_score"),
+        evidence_number(facts, "fx_drop_downlifter_score"),
+        measured_transition,
+    )
+    measured_drum_loop = evidence_number(facts, "drum_loop_source_score")
     duration = float(facts.evidence.get("duration_sec", 0.0) or 0.0) if isinstance(facts.evidence, dict) else 0.0
 
     low_total = clamp01(v(values, "sub_bass_ratio_lt_150hz") + v(values, "bass_ratio_150_500hz"))
@@ -498,6 +518,188 @@ def classify_shape(values: Mapping[str, float], *, facts: SharedAudioFacts) -> S
         + 0.12 * band_spread
         + 0.06 * inverse_ramp(solo_isolation, 0.24, 0.70)
     )
+    clean_bass_shape_evidence = bool(
+        low_total >= 0.42
+        and pitch_conf >= 0.58
+        and max(sustained_tonal, non_event_tonal, pitched) >= 0.62
+        and flatness <= 0.24
+        and noise_wash <= 0.46
+        and measured_texture < 0.52
+        and measured_fx_motion < 0.36
+    )
+    compact_struck_percussion = evidence_number(facts, "compact_struck_tonal_percussion_score")
+    struck_percussion_material = max(
+        evidence_number(facts, "hand_drum_membrane_score"),
+        evidence_number(facts, "pitched_metal_percussion_score"),
+        evidence_number(facts, "struck_wood_score"),
+    )
+    drum_material_branch = max(
+        evidence_number(facts, "drum_kick_source_score"),
+        evidence_number(facts, "drum_snare_source_score"),
+        evidence_number(facts, "drum_clap_source_score"),
+        evidence_number(facts, "drum_tom_conga_source_score"),
+        evidence_number(facts, "drum_rim_stick_source_score"),
+        evidence_number(facts, "drum_cymbal_source_score"),
+        evidence_number(facts, "drum_guiro_scrape_source_score"),
+        evidence_number(facts, "drum_metallic_percussion_source_score"),
+        evidence_number(facts, "drum_shaker_tambourine_source_score"),
+    )
+    pitched_repetition_shape_counter = bool(
+        scores.get(PITCHED_REPETITION_PHRASE, 0.0) >= 0.60
+        and max(pitched_onset, tonal_balance, pitched, pitch_conf) >= max(percussive_onset, percussive, drumlike) + 0.04
+        and max(plucked_authority, synth_source, keys_authority, tonal_presence) >= 0.42
+        and max(percussive, drumlike) <= 0.38
+    )
+    repeated_noisy_drum_loop_body = bool(
+        onset_count >= 8.0
+        and true_repetition >= 0.68
+        and span >= 0.62
+        and drum_material_branch >= 0.50
+        and (
+            drumlike >= 0.12
+            or percussive >= 0.52
+            or percussive_onset >= pitched_onset - 0.02
+            or measured_drum_loop >= 0.66
+        )
+        and (
+            measured_drum_loop >= 0.48
+            or max(drum_material_branch, percussive_onset) >= 0.58
+            or (high_event >= 0.72 and drum_material_branch >= 0.68)
+        )
+        and not clean_bass_shape_evidence
+        and not pitched_repetition_shape_counter
+    )
+    voice_body = max(
+        evidence_number(facts, "voice_score"),
+        evidence_number(facts, "human_spoken_voice_score"),
+        evidence_number(facts, "human_breath_mouth_score"),
+    )
+    short_percussive_hit_body = bool(
+        onset_count <= 3.0
+        and true_repetition <= 0.24
+        and evidence_number(facts, "role_one_shot_score") >= 0.72
+        and evidence_number(facts, "drum_hit_score") >= 0.62
+        and percussive_onset >= 0.62
+        and pitched <= 0.20
+        and pitch_conf <= 0.35
+    )
+    repeated_percussive_drum_loop_body = bool(
+        onset_count >= 6.0
+        and true_repetition >= 0.62
+        and measured_drum_loop >= 0.54
+        and max(percussive, drumlike, percussive_onset) >= 0.50
+        and measured_texture < 0.82
+        and not clean_bass_shape_evidence
+        and not pitched_repetition_shape_counter
+    )
+    tonal_struck_percussive_hit_body = bool(
+        onset_count <= 5.0
+        and true_repetition <= 0.38
+        and evidence_number(facts, "role_one_shot_score") >= 0.58
+        and compact_struck_percussion >= 0.74
+        and struck_percussion_material >= 0.56
+        and drum_material_branch >= 0.50
+        and max(percussive_onset, evidence_number(facts, "drum_hit_score"), drum_material_branch) >= 0.52
+        and voice_body < 0.62
+        and not clean_bass_shape_evidence
+        and not (
+            keys_authority >= 0.70
+            and keys_authority >= drum_material_branch + 0.18
+            and struck_percussion_material < 0.70
+        )
+    )
+    event_texture_body = bool(
+        measured_texture >= 0.58
+        and not clean_bass_shape_evidence
+        and not short_percussive_hit_body
+        and not tonal_struck_percussive_hit_body
+        and not repeated_percussive_drum_loop_body
+        and not repeated_noisy_drum_loop_body
+    )
+    low_tail_fx_body = bool(
+        measured_fx_tail >= 0.50
+        and tail >= 0.30
+        and not facts.is_loop_like
+        and onset_count <= 8.0
+        and not clean_bass_shape_evidence
+    )
+    motion_texture_body = bool(
+        max(measured_fx_motion, measured_transition, measured_fx_tail) >= 0.38
+        and max(noise_wash, measured_texture) >= 0.42
+        and not clean_bass_shape_evidence
+        and not (true_repetition >= 0.72 and measured_drum_loop >= 0.62)
+    )
+    if event_texture_body:
+        texture_shape_floor = min(0.96, max(measured_texture + 0.06, scores["texture_bed"]))
+        scores["texture_bed"] = max(scores["texture_bed"], texture_shape_floor)
+        scores["noise_texture"] = max(scores["noise_texture"], min(0.94, measured_texture + 0.04))
+        scores["static_bed"] = max(scores["static_bed"], min(0.92, 0.72 * measured_texture + 0.22 * noise_wash))
+        scores["beat_loop"] = min(scores["beat_loop"], scores["texture_bed"] - 0.03)
+        scores["top_loop"] = min(scores["top_loop"], scores["texture_bed"] - 0.04)
+        scores["repeated_phrase_loop"] = min(scores["repeated_phrase_loop"], scores["texture_bed"] - 0.02)
+    if repeated_percussive_drum_loop_body or repeated_noisy_drum_loop_body:
+        drum_loop_floor = min(
+            0.95,
+            max(
+                scores["beat_loop"],
+                0.42 * true_repetition
+                + 0.24 * max(measured_drum_loop, drum_material_branch)
+                + 0.34 * max(percussive, drumlike, percussive_onset, drum_material_branch),
+            ),
+        )
+        scores["beat_loop"] = max(scores["beat_loop"], drum_loop_floor)
+        if high_event >= 0.50 and high_total >= 0.16:
+            scores["top_loop"] = max(scores["top_loop"], min(0.94, drum_loop_floor - 0.02))
+        scores["texture_bed"] = min(scores["texture_bed"], drum_loop_floor - 0.04)
+        scores["noise_texture"] = min(scores["noise_texture"], drum_loop_floor - 0.05)
+        scores["static_bed"] = min(scores["static_bed"], drum_loop_floor - 0.06)
+        scores[PITCHED_REPETITION_PHRASE] = min(scores[PITCHED_REPETITION_PHRASE], drum_loop_floor - 0.04)
+    if short_percussive_hit_body:
+        hit_floor = min(0.96, max(scores["single_hit"], percussive_onset + 0.04))
+        scores["single_hit"] = max(scores["single_hit"], hit_floor)
+        scores["hit_with_tail"] = max(scores["hit_with_tail"], min(0.90, hit_floor - 0.03))
+        scores["texture_bed"] = min(scores["texture_bed"], hit_floor - 0.04)
+        scores["noise_texture"] = min(scores["noise_texture"], hit_floor - 0.05)
+        scores["static_bed"] = min(scores["static_bed"], hit_floor - 0.06)
+    if tonal_struck_percussive_hit_body:
+        struck_hit_floor = min(
+            0.96,
+            max(
+                scores["single_hit"],
+                scores["hit_with_tail"],
+                0.50 * compact_struck_percussion
+                + 0.28 * struck_percussion_material
+                + 0.22 * max(percussive_onset, drum_material_branch),
+            ),
+        )
+        if tail >= 0.14 or duration >= 0.42:
+            scores["hit_with_tail"] = max(scores["hit_with_tail"], struck_hit_floor)
+            scores["single_hit"] = max(scores["single_hit"], min(0.92, struck_hit_floor - 0.05))
+        else:
+            scores["single_hit"] = max(scores["single_hit"], struck_hit_floor)
+            scores["hit_with_tail"] = max(scores["hit_with_tail"], min(0.90, struck_hit_floor - 0.04))
+        scores["solo_phrase"] = min(scores["solo_phrase"], struck_hit_floor - 0.03)
+        scores["pitched_phrase"] = min(scores["pitched_phrase"], struck_hit_floor - 0.04)
+        scores[PITCHED_PHRASE_SHAPE] = min(scores[PITCHED_PHRASE_SHAPE], struck_hit_floor - 0.04)
+        scores[PITCHED_REPETITION_PHRASE] = min(scores[PITCHED_REPETITION_PHRASE], struck_hit_floor - 0.04)
+        scores["bass_phrase"] = min(scores["bass_phrase"], struck_hit_floor - 0.03)
+        scores["texture_bed"] = min(scores["texture_bed"], struck_hit_floor - 0.04)
+        scores["noise_texture"] = min(scores["noise_texture"], struck_hit_floor - 0.05)
+        scores["static_bed"] = min(scores["static_bed"], struck_hit_floor - 0.06)
+    if low_tail_fx_body:
+        tail_shape_floor = min(0.94, max(scores["impact_with_tail"], measured_fx_tail + 0.12))
+        scores["impact_with_tail"] = max(scores["impact_with_tail"], tail_shape_floor)
+        scores["hit_with_tail"] = max(scores["hit_with_tail"], min(0.90, tail_shape_floor - 0.03))
+        scores["bass_phrase"] = min(scores["bass_phrase"], tail_shape_floor - 0.02)
+        scores[PITCHED_REPETITION_PHRASE] = min(scores[PITCHED_REPETITION_PHRASE], tail_shape_floor - 0.03)
+    if motion_texture_body:
+        motion_shape_floor = min(
+            0.93, max(scores["hybrid_fx_motion"], measured_fx_tail + 0.08, measured_transition + 0.10)
+        )
+        scores["hybrid_fx_motion"] = max(scores["hybrid_fx_motion"], motion_shape_floor)
+        scores["bass_phrase"] = min(scores["bass_phrase"], motion_shape_floor - 0.02)
+        scores[PITCHED_PHRASE_SHAPE] = min(scores[PITCHED_PHRASE_SHAPE], motion_shape_floor - 0.03)
+        scores["pitched_phrase"] = min(scores["pitched_phrase"], motion_shape_floor - 0.03)
     drum_repetition_loop = clamp01(
         0.42 * true_repetition
         + 0.24 * ramp(max(percussive, drumlike), 0.18, 0.62)
@@ -525,18 +727,21 @@ def classify_shape(values: Mapping[str, float], *, facts: SharedAudioFacts) -> S
         and max(sustained_tonal, non_event_tonal) >= 0.82
         and max(percussive, drumlike) <= 0.08
     )
-    pitched_repetition_drum_decoy = bool(
-        scores.get(PITCHED_REPETITION_PHRASE, 0.0) >= 0.60
-        and max(pitched_onset, tonal_balance, pitched, pitch_conf) >= max(percussive_onset, percussive, drumlike) + 0.04
-        and max(plucked_authority, synth_source, keys_authority, tonal_presence) >= 0.42
-        and max(percussive, drumlike) <= 0.38
-    )
+    pitched_repetition_drum_decoy = pitched_repetition_shape_counter
+    if pitched_repetition_drum_decoy:
+        scores["repeated_phrase_loop"] = min(
+            scores["repeated_phrase_loop"],
+            max(0.0, scores[PITCHED_REPETITION_PHRASE] - 0.02),
+        )
+        scores["beat_loop"] = min(scores["beat_loop"], max(0.0, scores[PITCHED_REPETITION_PHRASE] - 0.04))
+        scores["top_loop"] = min(scores["top_loop"], max(0.0, scores[PITCHED_REPETITION_PHRASE] - 0.05))
     rhythmic_break_has_drum_body = bool(
         not pitched_repetition_drum_decoy
         and (
             max(percussive, drumlike) >= 0.52
             or (high_event >= 0.42 and high_total >= 0.18 and percussive_onset >= pitched_onset - 0.04)
             or (low_event >= 0.62 and max(percussive, drumlike) >= 0.18 and not clean_tonal_low_arp_body)
+            or repeated_noisy_drum_loop_body
         )
     )
     if rhythmic_break_loop >= 0.62 and true_repetition >= 0.62 and onset_count >= 6.0 and rhythmic_break_has_drum_body:
