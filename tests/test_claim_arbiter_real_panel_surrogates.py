@@ -631,10 +631,17 @@ def test_bright_high_band_loop_can_escape_fx_review_to_drum_loops() -> None:
     )
     core = DecisionCoreV2()
 
-    final = core.arbiter.adjudicate(raw_claim=raw, consensus_claims=[], eligibility_claims=[], facts=measured)
+    claims = core.gather_eligibility_claims(
+        raw,
+        eligibility("drum_loop", "Drums/Drum Loops/Loops", 0.86),
+        measured,
+        brain_result=None,
+        physics_result=VoterResult("physics", [guess("Drums/Hi Hats/Open Hat/One Shots", 2)]),
+    )
+    final = core.arbiter.adjudicate(raw_claim=raw, consensus_claims=[], eligibility_claims=claims, facts=measured)
 
     assert final.folder_path == "Drums/Drum Loops/Loops"
-    assert final.consensus_status == "final_measured_drum_loop_invariant"
+    assert final.consensus_status == "measured_drum_loop_claim"
 
 
 def test_synth_bass_one_shot_candidate_broadens_to_synth_loops_not_generic_instruments() -> None:
@@ -981,7 +988,22 @@ def test_decisive_struck_membrane_one_shot_stays_under_drums_after_sax_invariant
     )
     core = DecisionCoreV2()
 
-    final = core.arbiter.adjudicate(raw_claim=raw, consensus_claims=[], eligibility_claims=[], facts=measured)
+    claims = core.gather_eligibility_claims(
+        raw,
+        EligibilityDecision(
+            role_name="protected_percussive_one_shot",
+            confidence=0.90,
+            allowed_top_families=("Drums", "_TO_REVIEW"),
+            blocked_path_fragments=("Instruments", "FX"),
+            broad_folder_path="Drums/Percussion/Generic Percussion/One Shots",
+            reason="synthetic measured percussion one-shot",
+        ),
+        measured,
+        brain_result=VoterResult(voter_name="brain_full", guesses=[]),
+        physics_result=None,
+    )
+    assert any(claim.source == "final_decisive_struck_percussion_parent_invariant" for claim in claims)
+    final = core.arbiter.adjudicate(raw_claim=raw, consensus_claims=[], eligibility_claims=claims, facts=measured)
 
     assert final.folder_path == "Drums/Rims and Sticks/Generic Rim or Stick/One Shots"
     assert final.consensus_status == "final_decisive_struck_percussion_parent_invariant"
@@ -1030,7 +1052,22 @@ def test_decisive_struck_metal_scrape_one_shot_stays_under_drums_after_fx_invari
     )
     core = DecisionCoreV2()
 
-    final = core.arbiter.adjudicate(raw_claim=raw, consensus_claims=[], eligibility_claims=[], facts=measured)
+    claims = core.gather_eligibility_claims(
+        raw,
+        EligibilityDecision(
+            role_name="protected_percussive_one_shot",
+            confidence=0.90,
+            allowed_top_families=("Drums", "_TO_REVIEW"),
+            blocked_path_fragments=("Instruments", "FX"),
+            broad_folder_path="Drums/Percussion/Generic Percussion/One Shots",
+            reason="synthetic measured percussion one-shot",
+        ),
+        measured,
+        brain_result=VoterResult(voter_name="brain_full", guesses=[]),
+        physics_result=None,
+    )
+    assert any(claim.source == "final_decisive_struck_percussion_parent_invariant" for claim in claims)
+    final = core.arbiter.adjudicate(raw_claim=raw, consensus_claims=[], eligibility_claims=claims, facts=measured)
 
     assert final.folder_path == "Drums/Percussion/Guiros Scrapes and Rasps/One Shots"
     assert final.consensus_status == "final_decisive_struck_percussion_parent_invariant"

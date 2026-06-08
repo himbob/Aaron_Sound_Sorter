@@ -74,7 +74,7 @@ class DrumFxRescueMixin:
             pitch_confidence = _shape_metric_from_facts(context.facts, "pitch_confidence")
             if sustain_ratio >= 0.50 and pitch_confidence >= 0.72:
                 return None  # Too sustained/pitched for pure drum redirect
-            
+
             return self._redirect_from_raw(
                 context.raw,
                 "Drums/Drum Loops/Loops",

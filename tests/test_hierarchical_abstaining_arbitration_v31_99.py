@@ -583,14 +583,19 @@ def test_sax_loop_invariant_broadens_when_instrument_branch_is_not_woodwind() ->
         "instrument_MalletBell_subpanel_margin": 0.15,
     }
 
-    final = DecisionCoreV2().arbiter.adjudicate(
-        raw_claim=raw,
-        consensus_claims=[],
-        eligibility_claims=[],
-        facts=measured,
+    core = DecisionCoreV2()
+    claims = core.gather_eligibility_claims(
+        raw,
+        eligibility("pitched_music_loop", "Instruments/Instrument Loops/Loops"),
+        measured,
+        brain_result=VoterResult("brain", guesses=[]),
+        physics_result=VoterResult("physics", guesses=[]),
     )
+    final = core.arbiter.adjudicate(raw_claim=raw, consensus_claims=[], eligibility_claims=claims, facts=measured)
 
-    assert final.folder_path != "Instruments/Woodwinds/Saxophone/Loops"
+    assert any(claim.source == "final_false_sax_leaf_broad_instrument_loop_invariant" for claim in claims)
+    assert final.folder_path == "Instruments/Instrument Loops/Loops"
+    assert final.consensus_status == "final_false_sax_leaf_broad_instrument_loop_invariant"
 
 
 def test_noisy_bassloop_subpanel_can_refine_broad_instrument_loop_to_bass() -> None:
@@ -911,10 +916,25 @@ def test_short_voice_hit_beats_tonal_stab_synth_fallback() -> None:
         }
     }
 
-    arbiter = DecisionCoreV2().arbiter
-    tonal_stab_claim = arbiter._protect_measured_tonal_chord_stab(raw, measured)
+    core = DecisionCoreV2()
+    claims = core.gather_eligibility_claims(
+        raw,
+        eligibility("voiced_one_shot", "Instruments/Voice/Phrase/One Shots"),
+        measured,
+    )
+    tonal_stab_claim = next(
+        claim for claim in claims if claim.source == "final_measured_voice_before_tonal_stab_invariant"
+    )
     assert tonal_stab_claim.folder_path == "Instruments/Voice/Phrase/One Shots"
-    assert tonal_stab_claim.source == "final_measured_voice_before_tonal_stab_invariant"
+
+    final = core.arbiter.adjudicate(
+        raw_claim=raw,
+        consensus_claims=[],
+        eligibility_claims=claims,
+        facts=measured,
+    )
+    assert final.folder_path == "Instruments/Voice/Phrase/One Shots"
+    assert final.consensus_status == "final_measured_voice_before_tonal_stab_invariant"
 
 
 def test_physics_fx_role_layer_can_rescue_transition_from_instrument_loop() -> None:
@@ -953,12 +973,17 @@ def test_physics_fx_role_layer_can_rescue_transition_from_instrument_loop() -> N
         "fx_role_allows_fx": True,
     }
 
-    final = DecisionCoreV2().arbiter.adjudicate(
-        raw_claim=raw,
-        consensus_claims=[],
-        eligibility_claims=[],
-        facts=measured,
+    core = DecisionCoreV2()
+    claims = core.gather_eligibility_claims(
+        raw,
+        eligibility("pitched_music_loop", "Instruments/Instrument Loops/Loops"),
+        measured,
+        brain_result=VoterResult("brain", guesses=[]),
+        physics_result=VoterResult("physics", guesses=[]),
     )
+    assert any(claim.source == "final_measured_transition_fx_invariant" for claim in claims)
+
+    final = core.arbiter.adjudicate(raw_claim=raw, consensus_claims=[], eligibility_claims=claims, facts=measured)
 
     assert final.folder_path == "FX/Structural and Transitional FX/Risers and Builds/Generic Riser/Long FX"
     assert final.consensus_status == "final_measured_transition_fx_invariant"
@@ -1251,10 +1276,22 @@ def test_tonal_repeated_phrase_does_not_gain_drum_loop_protection() -> None:
         }
     }
 
-    protected = DecisionCoreV2().arbiter._protect_measured_rhythmic_break_loop(raw, measured)
+    core = DecisionCoreV2()
+    claims = core.gather_eligibility_claims(
+        raw,
+        eligibility("pitched_music_loop", "Instruments/Instrument Loops/Loops"),
+        measured,
+    )
+    assert not any(claim.source == "final_measured_rhythmic_break_loop_invariant" for claim in claims)
 
-    assert protected.folder_path == "Instruments/Instrument Loops/Loops"
-    assert protected.source == "strong_consensus"
+    final = core.arbiter.adjudicate(
+        raw_claim=raw,
+        consensus_claims=[],
+        eligibility_claims=claims,
+        facts=measured,
+    )
+    assert final.folder_path == "Instruments/Instrument Loops/Loops"
+    assert final.consensus_status == "strong_consensus"
 
 
 def test_short_synth_hit_keeps_synth_identity_over_weak_reed_one_shot() -> None:
@@ -1299,10 +1336,20 @@ def test_short_synth_hit_keeps_synth_identity_over_weak_reed_one_shot() -> None:
         ]
     }
 
-    protected = DecisionCoreV2().arbiter._protect_short_instrument_one_shot_from_loop_bucket(raw, measured)
+    core = DecisionCoreV2()
+    claims = core.gather_eligibility_claims(
+        raw,
+        eligibility("pitched_music_phrase", "Instruments/Instrument Loops/Loops"),
+        measured,
+        brain_result=VoterResult("brain", guesses=[]),
+        physics_result=VoterResult("physics", guesses=[]),
+    )
+    assert any(claim.source == "final_short_synth_one_shot_invariant" for claim in claims)
 
-    assert protected.folder_path == "Instruments/Synths/Synth One Shots"
-    assert protected.source == "final_short_synth_one_shot_invariant"
+    final = core.arbiter.adjudicate(raw_claim=raw, consensus_claims=[], eligibility_claims=claims, facts=measured)
+
+    assert final.folder_path == "Instruments/Synths/Synth One Shots"
+    assert final.consensus_status == "final_short_synth_one_shot_invariant"
 
 
 def test_dominant_wet_reed_loop_keeps_sax_depth_after_one_shot_broadening() -> None:
@@ -1371,7 +1418,17 @@ def test_dominant_wet_reed_loop_keeps_sax_depth_after_one_shot_broadening() -> N
         ]
     }
 
-    protected = DecisionCoreV2().arbiter._protect_instrument_one_shot_leaf_from_measured_loop(raw, measured)
+    core = DecisionCoreV2()
+    claims = core.gather_eligibility_claims(
+        raw,
+        eligibility("pitched_music_loop", "Instruments/Instrument Loops/Loops"),
+        measured,
+        brain_result=VoterResult("brain", guesses=[]),
+        physics_result=VoterResult("physics", guesses=[]),
+    )
+    assert any(claim.source == "final_measured_branch_loop_broad_bucket" for claim in claims)
 
-    assert protected.folder_path == "Instruments/Woodwinds/Saxophone/Loops"
-    assert protected.source == "final_measured_branch_loop_broad_bucket"
+    final = core.arbiter.adjudicate(raw_claim=raw, consensus_claims=[], eligibility_claims=claims, facts=measured)
+
+    assert final.folder_path == "Instruments/Woodwinds/Saxophone/Loops"
+    assert final.consensus_status == "final_measured_branch_loop_broad_bucket"

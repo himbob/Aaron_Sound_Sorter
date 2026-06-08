@@ -13,8 +13,21 @@ smaller producer classes.
 
 from __future__ import annotations
 
+from aaron_sound_sorter.engine.claim_producers.final_drum_loop import FinalDrumLoopClaimProducer
+from aaron_sound_sorter.engine.claim_producers.measured_drum_structures import (
+    MeasuredDrumStructureClaimProducer,
+)
+from aaron_sound_sorter.engine.claim_producers.measured_instrument_branches import (
+    MeasuredInstrumentBranchClaimProducer,
+)
+from aaron_sound_sorter.engine.claim_producers.measured_music_structures import (
+    MeasuredMusicStructureClaimProducer,
+)
 from aaron_sound_sorter.engine.claim_producers.measured_smoke_stability import (
     MeasuredSmokeStabilityClaimProducer,
+)
+from aaron_sound_sorter.engine.claim_producers.measured_transition_fx import (
+    MeasuredTransitionFxClaimProducer,
 )
 from aaron_sound_sorter.engine.claim_producers.measured_true_bucket import (
     MeasuredTrueBucketClaimProducer,
@@ -30,13 +43,45 @@ class MeasuredBucketClaimProducer:
         self,
         true_bucket: MeasuredTrueBucketClaimProducer | None = None,
         smoke_stability: MeasuredSmokeStabilityClaimProducer | None = None,
+        final_drum_loop: FinalDrumLoopClaimProducer | None = None,
+        transition_fx: MeasuredTransitionFxClaimProducer | None = None,
+        instrument_branches: MeasuredInstrumentBranchClaimProducer | None = None,
+        drum_structures: MeasuredDrumStructureClaimProducer | None = None,
+        music_structures: MeasuredMusicStructureClaimProducer | None = None,
     ) -> None:
         self.true_bucket = true_bucket or MeasuredTrueBucketClaimProducer()
         self.smoke_stability = smoke_stability or MeasuredSmokeStabilityClaimProducer()
+        self.final_drum_loop = final_drum_loop or FinalDrumLoopClaimProducer()
+        self.transition_fx = transition_fx or MeasuredTransitionFxClaimProducer()
+        self.instrument_branches = instrument_branches or MeasuredInstrumentBranchClaimProducer()
+        self.drum_structures = drum_structures or MeasuredDrumStructureClaimProducer()
+        self.music_structures = music_structures or MeasuredMusicStructureClaimProducer()
 
     def produce(self, context: DecisionContext) -> list[ConsensusClaim]:
-        """Return the first measured-bucket claim in legacy order."""
-        for producer in (self.true_bucket, self.smoke_stability):
+        """Return measured-bucket claims in architecture-safe priority order.
+
+        True-bucket corrections keep their legacy priority, but measured
+        instrument-branch claims may ride alongside them.  That moves branch
+        refinement out of late arbiter rescue while preserving broad true-bucket
+        claims that existing tests depend on.
+        """
+        true_claims = self.true_bucket.produce(context)
+        if true_claims:
+            return (
+                true_claims
+                + self.drum_structures.produce(context)
+                + self.instrument_branches.produce(context)
+                + self.music_structures.produce(context)
+            )
+
+        for producer in (
+            self.transition_fx,
+            self.drum_structures,
+            self.final_drum_loop,
+            self.instrument_branches,
+            self.music_structures,
+            self.smoke_stability,
+        ):
             claims = producer.produce(context)
             if claims:
                 return claims
