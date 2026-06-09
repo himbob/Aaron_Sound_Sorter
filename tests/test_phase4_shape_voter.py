@@ -7,8 +7,7 @@ import numpy as np
 from aaron_sound_sorter.core import FEATURE_NAMES, FP_SIZE
 from aaron_sound_sorter.domain.facts import build_shared_audio_facts
 from aaron_sound_sorter.domain.models import AudioPhysics, CategoryGuess, SharedAudioFacts, VoterResult
-from aaron_sound_sorter.engine.consensus import ConsensusRunner
-from aaron_sound_sorter.engine.family_claim_arbiter import FamilyClaimArbiter
+from aaron_sound_sorter.engine.decision_core_v2 import DecisionCoreV2
 from aaron_sound_sorter.voters.shape_voter import ShapeVoter, shape_compatible_tops
 
 
@@ -36,14 +35,8 @@ def _guess(label: str, rank: int) -> CategoryGuess:
 
 
 def _finalize_consensus(brain: VoterResult, physics: VoterResult, facts: SharedAudioFacts):
-    """Run the new evidence-then-arbiter consensus flow used by production."""
-    raw_claim, consensus_claims = ConsensusRunner().choose(brain, physics, facts)
-    return FamilyClaimArbiter().adjudicate(
-        raw_claim=raw_claim,
-        consensus_claims=consensus_claims,
-        eligibility_claims=[],
-        facts=facts,
-    )
+    """Run the production DecisionCore path, not a dead arbiter shortcut."""
+    return DecisionCoreV2().choose(brain, physics, facts)
 
 
 def test_shape_voter_detects_beat_loop_without_category_destination() -> None:

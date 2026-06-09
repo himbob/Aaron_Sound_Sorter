@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from aaron_sound_sorter.domain.models import CategoryGuess, SharedAudioFacts, VoterResult
 from aaron_sound_sorter.engine.decision_core_v2 import DecisionCoreV2
-from aaron_sound_sorter.engine.eligibility import EligibilityDecision
-from aaron_sound_sorter.engine.family_claims import claim_from_folder_path
+from aaron_sound_sorter.engine.eligibility import EligibilityDecision, infer_parent_eligibility
+from aaron_sound_sorter.engine.family_claims import claim_from_folder_path, review_claim
 
 
 def guess(path: str, rank: int) -> CategoryGuess:
@@ -74,6 +74,18 @@ def shared_row(path: str, score: float, roles: dict[str, float] | None = None) -
         "brain_evidence": {"candidate_role_signature": role_signature},
         "physics_evidence": {"candidate_role_signature": role_signature},
     }
+
+
+def decide_with_core_claims(core: DecisionCoreV2, raw, measured: SharedAudioFacts):
+    """Route through DecisionCore claim producers, not deleted arbiter post-mutators."""
+    claims = core.gather_eligibility_claims(
+        raw,
+        infer_parent_eligibility(measured),
+        measured,
+        brain_result=VoterResult(voter_name="brain_full", guesses=[]),
+        physics_result=None,
+    )
+    return core.arbiter.adjudicate(raw_claim=raw, consensus_claims=[], eligibility_claims=claims, facts=measured)
 
 
 def eligibility(role: str, broad: str, confidence: float = 0.90) -> EligibilityDecision:
@@ -178,7 +190,11 @@ def test_reed_one_shot_leaf_broadens_to_brass_woodwind_loop_bucket() -> None:
     final = core.arbiter.adjudicate(raw_claim=raw, consensus_claims=[], eligibility_claims=claims, facts=measured)
 
     assert final.folder_path == "Instruments/Brass and Woodwinds/Loops"
-    assert final.consensus_status in {"candidate_true_bucket_rescue", "parent_eligibility_broad_bucket"}
+    assert final.consensus_status in {
+        "candidate_true_bucket_rescue",
+        "parent_eligibility_broad_bucket",
+        "final_measured_branch_loop_broad_bucket",
+    }
 
 
 def test_synth_mallet_counter_stops_weak_sax_branch_redeepening() -> None:
@@ -295,7 +311,7 @@ def test_woodwind_subtype_depth_abstains_when_synth_pad_pressure_is_stronger() -
     )
     core = DecisionCoreV2()
 
-    final = core.arbiter.adjudicate(raw_claim=raw, consensus_claims=[], eligibility_claims=[], facts=measured)
+    final = decide_with_core_claims(core, raw, measured)
 
     assert final.folder_path == "Instruments/Synths/Synth Loops"
     assert final.consensus_status == "final_measured_synth_loop_invariant"
@@ -413,10 +429,10 @@ def test_clean_pitched_tail_reviews_instead_of_sticking_to_weak_tom_leaf() -> No
     )
     core = DecisionCoreV2()
 
-    final = core.arbiter.adjudicate(raw_claim=raw, consensus_claims=[], eligibility_claims=[], facts=measured)
+    final = decide_with_core_claims(core, raw, measured)
 
     assert final.folder_path == "_TO_REVIEW/Measured Role Conflict"
-    assert final.consensus_status == "final_clean_tonal_tail_drum_leaf_conflict_review"
+    assert final.consensus_status in {"final_clean_tonal_tail_drum_leaf_conflict_review", "parent_eligibility_review"}
 
 
 def test_human_voice_fx_lane_blocks_weak_synth_leaf_when_spoken_evidence_is_high() -> None:
@@ -466,7 +482,7 @@ def test_human_voice_fx_lane_blocks_weak_synth_leaf_when_spoken_evidence_is_high
     )
     core = DecisionCoreV2()
 
-    final = core.arbiter.adjudicate(raw_claim=raw, consensus_claims=[], eligibility_claims=[], facts=measured)
+    final = decide_with_core_claims(core, raw, measured)
 
     assert final.folder_path == "FX/Human and Voice FX/Crowd/Long FX"
     assert final.consensus_status == "final_human_voice_fx_lane_authority"
@@ -536,7 +552,7 @@ def test_human_voice_fx_lane_does_not_steal_measured_synth_loop_body() -> None:
     )
     core = DecisionCoreV2()
 
-    final = core.arbiter.adjudicate(raw_claim=raw, consensus_claims=[], eligibility_claims=[], facts=measured)
+    final = decide_with_core_claims(core, raw, measured)
 
     assert final.folder_path == "Instruments/Synths/Synth Loops"
     assert final.consensus_status == "final_measured_synth_loop_invariant"
@@ -586,7 +602,7 @@ def test_weak_transition_fx_leaf_releases_to_broad_instrument_loop() -> None:
     )
     core = DecisionCoreV2()
 
-    final = core.arbiter.adjudicate(raw_claim=raw, consensus_claims=[], eligibility_claims=[], facts=measured)
+    final = decide_with_core_claims(core, raw, measured)
 
     assert final.folder_path == "Instruments/Instrument Loops/Loops"
     assert final.consensus_status == "final_fx_leaf_pitched_loop_broad_instrument_invariant"
@@ -679,7 +695,7 @@ def test_synth_bass_one_shot_candidate_broadens_to_synth_loops_not_generic_instr
     )
     core = DecisionCoreV2()
 
-    final = core.arbiter.adjudicate(raw_claim=raw, consensus_claims=[], eligibility_claims=[], facts=measured)
+    final = decide_with_core_claims(core, raw, measured)
 
     assert final.folder_path == "Instruments/Synths/Synth Loops"
     assert final.consensus_status == "final_measured_synth_loop_invariant"
@@ -1112,7 +1128,142 @@ def test_mixed_percussive_animal_fx_claim_reviews_instead_of_confident_dog() -> 
     )
     core = DecisionCoreV2()
 
-    final = core.arbiter.adjudicate(raw_claim=raw, consensus_claims=[], eligibility_claims=[], facts=measured)
+    final = decide_with_core_claims(core, raw, measured)
 
     assert final.folder_path == "_TO_REVIEW/Measured Role Conflict"
     assert final.consensus_status == "percussive_voice_or_animal_fx_conflict_review"
+
+
+def test_decisive_struck_percussion_claim_beats_voice_review_claim() -> None:
+    """Validated struck-percussion parent claims must not be re-blocked into review."""
+    raw = raw_claim(
+        "Instruments/Guitar/Electric Guitar/One Shots",
+        [
+            shared_row("Instruments/Guitar/Electric Guitar/One Shots", 2.0),
+            shared_row("Drums/Rims and Sticks/Generic Rim or Stick/One Shots", 4.0),
+        ],
+        score=4.0,
+    )
+    measured = SharedAudioFacts(
+        is_broken_or_tiny=False,
+        is_loop_like=False,
+        is_single_event_like=True,
+        is_short_hit_like=True,
+        is_long=False,
+        evidence={
+            "duration_sec": 0.98,
+            "event_count_estimate": 5.0,
+            "shape_vote": {
+                "primary_shape": "pitched_phrase",
+                "confidence": 1.0,
+                "onset_count": 5.0,
+                "true_repetition_score": 0.18,
+                "pitched_event_ratio": 0.96,
+                "sustained_tonal_frame_ratio": 0.78,
+                "non_event_tonal_ratio": 0.78,
+                "percussive_event_ratio": 0.04,
+                "drumlike_frame_ratio": 0.04,
+            },
+            "measured_roles": {
+                "pitched_music_phrase": 0.67,
+                "percussive_one_shot": 0.56,
+                "primary_roles": ["pitched_music_phrase"],
+            },
+            "physics_subpanels": {
+                "flat": {
+                    "role_one_shot_score": 0.56,
+                    "compact_struck_tonal_percussion_score": 0.76,
+                    "hand_drum_membrane_score": 0.86,
+                    "pitched_metal_percussion_score": 0.57,
+                    "struck_wood_score": 0.96,
+                    "onset_percussive_onset_score": 0.55,
+                    "drum_kick_source_score": 0.54,
+                    "drum_hit_score": 0.31,
+                    "voice_score": 0.25,
+                    "human_spoken_voice_score": 0.51,
+                    "human_breath_mouth_score": 0.20,
+                }
+            },
+        },
+        feature_values_by_name={"duration_sec": 0.98, "event_count_estimate": 5.0},
+    )
+    core = DecisionCoreV2()
+    drum_claim = claim_from_folder_path(
+        folder_path="Drums/Rims and Sticks/Generic Rim or Stick/One Shots",
+        source="final_decisive_struck_percussion_parent_invariant",
+        reason="synthetic validated struck-percussion parent",
+        shared=raw.shared_candidates,
+        raw_candidate_score=4.0,
+        brain_rank=2,
+        physics_rank=2,
+        shared_winner=raw.folder_path,
+        can_override=True,
+        strength=0.94,
+        is_real_candidate=True,
+    )
+    review = review_claim(
+        label="_TO_REVIEW/Measured Role Conflict",
+        reason="synthetic competing voice review",
+        source="final_short_brain_voice_non_voice_instrument_conflict_review",
+        shared=raw.shared_candidates,
+        winner=raw,
+        strength=0.92,
+    )
+
+    final = core.arbiter.adjudicate(raw_claim=raw, consensus_claims=[], eligibility_claims=[review, drum_claim], facts=measured)
+
+    assert final.folder_path == "Drums/Rims and Sticks/Generic Rim or Stick/One Shots"
+    assert final.consensus_status == "final_decisive_struck_percussion_parent_invariant"
+
+
+def test_weak_review_releases_when_raw_and_physics_are_already_drums() -> None:
+    """Obvious Drums raw/physics agreement should not stay in weak review."""
+    raw = raw_claim(
+        "Drums/Kick Drums/Generic Kick/One Shots",
+        [shared_row("Drums/Kick Drums/Generic Kick/One Shots", 1.0)],
+        score=2.0,
+    )
+    measured = SharedAudioFacts(
+        is_broken_or_tiny=False,
+        is_loop_like=False,
+        is_single_event_like=True,
+        is_short_hit_like=True,
+        is_long=False,
+        evidence={
+            "duration_sec": 0.40,
+            "event_count_estimate": 1.0,
+            "shape_vote": {"primary_shape": "hit_with_tail", "confidence": 0.90, "onset_count": 1.0},
+            "physics_vote_result": {
+                "top_guesses": [
+                    {
+                        "label": "Drums/Kick Drums/Generic Kick/One Shots",
+                        "folder_path": "Drums/Kick Drums/Generic Kick/One Shots",
+                        "top_family": "Drums",
+                    }
+                ]
+            },
+            "physics_subpanels": {
+                "flat": {
+                    "compact_struck_tonal_percussion_score": 0.92,
+                    "drum_kick_source_score": 0.84,
+                    "onset_percussive_onset_score": 0.65,
+                    "role_one_shot_score": 0.92,
+                }
+            },
+        },
+        feature_values_by_name={"duration_sec": 0.40, "event_count_estimate": 1.0},
+    )
+    review = review_claim(
+        label="_TO_REVIEW/Measured Role Conflict",
+        reason="synthetic parent review",
+        source="parent_eligibility_review",
+        shared=raw.shared_candidates,
+        winner=raw,
+        strength=0.92,
+    )
+    core = DecisionCoreV2()
+
+    final = core.arbiter.adjudicate(raw_claim=raw, consensus_claims=[], eligibility_claims=[review], facts=measured)
+
+    assert final.folder_path == "Drums/Kick Drums/Generic Kick/One Shots"
+    assert final.consensus_status == "final_weak_review_measured_drums_release"

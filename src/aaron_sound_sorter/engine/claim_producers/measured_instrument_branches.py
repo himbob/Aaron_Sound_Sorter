@@ -82,6 +82,7 @@ class MeasuredInstrumentBranchClaimProducer:
             self._shape_number(context.facts, "loop_pulse_strength"),
             self._shape_number(context.facts, "true_repetition_score"),
             self._shape_number(context.facts, "onset_periodicity_score"),
+            self._shape_number(context.facts, "librosa_loop_confidence"),
         )
         if loop_role >= 0.55 and bool(getattr(context.facts, "is_loop_like", False)):
             return None
@@ -144,7 +145,11 @@ class MeasuredInstrumentBranchClaimProducer:
         if (
             not target
             and self._raw_path_is_brass_or_woodwind(raw_path)
-            and self._facts_support_repeated_tonal_hit_phrase(context.facts)
+            and not self._facts_have_non_woodwind_branch_identity_conflict(context.facts)
+            and (
+                self._facts_support_repeated_tonal_hit_phrase(context.facts)
+                or self._facts_support_measured_loop_body(context.facts)
+            )
         ):
             target = "Instruments/Brass and Woodwinds/Loops"
         if not target and self._facts_support_repeated_pitched_loop_phrase(context.facts):
@@ -254,6 +259,8 @@ class MeasuredInstrumentBranchClaimProducer:
             return True
         if self._facts_support_repeated_pitched_loop_phrase(facts):
             return True
+        if self._facts_support_third_party_pitched_loop_body(facts):
+            return True
         shape = _shape_vote_from_facts(facts)
         shape_confidence = _shape_confidence_from_facts(facts)
         detected_role = str(self._roles(facts).get("detected_parent_role") or "")
@@ -275,6 +282,7 @@ class MeasuredInstrumentBranchClaimProducer:
             self._role_value(facts, "pitched_reed_or_instrument_loop"),
             self._role_value(facts, "bass_loop"),
             self._role_value(facts, "synth_loop"),
+            self._shape_number(facts, "librosa_loop_confidence"),
         )
         repeated_pitched_loop_body = bool(
             shape == "repeated_phrase_loop"
@@ -301,6 +309,33 @@ class MeasuredInstrumentBranchClaimProducer:
         )
         return bool(measured_loop >= 0.86 or structural_loop_body or repeated_pitched_loop_body)
 
+    def _facts_support_third_party_pitched_loop_body(self, facts: SharedAudioFacts | None) -> bool:
+        """Return True when installed third-party DSP confirms a tonal loop body."""
+        if facts is None:
+            return False
+        duration = _feature_number_from_facts(facts, "duration_sec")
+        loop_confidence = self._shape_number(facts, "librosa_loop_confidence")
+        tonal_confidence = self._shape_number(facts, "librosa_tonal_confidence")
+        onset_events = self._shape_number(facts, "librosa_onset_event_count")
+        pitch_support = max(
+            self._shape_number(facts, "pitched_event_ratio"),
+            self._shape_number(facts, "f0_voiced_ratio"),
+            self._shape_number(facts, "pitch_confidence"),
+            tonal_confidence,
+        )
+        drumlike = max(
+            self._shape_number(facts, "drumlike_frame_ratio"),
+            self._shape_number(facts, "percussive_event_ratio"),
+        )
+        return bool(
+            duration >= 1.35
+            and loop_confidence >= 0.64
+            and onset_events >= 2.0
+            and pitch_support >= 0.35
+            and tonal_confidence >= 0.30
+            and drumlike <= 0.42
+        )
+
     def _measured_loop_branch_target(self, context: DecisionContext) -> str:
         layer = self._physics_layer(context.facts)
         branch = str(
@@ -313,6 +348,7 @@ class MeasuredInstrumentBranchClaimProducer:
             layer.get("instrument_branch_selected_confidence", layer.get("physics_layer_branch_confidence")),
             0.0,
         )
+        raw_path = _norm_path(context.raw.folder_path or context.raw.label)
         if branch == "Woodwinds":
             has_woodwind_signal = bool(
                 layer.get("instrument_woodwind_source_signal") or layer.get("instrument_reed_woodwind_source_signal")
@@ -330,6 +366,12 @@ class MeasuredInstrumentBranchClaimProducer:
                 )
             ):
                 return "Instruments/Woodwinds/Saxophone/Loops"
+        if self._facts_support_synth_loop(context) and (
+            branch == "Synth"
+            or "synth" in raw_path
+            or self._measured_score(context.facts, "synth_tonal_source_score") >= 0.58
+        ):
+            return self._measured_synth_loop_target_path(context)
         return ""
 
     def _bass_loop_claim(self, context: DecisionContext) -> ConsensusClaim | None:
@@ -338,6 +380,8 @@ class MeasuredInstrumentBranchClaimProducer:
         if raw.family == "Instruments" and "bass" in path and "loop" in path:
             return None
         if not self._facts_support_clean_bass_loop(context.facts):
+            return None
+        if self._facts_have_measured_drum_loop_authority(context.facts):
             return None
         return claim_from_folder_path(
             folder_path="Instruments/Bass/Bass Loops",
@@ -498,7 +542,45 @@ class MeasuredInstrumentBranchClaimProducer:
             or self._safe_float(layer.get("instrument_branch_Woodwinds"), 0.0) >= 0.86
         ):
             return False
-        if max(self._role_value(facts, "bass_loop"), bass_identity) < 0.58:
+        bass_role = self._role_value(facts, "bass_loop")
+        if max(bass_role, bass_identity) < 0.58:
+            return False
+        pure_low_bass_body = (
+            self._shape_number(facts, "low_event_ratio") >= 0.88
+            and self._shape_number(facts, "mid_event_ratio") <= 0.12
+            and self._shape_number(facts, "high_event_ratio") <= 0.08
+            and self._shape_number(facts, "spectral_flatness_mean") <= 0.05
+            and bass_identity >= 0.62
+        )
+        if bass_role < 0.55 and not pure_low_bass_body:
+            return False
+        duration = _feature_number_from_facts(facts, "duration_sec")
+        event_count = max(
+            _shape_metric_from_facts(facts, "onset_count"),
+            _feature_number_from_facts(facts, "event_count_estimate"),
+        )
+        compact_struck = self._measured_score(facts, "compact_struck_tonal_percussion_score")
+        struck_material = max(
+            self._measured_score(facts, "pitched_metal_percussion_score"),
+            self._measured_score(facts, "struck_wood_score"),
+            self._measured_score(facts, "hand_drum_membrane_score"),
+        )
+        drum_panel = max(
+            self._measured_score(facts, "drum_hit_score"),
+            self._measured_score(facts, "drum_kick_source_score"),
+            self._measured_score(facts, "drum_snare_source_score"),
+            self._measured_score(facts, "drum_tom_conga_source_score"),
+            self._measured_score(facts, "drum_rim_stick_source_score"),
+            self._measured_score(facts, "drum_metallic_percussion_source_score"),
+        )
+        if (
+            duration > 0.0
+            and duration <= 1.50
+            and event_count <= 8.0
+            and compact_struck >= 0.72
+            and struck_material >= 0.62
+            and drum_panel >= 0.32
+        ):
             return False
         return bool(
             self._shape_number(facts, "low_event_ratio") >= 0.72
@@ -516,6 +598,24 @@ class MeasuredInstrumentBranchClaimProducer:
             return False
         shape = _shape_vote_from_facts(facts)
         shape_conf = _shape_confidence_from_facts(facts)
+        if (
+            _feature_number_from_facts(facts, "duration_sec") <= 0.90
+            and shape in {"single_hit", "hit_with_tail", "solo_phrase", "pitched_phrase", "ui_blip"}
+            and self._measured_score(facts, "compact_struck_tonal_percussion_score") >= 0.78
+            and max(
+                self._measured_score(facts, "hand_drum_membrane_score"),
+                self._measured_score(facts, "pitched_metal_percussion_score"),
+                self._measured_score(facts, "struck_wood_score"),
+            ) >= 0.70
+            and max(
+                self._measured_score(facts, "drum_hit_score"),
+                self._measured_score(facts, "drum_tom_conga_source_score"),
+                self._measured_score(facts, "drum_rim_stick_source_score"),
+                self._measured_score(facts, "drum_snare_source_score"),
+                self._measured_score(facts, "drum_metallic_percussion_source_score"),
+            ) >= 0.34
+        ):
+            return False
         if shape not in {
             "bass_phrase",
             "beat_loop",
@@ -684,13 +784,28 @@ class MeasuredInstrumentBranchClaimProducer:
             return False
         shape = _shape_vote_from_facts(facts)
         shape_conf = _shape_confidence_from_facts(facts)
-        if shape not in {"pitched_repetition_phrase", "pitched_phrase", "vocal_phrase", "repeated_phrase_loop"}:
+        if shape not in {
+            "pitched_repetition_phrase",
+            "pitched_phrase",
+            "vocal_phrase",
+            "repeated_phrase_loop",
+            "transition_drop",
+            "transition_riser",
+        }:
             return False
-        sax_panel = self._measured_score(facts, "woodwind_sax_score")
-        reed_panel = self._measured_score(facts, "reed_wind_score", "reed_wind_authority_score")
+        layer = self._physics_layer(facts)
+        sax_panel = max(
+            self._measured_score(facts, "woodwind_sax_score"),
+            self._safe_float(layer.get("instrument_panel_Woodwinds_Sax"), 0.0),
+            self._safe_float(layer.get("instruments_woodwinds_saxophone_one_shots_score"), 0.0),
+        )
+        reed_panel = max(
+            self._measured_score(facts, "reed_wind_score", "reed_wind_authority_score"),
+            self._safe_float(layer.get("instrument_subpanel_reed_wind_score"), 0.0),
+            self._safe_float(layer.get("instrument_subpanel_reed_wind_authority_score"), 0.0),
+        )
         synth_panel = self._measured_score(facts, "synth_tonal_source_score", "synth_lead_score", "synth_pad_score")
         keys_panel = self._measured_score(facts, "struck_keys_score", "keys_tonal_decay_score")
-        layer = self._physics_layer(facts)
         branch = str(layer.get("instrument_branch_selected") or layer.get("physics_layer_branch") or "")
         dark_low_mid_reed_branch = bool(
             branch in {"Woodwinds", "ReedWoodwind"}
@@ -711,6 +826,16 @@ class MeasuredInstrumentBranchClaimProducer:
             return True
         if branch in {"Woodwinds", "ReedWoodwind"} and clean_loop_shape and sax_panel >= 0.64:
             return True
+        if (
+            branch in {"Woodwinds", "ReedWoodwind"}
+            and clean_loop_shape
+            and sax_panel >= 0.62
+            and reed_panel >= 0.50
+            and str(layer.get("instrument_Woodwinds_subpanel_selected") or "") in {"Sax", "AiryWoodwind", "Clarinet"}
+            and self._safe_float(layer.get("third_party_api_bowed_string_support"), 0.0) <= 0.24
+            and self._safe_float(layer.get("third_party_api_synth_support"), 0.0) <= 0.42
+        ):
+            return True
         if synth_panel >= sax_panel + 0.10 or keys_panel >= sax_panel + 0.08:
             return False
         return bool(
@@ -721,14 +846,21 @@ class MeasuredInstrumentBranchClaimProducer:
         if facts is None:
             return False
         roles = self._roles(facts)
+        measured_drum_loop = max(
+            role_strength(roles, "drum_loop"),
+            role_strength(roles, "low_rhythmic_drum_loop"),
+            role_strength(roles, "percussive_drum_loop"),
+            role_strength(roles, "bright_drum_loop"),
+            self._measured_score(facts, "drum_loop_source_score"),
+        )
+        onset_count = self._shape_number(facts, "onset_count")
+        true_repetition = self._shape_number(facts, "true_repetition_score")
+        low_event = self._shape_number(facts, "low_event_ratio")
+        high_event = self._shape_number(facts, "high_event_ratio")
         return bool(
-            max(
-                role_strength(roles, "drum_loop"),
-                role_strength(roles, "low_rhythmic_drum_loop"),
-                role_strength(roles, "percussive_drum_loop"),
-                role_strength(roles, "bright_drum_loop"),
-            )
-            >= 0.58
+            measured_drum_loop >= 0.58
+            and onset_count >= 6.0
+            and (true_repetition >= 0.50 or low_event >= 0.70 or high_event >= 0.45)
         )
 
     def _facts_support_true_voice_role(self, facts: SharedAudioFacts | None) -> bool:
@@ -783,18 +915,34 @@ class MeasuredInstrumentBranchClaimProducer:
         if facts is None or not isinstance(getattr(facts, "evidence", None), dict):
             return {}
         evidence = facts.evidence
+        merged: dict = {}
+
+        # Product runs store the richest layer packet inside the top PhysicsVoter
+        # guess evidence.  Direct tests often pass a smaller physics_layer_decision
+        # packet or flattened branch keys.  Merge all source-blind internal forms
+        # so lower claim producers see the same measured branch facts the manifest
+        # already reports.
+        physics_vote = evidence.get("physics_vote_result", {})
+        top_guesses = physics_vote.get("top_guesses", []) if isinstance(physics_vote, dict) else []
+        if isinstance(top_guesses, list) and top_guesses:
+            top_evidence = top_guesses[0].get("evidence", {}) if isinstance(top_guesses[0], dict) else {}
+            if isinstance(top_evidence, dict):
+                merged.update(top_evidence)
+
         layer = evidence.get("physics_layer_decision", {})
-        if not isinstance(layer, dict):
-            layer = {}
-        merged = dict(layer)
+        if isinstance(layer, dict):
+            merged.update(layer)
+
         # Some debug/acceptance paths carry selected branch facts flattened next
-        # to the physics-layer packet.  Preserve source-blind behavior while
+        # to the physics-layer packet. Preserve source-blind behavior while
         # making the lower claim producers robust to either representation.
         for key in (
             "physics_layer_branch",
             "physics_layer_branch_confidence",
             "physics_top_layer_instrument_branch",
             "physics_top_layer_instrument_branch_confidence",
+            "instrument_branch_selected",
+            "instrument_branch_selected_confidence",
         ):
             if key in evidence and key not in merged:
                 merged[key] = evidence[key]

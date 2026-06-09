@@ -7,6 +7,7 @@ import threading
 
 from .core import *
 from .io_utils import *
+from .third_party_audio_features import third_party_feature_profile_from_audio
 from .training_labels import *
 from .training_labels import (
     _expanded_decay_and_low_source_descriptors,
@@ -400,6 +401,24 @@ def make_fingerprint_safe(
     finally:
         signal.setitimer(signal.ITIMER_REAL, 0.0)
         signal.signal(signal.SIGALRM, old_handler)
+
+
+def third_party_feature_profile(path: Path) -> dict[str, object]:
+    """Return automatic third-party measured features for one audio file.
+
+    This is analysis evidence only.  Adapters may use installed third-party DSP
+    libraries, but they cannot inspect source names or emit final folder labels.
+    """
+    try:
+        y, sr0 = read_audio(path)
+        y, sr = resample_linear(y, sr0, TARGET_SR)
+        y, status = trim_and_normalize(y)
+        if status != "ok" or y.size == 0:
+            return {"status": status, "adapters": {}, "flat": {}}
+        mono = np.mean(y, axis=1).astype(np.float32)
+        return third_party_feature_profile_from_audio(mono, sr)
+    except Exception as exc:
+        return {"status": "third_party_feature_error:" + str(exc)[:120], "adapters": {}, "flat": {}}
 
 
 # ---------------------------------------------------------------------------

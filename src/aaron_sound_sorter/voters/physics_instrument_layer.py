@@ -13,6 +13,7 @@ from typing import Any
 from aaron_sound_sorter.domain.models import SharedAudioFacts
 from aaron_sound_sorter.voters.physics_compound_music_layer import PhysicsCompoundMusicLayer
 from aaron_sound_sorter.voters.physics_layer_utils import *
+from aaron_sound_sorter.voters.third_party_instrument_support import third_party_instrument_support
 
 
 class PhysicsInstrumentLayer:
@@ -150,6 +151,16 @@ class PhysicsInstrumentLayer:
         sub_fx_transition_authority = safe_float(
             subpanel_flat.get("fx_transition_authority_score", sub_fx_motion), sub_fx_motion
         )
+        api_support = third_party_instrument_support(facts)
+        api_voice = safe_float(api_support.get("api_voice_support", 0.0), 0.0)
+        api_reed = safe_float(api_support.get("api_reed_wind_support", 0.0), 0.0)
+        api_bowed = safe_float(api_support.get("api_bowed_string_support", 0.0), 0.0)
+        api_plucked = safe_float(api_support.get("api_plucked_string_support", 0.0), 0.0)
+        api_synth = safe_float(api_support.get("api_synth_support", 0.0), 0.0)
+        api_keys = safe_float(api_support.get("api_keys_support", 0.0), 0.0)
+        api_mixed = safe_float(api_support.get("api_mixed_loop_support", 0.0), 0.0)
+        api_clean_tonal = safe_float(api_support.get("api_clean_tonal_source", 0.0), 0.0)
+        api_eventful_tonal = safe_float(api_support.get("api_eventful_tonal_phrase", 0.0), 0.0)
 
         pitch_role = max(role_value(roles, "pitched_music_phrase"), role_value(roles, "pitched_music_loop"))
         bass_role = role_value(roles, "bass_loop")
@@ -561,6 +572,53 @@ class PhysicsInstrumentLayer:
                 mallet_bell_core = max(mallet_bell_core, min(0.92, 0.46 + 0.42 * sub_metallic))
         if sub_metallic >= 0.68 and high >= 0.14:
             mallet_bell_core = max(mallet_bell_core, min(0.92, 0.48 + 0.40 * sub_metallic))
+
+        # Third-party API support stays in the low-level instrument voter. It
+        # lifts branches only when source-blind librosa primitives agree with
+        # the project's own measured physics; it does not create final labels.
+        api_non_drum_gate = inverse_ramp(max(percussive_loop, drumlike_loop, drum_role), 0.08, 0.44)
+        if api_clean_tonal >= 0.50 and api_non_drum_gate >= 0.35:
+            instrument_anchor = max(
+                instrument_anchor,
+                min(0.94, 0.46 + 0.28 * api_clean_tonal + 0.16 * api_eventful_tonal),
+            )
+        if api_voice >= 0.56 and sub_reed_authority <= api_voice + 0.12 and not non_voice_tonal_loop_voice_decoy:
+            voice_core = max(voice_core, min(0.94, 0.48 + 0.42 * api_voice))
+            reed_core = min(reed_core, max(0.42, voice_core - 0.05))
+            brass_core = min(brass_core, max(0.42, voice_core - 0.08))
+        if api_reed >= 0.56 and api_non_drum_gate >= 0.35 and api_voice <= api_reed + 0.08:
+            reed_core = max(reed_core, min(0.95, 0.48 + 0.42 * api_reed))
+            if api_synth < api_reed + 0.04:
+                synth_core = min(synth_core, max(0.46, reed_core - 0.06))
+        if (
+            api_reed >= 0.46
+            and sub_reed_authority >= 0.48
+            and api_non_drum_gate >= 0.35
+            and api_voice <= api_reed + 0.12
+            and api_bowed <= 0.22
+            and api_synth <= api_reed + 0.18
+        ):
+            # Some real sax loops have unstable YIN contours from vibrato/reverb,
+            # which lowers the conservative API reed score.  When the existing
+            # reed subpanel already selects a sax-like source and the API says
+            # "not bowed string / not synth", keep the source-specific reed
+            # branch alive instead of falling back to broad Instrument Loops.
+            reed_core = max(reed_core, min(0.94, 0.52 + 0.36 * max(api_reed, sub_reed_authority)))
+            strings_core = min(strings_core, max(0.42, reed_core - 0.055))
+        if api_bowed >= 0.56 and api_non_drum_gate >= 0.35 and api_plucked <= api_bowed + 0.10:
+            strings_core = max(strings_core, min(0.94, 0.48 + 0.40 * api_bowed))
+            plucked_core = min(plucked_core, max(0.46, strings_core - 0.05))
+        if api_plucked >= 0.54 and api_non_drum_gate >= 0.32 and api_bowed <= api_plucked + 0.14:
+            plucked_core = max(plucked_core, min(0.94, 0.50 + 0.40 * api_plucked))
+        if api_synth >= 0.56 and api_non_drum_gate >= 0.35 and api_voice <= api_synth + 0.05:
+            synth_core = max(synth_core, min(0.94, 0.48 + 0.42 * api_synth))
+        if api_keys >= 0.56 and api_non_drum_gate >= 0.35 and api_reed <= api_keys + 0.12:
+            keys_core = max(keys_core, min(0.94, 0.48 + 0.40 * api_keys))
+        if api_mixed >= 0.58 and api_non_drum_gate >= 0.30:
+            mixed_api_lift = min(0.90, 0.44 + 0.40 * api_mixed)
+        else:
+            mixed_api_lift = 0.0
+
         # Mixed/compound musical loops: strong instrument anchor but no single
         # identity branch dominates, or several branches are plausible.
         shape_name = str(shape.get("primary_shape", ""))
@@ -581,6 +639,8 @@ class PhysicsInstrumentLayer:
             and loop_pitched >= 0.75
             and event_low >= 0.70
             and max(percussive_loop, drumlike_loop) <= 0.20
+            and sub_drum_loop_source <= 0.36
+            and role_value(roles, "low_rhythmic_drum_loop") < 0.58
             and low_pitch_bass_identity
             and not high_register_low_band_conflict
         )
@@ -1508,6 +1568,7 @@ class PhysicsInstrumentLayer:
         branch_scores["MixedInstrument"] = clamp01(
             max(
                 branch_gate * float(compound["compound_music_mixed_branch_score"]),
+                mixed_api_lift,
                 0.54 if instrument_anchor >= 0.82 and strongest < 0.52 else 0.0,
             )
         )
@@ -1672,6 +1733,26 @@ class PhysicsInstrumentLayer:
             if not plucked_string_source_signal:
                 branch_scores["PluckedString"] = min(branch_scores["PluckedString"], branch_scores["Woodwinds"] - 0.050)
             branch_scores["Voice"] = min(branch_scores["Voice"], branch_scores["Woodwinds"] - 0.035)
+        if (
+            api_reed >= 0.46
+            and api_bowed <= 0.22
+            and api_synth <= api_reed + 0.18
+            and wood_sub in {"Sax", "AiryWoodwind", "Clarinet", "Bassoon", "Flute"}
+            and wood_sub_score >= 0.70
+            and sub_reed_authority >= 0.48
+            and not plucked_string_source_signal
+            and not clean_electric_keys_loop_source
+        ):
+            # API + native reed panels agree on a wind/reed source.  Keep that
+            # source-specific branch above broad MixedInstrument safety and
+            # above string-loop decoys caused by wet sax vibrato/reverb.
+            branch_scores["Woodwinds"] = max(
+                branch_scores["Woodwinds"],
+                min(0.96, max(branch_scores["MixedInstrument"], branch_scores["Strings"], branch_scores["KeysPiano"]) + 0.026),
+            )
+            branch_scores["MixedInstrument"] = min(branch_scores["MixedInstrument"], branch_scores["Woodwinds"] - 0.024)
+            branch_scores["Strings"] = min(branch_scores["Strings"], branch_scores["Woodwinds"] - 0.026)
+            branch_scores["Synth"] = min(branch_scores["Synth"], branch_scores["Woodwinds"] - 0.035)
 
         # Do not let broad mixed-loop safety swallow a measured articulated
         # voice texture. MixedInstrument is a safety bucket, not a source
@@ -1736,6 +1817,7 @@ class PhysicsInstrumentLayer:
             "instrument_branch_plausible_count": int(plausible_count),
             "instrument_branch_strongest_pre_gate": round(float(strongest), 6),
             "instrument_shape_primary": shape_name,
+            **{f"third_party_{name}": round(float(value), 6) for name, value in api_support.items()},
             "instrument_event_count": round(float(event_count), 6),
             "instrument_event_mid_ratio": round(float(event_mid), 6),
             "instrument_event_high_ratio": round(float(event_high), 6),
@@ -1780,6 +1862,14 @@ class PhysicsInstrumentLayer:
             "instrument_breathy_low_mid_sax_source": bool(breathy_low_mid_sax_source),
             "instrument_focused_reed_phrase_source": bool(focused_reed_phrase_source),
             "instrument_reed_woodwind_source_signal": bool(reed_woodwind_source_signal),
+            "instrument_api_reed_woodwind_source_signal": bool(
+                api_reed >= 0.46
+                and api_bowed <= 0.22
+                and wood_sub in {"Sax", "AiryWoodwind", "Clarinet", "Bassoon", "Flute"}
+                and wood_sub_score >= 0.70
+                and sub_reed_authority >= 0.48
+                and not clean_electric_keys_loop_source
+            ),
             "instrument_woodwind_source_signal": bool(woodwind_source_signal),
             "instrument_articulated_plucked_source_candidate": bool(articulated_plucked_source_candidate),
             "instrument_bright_articulated_pluck_source": bool(bright_articulated_pluck_source),

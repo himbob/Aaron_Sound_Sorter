@@ -9,7 +9,7 @@ from dataclasses import dataclass
 class SharedFactsPolicy:
     """Thresholds used only to build broad structural facts."""
 
-    tiny_duration_sec: float = 0.030
+    tiny_duration_sec: float = 0.015
     long_duration_sec: float = 4.0
     loop_min_duration_sec: float = 1.20
     loop_min_event_count: float = 4.0

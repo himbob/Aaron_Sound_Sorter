@@ -242,6 +242,8 @@ class PhysicsTopFamilyLayer:
             >= 0.86
             and loop_percussive <= 0.08
             and number(shape, "drumlike_frame_ratio", 0.0) <= 0.08
+            and safe_float(instrument_evidence.get("instrument_subpanel_drum_loop_source_score", 0.0), 0.0) <= 0.36
+            and role_value(roles, "low_rhythmic_drum_loop") < 0.58
         )
         if bass_loop_branch_guard or clean_low_bass_phrase:
             return (
@@ -535,6 +537,38 @@ class PhysicsTopFamilyLayer:
                     "physics_top_layer_instrument_anchor": round(float(instrument_anchor), 6),
                 },
             )
+        fx_branch_strength = safe_float(
+            fx_evidence.get("fx_branch_selected_confidence", fx_confidence),
+            fx_confidence,
+        )
+        strong_clean_mid_blip_tone = bool(
+            fx_branch == "BlipBeep"
+            and fx_allows
+            and fx_branch_strength >= 0.78
+            and fx_action >= 0.78
+            and safe_float(fx_evidence.get("fx_clean_mid_blip_tone", 0.0), 0.0) >= 0.58
+            and safe_float(fx_evidence.get("fx_blip_band_support", 0.0), 0.0) >= 0.48
+            and fx_conflict < 0.42
+        )
+        if strong_clean_mid_blip_tone:
+            return (
+                "FX",
+                max(fx_confidence, fx_action),
+                {
+                    **drum_evidence,
+                    **instrument_evidence,
+                    **fx_evidence,
+                    "physics_top_layer_source": "clean_mid_blip_fx_preempts_solo_phrase",
+                    "physics_top_layer_fx_branch": fx_branch,
+                    "physics_top_layer_fx_branch_confidence": round(float(fx_branch_strength), 6),
+                    "physics_top_layer_fx_role_confidence": round(float(fx_confidence), 6),
+                    "physics_top_layer_fx_action": round(float(fx_action), 6),
+                    "physics_top_layer_drum_anchor": round(float(drum_anchor), 6),
+                    "physics_top_layer_instrument_anchor": round(float(instrument_anchor), 6),
+                    "physics_top_layer_shape": shape_name,
+                    "physics_top_layer_shape_confidence": round(float(shape_confidence), 6),
+                },
+            )
         if instrument_anchor >= 0.68 and instrument_anchor >= drum_anchor + 0.08:
             return (
                 "Instruments",
@@ -567,38 +601,6 @@ class PhysicsTopFamilyLayer:
                     **instrument_evidence,
                     **fx_evidence,
                     "physics_top_layer_source": "shape_music_family",
-                    "physics_top_layer_shape": shape_name,
-                    "physics_top_layer_shape_confidence": round(float(shape_confidence), 6),
-                },
-            )
-        fx_branch_strength = safe_float(
-            fx_evidence.get("fx_branch_selected_confidence", fx_confidence),
-            fx_confidence,
-        )
-        strong_clean_mid_blip_tone = bool(
-            fx_branch == "BlipBeep"
-            and fx_allows
-            and fx_branch_strength >= 0.78
-            and fx_action >= 0.78
-            and safe_float(fx_evidence.get("fx_clean_mid_blip_tone", 0.0), 0.0) >= 0.58
-            and safe_float(fx_evidence.get("fx_blip_band_support", 0.0), 0.0) >= 0.48
-            and fx_conflict < 0.42
-        )
-        if strong_clean_mid_blip_tone:
-            return (
-                "FX",
-                max(fx_confidence, fx_action),
-                {
-                    **drum_evidence,
-                    **instrument_evidence,
-                    **fx_evidence,
-                    "physics_top_layer_source": "clean_mid_blip_fx_preempts_solo_phrase",
-                    "physics_top_layer_fx_branch": fx_branch,
-                    "physics_top_layer_fx_branch_confidence": round(float(fx_branch_strength), 6),
-                    "physics_top_layer_fx_role_confidence": round(float(fx_confidence), 6),
-                    "physics_top_layer_fx_action": round(float(fx_action), 6),
-                    "physics_top_layer_drum_anchor": round(float(drum_anchor), 6),
-                    "physics_top_layer_instrument_anchor": round(float(instrument_anchor), 6),
                     "physics_top_layer_shape": shape_name,
                     "physics_top_layer_shape_confidence": round(float(shape_confidence), 6),
                 },

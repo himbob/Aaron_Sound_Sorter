@@ -103,7 +103,24 @@ def _strong_vocal_shape_true_bucket_evidence(facts: SharedAudioFacts, shape_conf
     vocal_eligibility = role_name in {"vocal_phrase", "vocal_one_shot", "voiced_one_shot", "vocal_music_phrase"}
     decisive_vocal_eligibility = vocal_eligibility and eligibility_confidence >= 0.74 and shape_confidence >= 0.88
     direct_vocal_hit = direct_voice >= 0.84 and shape_confidence >= 0.88 and formant_identity >= 0.70
-    measured_vocal_phrase = measured_voice >= 0.84 and shape_confidence >= 0.90 and formant_identity >= 0.70
+    human_voice_source = 0.0
+    for source in (
+        evidence,
+        evidence.get("physics_subpanels", {}).get("flat", {})
+        if isinstance(evidence.get("physics_subpanels"), dict)
+        else {},
+    ):
+        if not isinstance(source, dict):
+            continue
+        for key in ("human_spoken_voice_score", "voice_score", "voice_vocal_source_score", "human_voice_score"):
+            try:
+                human_voice_source = max(human_voice_source, float(source.get(key, 0.0) or 0.0))
+            except Exception:
+                pass
+
+    measured_vocal_phrase = (
+        measured_voice >= 0.84 and shape_confidence >= 0.90 and (formant_identity >= 0.70 or human_voice_source >= 0.78)
+    )
     measured_vocal_one_shot = (
         vocal_eligibility
         and eligibility_confidence >= 0.80

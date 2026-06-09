@@ -339,6 +339,28 @@ class MeasuredMusicStructureClaimProducer:
         )
 
     def _facts_support_voice_before_tonal_stab(self, facts: SharedAudioFacts) -> bool:
+        # Voice wins only when struck-percussion material is not equally concrete.
+        # Percussion-pack bell/block/rim hits often have stable F0 and formant-like
+        # spacing, but compact struck material plus metallic/drum support should
+        # remain Drums rather than Voice.
+        compact_struck = self._measured_score(facts, "compact_struck_tonal_percussion_score")
+        struck_material = max(
+            self._measured_score(facts, "pitched_metal_percussion_score"),
+            self._measured_score(facts, "struck_wood_score"),
+            self._measured_score(facts, "hand_drum_membrane_score"),
+        )
+        drum_material = max(
+            self._measured_score(facts, "drum_hit_score"),
+            self._measured_score(facts, "drum_metallic_percussion_source_score"),
+            self._measured_score(facts, "drum_cymbal_source_score"),
+        )
+        if (
+            compact_struck >= 0.70
+            and struck_material >= 0.64
+            and drum_material >= 0.55
+            and self._shape_number(facts, "duration_sec") <= 0.65
+        ):
+            return False
         return bool(
             self._facts_support_true_voice_role(facts)
             and max(
@@ -416,15 +438,21 @@ class MeasuredMusicStructureClaimProducer:
             self._shape_number(facts, "loop_tempo_confidence"),
             self._shape_number(facts, "pulse_regularity"),
             self._shape_number(facts, "loop_onset_periodicity"),
+            # Required librosa rhythm evidence: used as supporting measured input,
+            # never as a folder owner.  This strengthens loop-vs-one-shot voting
+            # before the arbiter sees candidates.
+            self._shape_number(facts, "librosa_loop_confidence"),
         )
         percussive = max(
             self._shape_number(facts, "percussive_event_ratio"),
             self._measured_score(facts, "onset_percussive_onset_score"),
+            self._shape_number(facts, "librosa_percussive_confidence"),
         )
         pitched = max(
             self._measured_score(facts, "onset_pitched_onset_score"),
             self._measured_score(facts, "pitched_repetition_phrase_score"),
             self._shape_number(facts, "pitched_event_ratio"),
+            self._shape_number(facts, "librosa_tonal_confidence"),
         )
         return bool(
             role_score >= 0.58

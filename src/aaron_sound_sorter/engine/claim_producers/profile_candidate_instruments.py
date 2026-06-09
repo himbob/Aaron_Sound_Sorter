@@ -727,6 +727,8 @@ class ProfileInstrumentClaimMixin:
             facts,
         ):
             return None
+        if self._facts_have_measured_drum_loop_authority(facts):
+            return None
         raw_is_generic = raw.final_top == "Instruments" and _path_has_any(
             raw_path,
             ("instrument loops",),
@@ -1029,6 +1031,8 @@ class ProfileInstrumentClaimMixin:
             facts,
         ):
             return None
+        if self._facts_support_short_rhythmic_struck_percussion_phrase(facts):
+            return None
         sustained_mallet_pad_false_positive = bool(
             raw_group == "mallet_bell"
             and self._raw_mallet_bell_has_sustained_non_struck_pad_body(
@@ -1136,6 +1140,51 @@ class ProfileInstrumentClaimMixin:
             can_override=True,
             strength=0.84,
             is_real_candidate=False,
+        )
+
+    def _facts_support_short_rhythmic_struck_percussion_phrase(self, facts: SharedAudioFacts | None) -> bool:
+        """Return True for short rhythmic struck material that must not broaden to Instrument Loops.
+
+        This protects percussion-pack wood/metal/membrane phrases that have repeated pitched
+        resonances.  They can look stable and musical to the instrument sibling rule, but the
+        measured body is a compact struck/percussive phrase, not a playable instrument loop.
+        """
+        if facts is None:
+            return False
+        duration = _feature_number_from_facts(facts, "duration_sec")
+        event_count = max(
+            _shape_metric_from_facts(facts, "onset_count"),
+            _feature_number_from_facts(facts, "event_count_estimate"),
+        )
+        shape = _shape_vote_from_facts(facts)
+        compact_struck = _feature_number_from_facts(facts, "compact_struck_tonal_percussion_score")
+        struck_material = max(
+            _feature_number_from_facts(facts, "struck_wood_score"),
+            _feature_number_from_facts(facts, "hand_drum_membrane_score"),
+            _feature_number_from_facts(facts, "pitched_metal_percussion_score"),
+        )
+        onset_percussive = _feature_number_from_facts(facts, "onset_percussive_onset_score")
+        low_event = _shape_metric_from_facts(facts, "low_event_ratio")
+        attack = _shape_metric_from_facts(facts, "attack_rise_time_norm")
+        rhythm = max(
+            _feature_number_from_facts(facts, "rhythmic_break_loop_score"),
+            _shape_metric_from_facts(facts, "true_repetition_score"),
+        )
+        voice_body = max(
+            _feature_number_from_facts(facts, "voice_score"),
+            _feature_number_from_facts(facts, "human_spoken_voice_score"),
+            _feature_number_from_facts(facts, "human_breath_mouth_score"),
+        )
+        return bool(
+            0.0 < duration <= 1.25
+            and event_count <= 8.0
+            and shape in {"pitched_repetition_phrase", "repeated_phrase_loop", "beat_loop", "bass_phrase", "solo_phrase"}
+            and onset_percussive >= 0.70
+            and rhythm >= 0.42
+            and max(struck_material, compact_struck) >= 0.62
+            and low_event >= 0.68
+            and attack <= 0.03
+            and voice_body <= 0.68
         )
 
     def _best_sax_leaf_support(
@@ -1816,6 +1865,33 @@ class ProfileInstrumentClaimMixin:
             return False
 
         return bool(entropy >= 0.30 or flatness >= 0.08 or high_event >= 0.08)
+
+    @staticmethod
+    def _facts_have_measured_drum_loop_authority(facts: SharedAudioFacts | None) -> bool:
+        """Return True when measured role/shape evidence already supports a drum loop.
+
+        Profile candidate claims are allowed to use candidate output, but they
+        should not convert a measured low-rhythmic drum loop into Synth merely
+        because the loop is pitched or bass-heavy.  This reads only measured
+        audio facts, not source names.
+        """
+        if facts is None:
+            return False
+        measured_drum_loop = max(
+            _role_strength_from_facts(facts, "low_rhythmic_drum_loop"),
+            _role_strength_from_facts(facts, "percussive_drum_loop"),
+            _role_strength_from_facts(facts, "bright_drum_loop"),
+            _feature_number_from_facts(facts, "drum_loop_source_score"),
+        )
+        onset_count = _shape_metric_from_facts(facts, "onset_count")
+        true_repetition = _shape_metric_from_facts(facts, "true_repetition_score")
+        low_event = _shape_metric_from_facts(facts, "low_event_ratio")
+        high_event = _shape_metric_from_facts(facts, "high_event_ratio")
+        return bool(
+            measured_drum_loop >= 0.58
+            and onset_count >= 6.0
+            and (true_repetition >= 0.50 or low_event >= 0.70 or high_event >= 0.45)
+        )
 
     @staticmethod
     def _facts_have_strong_human_voice_identity(facts: SharedAudioFacts | None) -> bool:

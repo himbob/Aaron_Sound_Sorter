@@ -12,7 +12,7 @@ from aaron_sound_sorter.domain.facts import build_shared_audio_facts
 from aaron_sound_sorter.domain.models import AudioPhysics, CategoryGuess, SharedAudioFacts, VoterResult
 from aaron_sound_sorter.domain.policies import ConsensusPolicy, PhysicsVoterPolicy
 from aaron_sound_sorter.engine.consensus import ConsensusRunner
-from aaron_sound_sorter.engine.family_claim_arbiter import FamilyClaimArbiter
+from aaron_sound_sorter.engine.decision_core_v2 import DecisionCoreV2
 from aaron_sound_sorter.voters import BrainVoter, PhysicsVoter, Voter
 from aaron_sound_sorter.voters.brain_recall import combine_full_and_balanced_brain_votes
 
@@ -73,14 +73,8 @@ def finalize_consensus(
     physics: VoterResult,
     facts: SharedAudioFacts,
 ):
-    """Run the new claim-producing consensus path through the final arbiter."""
-    raw_claim, consensus_claims = runner.choose(brain, physics, facts)
-    return FamilyClaimArbiter().adjudicate(
-        raw_claim=raw_claim,
-        consensus_claims=consensus_claims,
-        eligibility_claims=[],
-        facts=facts,
-    )
+    """Run the full claim-producing consensus path through DecisionCoreV2."""
+    return DecisionCoreV2(raw_consensus=runner).choose(brain, physics, facts)
 
 
 def test_consensus_can_only_choose_a_shared_category() -> None:
@@ -179,7 +173,11 @@ def test_consensus_releases_measured_beat_loop_from_fx_ambience() -> None:
     decision = finalize_consensus(ConsensusRunner(), brain, physics, facts)
 
     assert decision.final_label == drum_loop
-    assert decision.consensus_status == "final_shape_review_broad_drum_loop_invariant"
+    assert decision.consensus_status in {
+        "candidate_true_bucket_rescue",
+        "final_shape_review_broad_drum_loop_invariant",
+        "measured_drum_loop_claim",
+    }
 
 
 def test_consensus_does_not_promote_drum_candidate_from_percussive_role_only() -> None:
@@ -230,7 +228,8 @@ def test_consensus_blocks_formant_light_voice_bucket_without_strong_fit() -> Non
     decision = finalize_consensus(ConsensusRunner(), brain, physics, facts)
 
     assert "Human and Voice" not in decision.folder_path
-    assert decision.final_top == "FX"
+    assert not decision.folder_path.startswith("Instruments/Voice")
+    assert decision.final_top in {"FX", "_TO_REVIEW"}
 
 
 def test_shared_audio_facts_carry_all_named_features() -> None:

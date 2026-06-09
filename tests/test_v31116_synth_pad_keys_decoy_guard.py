@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from aaron_sound_sorter.domain.models import SharedAudioFacts
+from aaron_sound_sorter.domain.models import SharedAudioFacts, VoterResult
 from aaron_sound_sorter.engine.decision_core_v2 import DecisionCoreV2
+from aaron_sound_sorter.engine.eligibility import infer_parent_eligibility
 from aaron_sound_sorter.engine.family_claims import claim_from_folder_path
 
 
@@ -101,17 +102,24 @@ def _facts_with_shape_and_panels(*, synth_pad_score: float) -> SharedAudioFacts:
     )
 
 
+def _decide_with_core_claims(raw, measured: SharedAudioFacts):
+    core = DecisionCoreV2()
+    claims = core.gather_eligibility_claims(
+        raw,
+        infer_parent_eligibility(measured),
+        measured,
+        brain_result=VoterResult(voter_name="brain_full", guesses=[]),
+        physics_result=None,
+    )
+    return core.arbiter.adjudicate(raw_claim=raw, consensus_claims=[], eligibility_claims=claims, facts=measured)
+
+
 def test_source_safe_phrase_shape_synth_pad_can_correct_keys_decoy() -> None:
     """A source-safe phrase shape must still let strong synth-pad facts beat keys."""
     raw = _raw_claim("Instruments/Keys/Electric Piano/Loops")
     measured = _facts_with_shape_and_panels(synth_pad_score=0.86)
 
-    final = DecisionCoreV2().arbiter.adjudicate(
-        raw_claim=raw,
-        consensus_claims=[],
-        eligibility_claims=[],
-        facts=measured,
-    )
+    final = _decide_with_core_claims(raw, measured)
 
     assert final.folder_path == "Instruments/Synths/Pads/Loops"
     assert final.consensus_status == "final_measured_synth_loop_invariant"
@@ -122,11 +130,6 @@ def test_weak_synth_pad_panel_does_not_steal_clean_keys_loop() -> None:
     raw = _raw_claim("Instruments/Keys/Electric Piano/Loops")
     measured = _facts_with_shape_and_panels(synth_pad_score=0.55)
 
-    final = DecisionCoreV2().arbiter.adjudicate(
-        raw_claim=raw,
-        consensus_claims=[],
-        eligibility_claims=[],
-        facts=measured,
-    )
+    final = _decide_with_core_claims(raw, measured)
 
     assert final.folder_path == "Instruments/Keys/Electric Piano/Loops"

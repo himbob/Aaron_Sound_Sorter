@@ -21,14 +21,31 @@ csv.field_size_limit(sys.maxsize)
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SORTER = PROJECT_ROOT / "Aaron_Sound_Sorter.py"
 BRAIN = PROJECT_ROOT / "stage4_folder_brain.json"
-AUDIO_DIR = PROJECT_ROOT / "tests" / "regression_audio_drum_loop_steal_guard"
+GUARD_AUDIO_DIR = PROJECT_ROOT / "tests" / "regression_audio_drum_loop_steal_guard"
+FALLBACK_AUDIO_DIR = PROJECT_ROOT / "tests" / "regression_audio"
+AUDIO_DIRS = [path for path in (FALLBACK_AUDIO_DIR, GUARD_AUDIO_DIR) if path.exists()]
+AUDIO_DIR = AUDIO_DIRS[0] if AUDIO_DIRS else FALLBACK_AUDIO_DIR
 OUT_DIR = PROJECT_ROOT / "_reports" / "pytest_outputs" / "parent_eligibility_v24_drum_loop_steal_guard"
-SYNTHETIC_FIXTURE_MODE = AUDIO_DIR.is_symlink()
+
+
+def _fixture_path(name: str) -> Path:
+    """Return the first available source-name-blind fixture copy for a case."""
+    for audio_dir in AUDIO_DIRS:
+        candidate = audio_dir / name
+        if candidate.exists():
+            return candidate
+    return AUDIO_DIR / name
 
 
 def _case_list(full: list[str], synthetic: list[str]) -> list[str]:
-    """Run the full private fixture set only when those files are actually present."""
-    return synthetic if SYNTHETIC_FIXTURE_MODE else full
+    """Run every requested real fixture that exists, including fallback regression audio."""
+    seen: set[str] = set()
+    selected: list[str] = []
+    for name in [*full, *synthetic]:
+        if name not in seen and _fixture_path(name).exists():
+            selected.append(name)
+            seen.add(name)
+    return selected
 
 
 class LazySortedRows:
@@ -38,12 +55,12 @@ class LazySortedRows:
         self._cache: dict[str, dict[str, str]] = {}
 
     def __contains__(self, name: str) -> bool:
-        return (AUDIO_DIR / name).exists() or name in self._cache
+        return _fixture_path(name).exists() or name in self._cache
 
     def __getitem__(self, name: str) -> dict[str, str]:
         if name in self._cache:
             return self._cache[name]
-        source = AUDIO_DIR / name
+        source = _fixture_path(name)
         assert source.exists(), f"Missing fixture file: {source}"
         case_out = OUT_DIR / source.stem
         if case_out.exists():
@@ -75,7 +92,10 @@ class LazySortedRows:
         return rows[0]
 
     def keys(self) -> list[str]:
-        return sorted(p.name for p in AUDIO_DIR.glob("*.wav"))
+        names: set[str] = set()
+        for audio_dir in AUDIO_DIRS:
+            names.update(p.name for p in audio_dir.glob("*.wav"))
+        return sorted(names)
 
 
 @pytest.fixture(scope="module")

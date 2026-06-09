@@ -60,6 +60,23 @@ class MeasuredTransitionFxClaimProducer:
     def _produce_claim(self, context: DecisionContext) -> ConsensusClaim | None:
         raw = context.raw
         facts = context.facts
+        if self._facts_support_measured_sub_impact_hit(facts):
+            return claim_from_folder_path(
+                folder_path="FX/Impacts and Hits/Sub Hit/One Shots",
+                source="final_measured_sub_impact_hit_invariant",
+                reason=(
+                    "measured FX sub-hit claim: short low impact body was established "
+                    "before broad bass/instrument-loop fallbacks could win"
+                ),
+                shared=raw.shared_candidates,
+                raw_candidate_score=raw.raw_candidate_score,
+                brain_rank=raw.brain_rank,
+                physics_rank=raw.physics_rank,
+                shared_winner=raw.shared_winner or raw.folder_path,
+                can_override=True,
+                strength=max(0.90, raw.strength),
+                is_real_candidate=False,
+            )
         if not self._facts_support_measured_transition_fx(facts, raw):
             return None
 
@@ -95,6 +112,44 @@ class MeasuredTransitionFxClaimProducer:
             strength=max(0.90, raw.strength),
             is_real_candidate=False,
         )
+
+    def _facts_support_measured_sub_impact_hit(self, facts: SharedAudioFacts | None) -> bool:
+        """Return True for short low sub/boom hits that are FX, not bass instruments."""
+        if facts is None:
+            return False
+        duration = _feature_number_from_facts(facts, "duration_sec")
+        if duration <= 0.0 or duration > 0.95:
+            return False
+        event_count = max(
+            self._shape_number(facts, "onset_count"),
+            _feature_number_from_facts(facts, "event_count_estimate"),
+        )
+        if event_count > 3.0:
+            return False
+        low_body = max(
+            self._shape_number(facts, "low_event_ratio"),
+            _feature_number_from_facts(facts, "low_total"),
+        )
+        if low_body < 0.78:
+            return False
+        sub_hit = self._subpanel_score(facts, "fx_sub_hit_score")
+        impact = max(
+            self._subpanel_score(facts, "fx_impact_score"),
+            self._subpanel_score(facts, "fx_slam_score"),
+            self._subpanel_score(facts, "fx_impacts_and_hits_sub_hit_one_shots_score"),
+        )
+        if max(sub_hit, impact) < 0.56:
+            return False
+        # Clean 808/bass one-shots usually have a sustained voiced pitch contour.
+        # Sub impacts can have pitch confidence, but low voiced-frame coverage.
+        if self._shape_number(facts, "f0_voiced_ratio") > 0.38:
+            return False
+        roles = facts.evidence.get("measured_roles", {}) if isinstance(getattr(facts, "evidence", None), dict) else {}
+        if isinstance(roles, dict) and role_strength(roles, "bass_loop") >= 0.60:
+            return False
+        if self._subpanel_score(facts, "drum_kick_source_score") >= 0.58:
+            return False
+        return True
 
     def _facts_support_measured_transition_fx(
         self,
@@ -189,9 +244,21 @@ class MeasuredTransitionFxClaimProducer:
             _shape_vote_from_facts(facts) in {"transition_riser", "transition_downlifter", "transition_drop"}
             and _shape_confidence_from_facts(facts) >= 0.80
             and self._shape_number(facts, "onset_count") >= 8.0
-            and self._shape_number(facts, "onset_span_ratio") >= 0.80
-            and self._shape_number(facts, "pulse_regularity") >= 0.38
-            and self._shape_number(facts, "percussive_event_ratio") >= 0.18
+            and max(
+                self._shape_number(facts, "onset_span_ratio"),
+                self._shape_number(facts, "librosa_loop_confidence"),
+            )
+            >= 0.80
+            and max(
+                self._shape_number(facts, "pulse_regularity"),
+                self._shape_number(facts, "librosa_loop_confidence"),
+            )
+            >= 0.38
+            and max(
+                self._shape_number(facts, "percussive_event_ratio"),
+                self._shape_number(facts, "librosa_percussive_confidence"),
+            )
+            >= 0.18
             and self._subpanel_score(facts, "drum_hit_score") >= 0.40
             and self._subpanel_score(facts, "fx_transition_authority_score") < 0.45
             and self._subpanel_score(facts, "fx_motion_score") < 0.42
@@ -218,7 +285,10 @@ class MeasuredTransitionFxClaimProducer:
         reverse_score = self._subpanel_score(facts, "fx_reverse_score")
         impact_score = self._subpanel_score(facts, "fx_impact_score")
         motion_score = self._subpanel_score(facts, "fx_motion_score")
-        slope = abs(self._shape_number(facts, "centroid_slope_norm"))
+        slope = max(
+            abs(self._shape_number(facts, "centroid_slope_norm")),
+            abs(self._shape_number(facts, "librosa_spectral_centroid_slope_norm")),
+        )
         onset_span = self._shape_number(facts, "onset_span_ratio")
         sustained_tonal = max(
             self._shape_number(facts, "sustained_tonal_frame_ratio"),
@@ -389,10 +459,15 @@ class MeasuredTransitionFxClaimProducer:
             return False
         if self._shape_number(facts, "drumlike_frame_ratio") > 0.18:
             return False
-        return not (
-            self._shape_number(facts, "pitched_event_ratio") < 0.45
-            and self._shape_number(facts, "sustained_tonal_frame_ratio") < 0.35
+        pitched_support = max(
+            self._shape_number(facts, "pitched_event_ratio"),
+            self._shape_number(facts, "librosa_tonal_confidence"),
         )
+        sustained_support = max(
+            self._shape_number(facts, "sustained_tonal_frame_ratio"),
+            self._shape_number(facts, "librosa_harmonic_energy_ratio"),
+        )
+        return not (pitched_support < 0.45 and sustained_support < 0.35)
 
     def _facts_support_true_voice_role(self, facts: SharedAudioFacts | None) -> bool:
         """Return True when measured role and shape support actual voice."""

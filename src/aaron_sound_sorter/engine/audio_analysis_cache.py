@@ -232,8 +232,11 @@ def clone_audio_physics(physics: AudioPhysics) -> AudioPhysics:
         ),
         direct_body_duration_sec=float(physics.direct_body_duration_sec),
         direct_body_status=str(physics.direct_body_status),
+        third_party_feature_profile=(
+            None if physics.third_party_feature_profile is None else deepcopy(physics.third_party_feature_profile)
+        ),
     )
-    for attr in ("direct_body_profile", "wetness_profile"):
+    for attr in ("direct_body_profile", "wetness_profile", "third_party_feature_profile"):
         if hasattr(physics, attr):
             object.__setattr__(clone, attr, getattr(physics, attr))
     return clone

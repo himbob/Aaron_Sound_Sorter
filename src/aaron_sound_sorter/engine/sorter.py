@@ -32,6 +32,7 @@ from aaron_sound_sorter.features import (
     make_direct_body_fingerprint_safe,
     make_fingerprint_safe,
     make_harmonic_core_fingerprint_safe,
+    third_party_feature_profile,
     wetness_profile,
 )
 from aaron_sound_sorter.infrastructure.audio_repository import AudioInputRepository
@@ -693,6 +694,7 @@ def analyze_audio_file(audio_file: Path) -> AudioPhysics:
     """
     fingerprint, duration, read_status = make_fingerprint_safe(audio_file)
     direct_fp, direct_duration, direct_status, direct_meta = make_direct_body_fingerprint_safe(audio_file)
+    third_party_profile = third_party_feature_profile(audio_file)
     physics = AudioPhysics(
         source_path=audio_file,
         fingerprint=fingerprint,
@@ -703,6 +705,7 @@ def analyze_audio_file(audio_file: Path) -> AudioPhysics:
         direct_body_status=str(direct_status),
     )
     object.__setattr__(physics, "direct_body_profile", direct_meta)
+    object.__setattr__(physics, "third_party_feature_profile", third_party_profile)
     return physics
 
 

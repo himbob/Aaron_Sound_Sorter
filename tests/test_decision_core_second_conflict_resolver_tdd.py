@@ -7,7 +7,7 @@ random-folder/failure-review-pack logs without storing real audio files.
 
 from __future__ import annotations
 
-from aaron_sound_sorter.domain.models import ConsensusDecision
+from aaron_sound_sorter.domain.models import ConsensusDecision, SharedAudioFacts
 from aaron_sound_sorter.engine.decision_core_v2 import DecisionCoreV2
 from aaron_sound_sorter.engine.eligibility import EligibilityDecision
 
@@ -189,3 +189,42 @@ def test_vocal_or_voice_candidate_blocks_drum_loop_broadening_from_non_drum_raw(
     )
     assert final.final_top == "_TO_REVIEW"
     assert "vocal loop conflict" in final.reason
+
+
+def test_measured_drum_loop_shape_blocks_low_end_bass_loop_rehome() -> None:
+    """Low-end energy must not drag a measured drum loop into Bass Loops."""
+    facts = SharedAudioFacts(
+        is_broken_or_tiny=False,
+        is_loop_like=True,
+        is_single_event_like=False,
+        is_short_hit_like=False,
+        is_long=True,
+        evidence={
+            "shape_vote": {
+                "primary_shape": "drum_loop",
+                "confidence": 0.96,
+                "drumlike_frame_ratio": 0.90,
+                "percussive_event_ratio": 0.80,
+            },
+            "measured_roles": {"bass_loop": 0.95, "drum_loop": 0.96},
+        },
+    )
+    final = DecisionCoreV2().apply_eligibility(
+        raw(
+            "Drums/Drum Loops/Loops",
+            "Drums",
+            candidates=[
+                candidate("Instruments/Bass/Bass Loops", 8),
+                candidate("Drums/Drum Loops/Loops", 12),
+            ],
+        ),
+        eligibility(
+            "bass_loop",
+            ("Instruments", "_TO_REVIEW"),
+            "Instruments/Bass/Bass Loops",
+            confidence=0.90,
+        ),
+        facts,
+    )
+
+    assert final.folder_path == "Drums/Drum Loops/Loops"

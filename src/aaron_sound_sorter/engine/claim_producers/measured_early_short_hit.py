@@ -134,6 +134,12 @@ class ShortHitGuardMixin:
             )
         if best_drum_hit is not None:
             drum_score, drum_path = best_drum_hit
+            if self._clean_pitched_tail_lacks_decisive_drum_material(context):
+                return self._review_from_raw(
+                    context.raw,
+                    context.eligibility,
+                    "short-hit guard: clean pitched tail reviewed instead of sticking to weak drum leaf without decisive struck material",
+                )
             drum_margin = 10.0 if context.shape == "hit_with_tail" else 2.5
             kick_margin = 6.0 if context.shape == "bass_phrase" else 3.0
             if drum_score <= compare_score + drum_margin:
@@ -170,6 +176,98 @@ class ShortHitGuardMixin:
                 "short-hit guard: bright single transient blocked unsafe voice/FX certainty without enough drum evidence",
             )
         return None
+
+
+    @staticmethod
+    def _subpanel_score_from_context(context: EarlyAdjudicationContext, key: str) -> float:
+        """Read flat physics subpanel scores without importing the heavy arbiter.
+
+        This guard is deliberately source-name blind.  It only inspects measured
+        physics evidence already produced by lower voters.
+        """
+        facts = context.facts
+        if facts is None or not isinstance(getattr(facts, "evidence", None), dict):
+            return 0.0
+        containers = []
+        subpanels = facts.evidence.get("physics_subpanels")
+        if isinstance(subpanels, dict):
+            flat = subpanels.get("flat")
+            if isinstance(flat, dict):
+                containers.append(flat)
+            containers.append(subpanels)
+        containers.append(facts.evidence)
+        for container in containers:
+            if not isinstance(container, dict) or key not in container:
+                continue
+            try:
+                return float(container.get(key) or 0.0)
+            except (TypeError, ValueError):
+                return 0.0
+        return 0.0
+
+    def _clean_pitched_tail_lacks_decisive_drum_material(self, context: EarlyAdjudicationContext) -> bool:
+        """Return True for clean sustained pitched tails that only weakly resemble toms.
+
+        The percussion repair made struck one-shots more assertive.  This keeps
+        the opposite invariant intact: a clean tonal tail with almost no
+        percussive/drumlike frames must not stick to a weak Tom/Rim leaf simply
+        because a hand-drum membrane proxy is moderately high.
+        """
+        if context.shape != "hit_with_tail" or context.shape_conf < 0.72:
+            return False
+        if _shape_metric_from_facts(context.facts, "pitched_event_ratio") < 0.88:
+            return False
+        if max(
+            _shape_metric_from_facts(context.facts, "sustained_tonal_frame_ratio"),
+            _shape_metric_from_facts(context.facts, "non_event_tonal_ratio"),
+        ) < 0.86:
+            return False
+        if _shape_metric_from_facts(context.facts, "percussive_event_ratio") > 0.10:
+            return False
+        if _shape_metric_from_facts(context.facts, "drumlike_frame_ratio") > 0.10:
+            return False
+        compact_struck = self._subpanel_score_from_context(context, "compact_struck_tonal_percussion_score")
+        pitched_metal = self._subpanel_score_from_context(context, "pitched_metal_percussion_score")
+        struck_wood = self._subpanel_score_from_context(context, "struck_wood_score")
+        tom = self._subpanel_score_from_context(context, "drum_tom_conga_source_score")
+        snare = self._subpanel_score_from_context(context, "drum_snare_source_score")
+        rim = self._subpanel_score_from_context(context, "drum_rim_stick_source_score")
+        cymbal = self._subpanel_score_from_context(context, "drum_cymbal_source_score")
+        metallic = self._subpanel_score_from_context(context, "drum_metallic_percussion_source_score")
+        guiro = self._subpanel_score_from_context(context, "drum_guiro_scrape_source_score")
+        hand_drum = self._subpanel_score_from_context(context, "hand_drum_membrane_score")
+        decisive_struck_material = bool(
+            compact_struck >= 0.70
+            and max(pitched_metal, struck_wood, hand_drum) >= 0.76
+            and max(tom, snare, rim, cymbal, metallic, guiro) >= 0.58
+        )
+        event_count = max(
+            _shape_metric_from_facts(context.facts, "onset_count"),
+            _feature_number_from_facts(context.facts, "event_count_estimate"),
+        )
+        resonant_hand_drum_hit = bool(
+            compact_struck >= 0.72
+            and hand_drum >= 0.80
+            and _shape_metric_from_facts(context.facts, "low_event_ratio") >= 0.65
+            and event_count <= 4.0
+            and _shape_metric_from_facts(context.facts, "attack_rise_time_norm") <= 0.03
+            and _shape_metric_from_facts(context.facts, "temporal_centroid_ratio") <= 0.12
+        )
+        resonant_struck_wood_hit = bool(
+            compact_struck >= 0.72
+            and struck_wood >= 0.74
+            and _shape_metric_from_facts(context.facts, "low_event_ratio") >= 0.60
+            and event_count <= 4.0
+            and _shape_metric_from_facts(context.facts, "attack_rise_time_norm") <= 0.03
+            and _shape_metric_from_facts(context.facts, "temporal_centroid_ratio") <= 0.12
+        )
+        decisive_named_drum = max(tom, snare, rim, cymbal, metallic, guiro) >= 0.68
+        return not (
+            decisive_struck_material
+            or resonant_hand_drum_hit
+            or resonant_struck_wood_hit
+            or decisive_named_drum
+        )
 
     @staticmethod
     def _bright_single_transient_blocks_voice_rescue(context: EarlyAdjudicationContext) -> bool:

@@ -9,6 +9,7 @@ from __future__ import annotations
 from aaron_sound_sorter.domain.models import SharedAudioFacts
 from aaron_sound_sorter.engine.decision_helpers import (
     _direct_body_role_strength_from_facts,
+    _feature_number_from_facts,
     _measured_role_from_facts,
     _norm_path,
     _path_has_any,
@@ -190,12 +191,29 @@ class InstrumentLoopConflictMixin:
     def _has_music_loop_structure(facts: SharedAudioFacts | None) -> bool:
         """Return True for measured pitched or mixed-music loop structure."""
         shape_confidence = _shape_confidence_from_facts(facts)
-        pitched_ratio = _shape_metric_from_facts(facts, "pitched_event_ratio")
-        percussive_ratio = _shape_metric_from_facts(facts, "percussive_event_ratio")
-        pitch_confidence = _shape_metric_from_facts(facts, "pitch_confidence")
-        onset_count = _shape_metric_from_facts(facts, "onset_count")
+        pitched_ratio = max(
+            _shape_metric_from_facts(facts, "pitched_event_ratio"),
+            _feature_number_from_facts(facts, "librosa_tonal_confidence"),
+        )
+        percussive_ratio = max(
+            _shape_metric_from_facts(facts, "percussive_event_ratio"),
+            _feature_number_from_facts(facts, "librosa_percussive_confidence"),
+        )
+        pitch_confidence = max(
+            _shape_metric_from_facts(facts, "pitch_confidence"),
+            _feature_number_from_facts(facts, "librosa_tonal_confidence"),
+        )
+        onset_count = max(
+            _shape_metric_from_facts(facts, "onset_count"),
+            _feature_number_from_facts(facts, "librosa_onset_event_count"),
+        )
+        loop_confidence = _feature_number_from_facts(facts, "librosa_loop_confidence")
+        third_party_music_loop = bool(
+            loop_confidence >= 0.62 and onset_count >= 2.0 and pitch_confidence >= 0.35 and percussive_ratio <= 0.60
+        )
         return (
-            shape_confidence >= 0.68
+            third_party_music_loop
+            or shape_confidence >= 0.68
             and onset_count >= 3.0
             and (pitched_ratio >= 0.50 or pitch_confidence >= 0.30)
             and (pitched_ratio + percussive_ratio) >= 0.80

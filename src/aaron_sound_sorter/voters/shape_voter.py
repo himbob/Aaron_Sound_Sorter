@@ -220,12 +220,41 @@ def classify_shape(values: Mapping[str, float], *, facts: SharedAudioFacts) -> S
         evidence_number(facts, "fx_drop_downlifter_score"),
         measured_transition,
     )
-    measured_drum_loop = evidence_number(facts, "drum_loop_source_score")
+    raw_measured_drum_loop = max(
+        evidence_number(facts, "drum_loop_source_score"),
+        role_number(facts, "percussive_drum_loop"),
+        role_number(facts, "bright_drum_loop"),
+    )
+    measured_low_rhythmic_role = role_number(facts, "low_rhythmic_drum_loop")
     duration = float(facts.evidence.get("duration_sec", 0.0) or 0.0) if isinstance(facts.evidence, dict) else 0.0
 
     low_total = clamp01(v(values, "sub_bass_ratio_lt_150hz") + v(values, "bass_ratio_150_500hz"))
     high_total = clamp01(v(values, "presence_ratio_2000_8000hz") + v(values, "air_ratio_gt_8000hz"))
     mid_total = clamp01(v(values, "mid_ratio_500_2000hz"))
+    bass_identity_source = max(
+        evidence_number(facts, "bass_synth_score"),
+        evidence_number(facts, "bass_sub_score"),
+        evidence_number(facts, "bass_808_score"),
+        evidence_number(facts, "bass_electric_score"),
+        evidence_number(facts, "low_end_source_score"),
+    )
+    pure_low_bass_loop_body = bool(
+        bass_identity_source >= 0.70
+        and low_event >= 0.88
+        and mid_event <= 0.08
+        and high_event <= 0.06
+        and max(sustained_tonal, non_event_tonal) >= 0.55
+        and max(percussive, drumlike) <= 0.08
+    )
+    measured_drum_loop = raw_measured_drum_loop
+    if pure_low_bass_loop_body:
+        # A very pure low, pitched Bass-panel loop can trip generic drum-loop
+        # source scores because it is repetitive and transient-rich.  Keep that
+        # source score diagnostic, but do not let ShapeVoter turn it into a beat
+        # loop unless there is additional non-bass rhythmic evidence.
+        measured_drum_loop = min(measured_drum_loop, 0.42)
+    else:
+        measured_drum_loop = max(measured_drum_loop, measured_low_rhythmic_role)
     event_separation = max(low_event, high_event, mid_event) - min(low_event, high_event, mid_event)
     low_band_active = ramp(max(low_total, low_event), 0.12, 0.42)
     mid_band_active = ramp(max(mid_total, mid_event), 0.22, 0.58)
@@ -744,6 +773,16 @@ def classify_shape(values: Mapping[str, float], *, facts: SharedAudioFacts) -> S
             or repeated_noisy_drum_loop_body
         )
     )
+    measured_low_rhythmic_drum_loop = bool(
+        measured_drum_loop >= 0.62
+        and true_repetition >= 0.62
+        and onset_count >= 6.0
+        and low_event >= 0.70
+        and max(mid_event, high_event) <= 0.30
+    )
+    if measured_low_rhythmic_drum_loop:
+        rhythmic_break_has_drum_body = True
+        rhythmic_break_loop = max(rhythmic_break_loop, measured_drum_loop, true_repetition)
     if rhythmic_break_loop >= 0.62 and true_repetition >= 0.62 and onset_count >= 6.0 and rhythmic_break_has_drum_body:
         preferred_drum_shape = "top_loop" if high_event >= 0.42 and high_total >= 0.18 else "beat_loop"
         strongest_transition = max(scores.get("transition_riser", 0.0), scores.get("transition_drop", 0.0))
@@ -751,6 +790,7 @@ def classify_shape(values: Mapping[str, float], *, facts: SharedAudioFacts) -> S
             scores[preferred_drum_shape],
             rhythmic_break_loop + 0.03,
             strongest_transition + 0.02,
+            scores.get(PITCHED_REPETITION_PHRASE, 0.0) + 0.02,
         )
         scores["bass_phrase"] = min(scores["bass_phrase"], rhythmic_break_loop - 0.02)
         scores["pitched_phrase"] = min(scores["pitched_phrase"], rhythmic_break_loop - 0.03)
@@ -860,6 +900,20 @@ def evidence_number(facts: SharedAudioFacts, name: str, default: float = 0.0) ->
         return float(default)
     try:
         return float(evidence.get(name, default) or default)
+    except Exception:
+        return float(default)
+
+
+def role_number(facts: SharedAudioFacts, name: str, default: float = 0.0) -> float:
+    """Read measured-role strength from the nested role packet."""
+    evidence = getattr(facts, "evidence", {})
+    if not isinstance(evidence, Mapping):
+        return float(default)
+    roles = evidence.get("measured_roles")
+    if not isinstance(roles, Mapping):
+        return float(default)
+    try:
+        return float(roles.get(name, default) or default)
     except Exception:
         return float(default)
 

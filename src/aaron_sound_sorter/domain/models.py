@@ -38,6 +38,7 @@ class AudioPhysics:
     direct_body_fingerprint: np.ndarray | None = None
     direct_body_duration_sec: float = 0.0
     direct_body_status: str = "not_computed"
+    third_party_feature_profile: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)

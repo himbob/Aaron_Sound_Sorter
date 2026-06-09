@@ -20,6 +20,7 @@ from aaron_sound_sorter.engine.claim_producers.broad_bucket_claims import BroadB
 from aaron_sound_sorter.engine.claim_producers.candidate_conflicts import CandidateConflictClaimProducer
 from aaron_sound_sorter.engine.claim_producers.final_eligibility import FinalEligibilityClaimProducer
 from aaron_sound_sorter.engine.claim_producers.instrument_loop_safety import InstrumentLoopSafetyClaimProducer
+from aaron_sound_sorter.engine.claim_producers.measured_final_guards import MeasuredFinalGuardClaimProducer
 from aaron_sound_sorter.engine.claim_producers.profile_candidates import ProfileCandidateClaimProducer
 from aaron_sound_sorter.engine.claim_producers.protocols import ClaimProducer
 from aaron_sound_sorter.engine.claim_producers.voice_percussive_buckets import VoicePercussiveBucketClaimProducer
@@ -50,6 +51,7 @@ class DecisionCoreV2:
             instrument_safety=self.instrument_safety_claim_producer,
             candidate_conflicts=self.candidate_conflict_claim_producer,
         )
+        self.measured_final_guard_claim_producer = MeasuredFinalGuardClaimProducer()
 
     def choose(
         self,
@@ -67,6 +69,7 @@ class DecisionCoreV2:
             facts,
             brain_result=brain_result,
             physics_result=physics_result,
+            consensus_claims=consensus_claims,
         )
         return self.arbiter.adjudicate(
             raw_claim=raw_claim,
@@ -102,8 +105,17 @@ class DecisionCoreV2:
         facts: SharedAudioFacts | None = None,
         brain_result: VoterResult | None = None,
         physics_result: VoterResult | None = None,
+        consensus_claims: list[ConsensusClaim] | None = None,
     ) -> list[ConsensusClaim]:
-        """Gather all measured-eligibility claims without final placement."""
+        """Gather all measured-eligibility claims without final placement.
+
+        Final-guard producers must see consensus claims too, not only later
+        eligibility producers.  Several former post-winner guards operate on
+        top-family sanity or shape-conflict claims emitted by the raw consensus
+        runner.  Feeding those claims through the guard producer keeps the
+        cleanup architecture honest: the arbiter receives all guard outcomes as
+        normal claims instead of recreating a late mutation layer.
+        """
         context = DecisionContext(
             raw=raw,
             eligibility=eligibility,
@@ -114,6 +126,8 @@ class DecisionCoreV2:
         claims: list[ConsensusClaim] = []
         for producer in self._ordered_claim_producers():
             claims.extend(producer.produce(context))
+        guard_seeds = [*(consensus_claims or []), *claims]
+        claims.extend(self.measured_final_guard_claim_producer.produce_for_claims(context, guard_seeds))
         return claims
 
     def _ordered_claim_producers(self) -> tuple[ClaimProducer, ...]:

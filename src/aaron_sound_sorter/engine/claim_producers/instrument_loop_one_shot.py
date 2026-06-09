@@ -9,6 +9,7 @@ from __future__ import annotations
 from aaron_sound_sorter.domain.models import SharedAudioFacts
 from aaron_sound_sorter.engine.decision_helpers import (
     LOOP_PHRASE_ROLES,
+    _feature_number_from_facts,
     _norm_path,
     _path_has_any,
     _shape_confidence_from_facts,
@@ -71,10 +72,23 @@ class InstrumentOneShotLoopMixin:
         """Return True when measured shape supports broad loop placement."""
         shape_confidence = _shape_confidence_from_facts(facts)
         shape_name = _shape_vote_from_facts(facts)
-        pitched_ratio = _shape_metric_from_facts(facts, "pitched_event_ratio")
-        percussive_ratio = _shape_metric_from_facts(facts, "percussive_event_ratio")
-        sustain_ratio = _shape_metric_from_facts(facts, "sustain_ratio")
-        onset_count = _shape_metric_from_facts(facts, "onset_count")
+        pitched_ratio = max(
+            _shape_metric_from_facts(facts, "pitched_event_ratio"),
+            _feature_number_from_facts(facts, "librosa_tonal_confidence"),
+        )
+        percussive_ratio = max(
+            _shape_metric_from_facts(facts, "percussive_event_ratio"),
+            _feature_number_from_facts(facts, "librosa_percussive_confidence"),
+        )
+        sustain_ratio = max(
+            _shape_metric_from_facts(facts, "sustain_ratio"),
+            _feature_number_from_facts(facts, "librosa_harmonic_energy_ratio"),
+        )
+        onset_count = max(
+            _shape_metric_from_facts(facts, "onset_count"),
+            _feature_number_from_facts(facts, "librosa_onset_event_count"),
+        )
+        loop_confidence = _feature_number_from_facts(facts, "librosa_loop_confidence")
         repeated_tonal_hit = (
             shape_name == "hit_with_tail"
             and shape_confidence >= 0.70
@@ -83,9 +97,18 @@ class InstrumentOneShotLoopMixin:
             and sustain_ratio >= 0.70
             and percussive_ratio <= 0.12
         )
-        if shape_confidence < 0.74 and not repeated_tonal_hit:
+        third_party_loop = bool(
+            loop_confidence >= 0.62 and onset_count >= 2.0 and pitched_ratio >= 0.35 and percussive_ratio <= 0.55
+        )
+        if shape_confidence < 0.74 and not repeated_tonal_hit and not third_party_loop:
             return False
-        return not (pitched_ratio < 0.55 and sustain_ratio < 0.45 and onset_count < 4.0 and not repeated_tonal_hit)
+        return not (
+            pitched_ratio < 0.55
+            and sustain_ratio < 0.45
+            and onset_count < 4.0
+            and not repeated_tonal_hit
+            and not third_party_loop
+        )
 
     @staticmethod
     def _broad_instrument_loop_target(

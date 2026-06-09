@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from aaron_sound_sorter.domain.models import SharedAudioFacts
+from aaron_sound_sorter.domain.models import SharedAudioFacts, VoterResult
 from aaron_sound_sorter.engine.claim_producers.baby_recall import BabyRecallClaimProducer
 from aaron_sound_sorter.engine.decision_context import DecisionContext
+from aaron_sound_sorter.engine.decision_core_v2 import DecisionCoreV2
+from aaron_sound_sorter.engine.eligibility import infer_parent_eligibility
 from aaron_sound_sorter.engine.eligibility_decision import EligibilityDecision
 from aaron_sound_sorter.engine.family_claim_arbiter import FamilyClaimArbiter
 from aaron_sound_sorter.engine.family_claims import claim_from_folder_path
@@ -72,11 +74,20 @@ def test_strong_pitched_loop_evidence_can_escape_false_fx_siren() -> None:
         is_real_candidate=True,
     )
 
-    final = FamilyClaimArbiter().adjudicate(
+    measured = pitched_loop_facts(outlier_confirms_siren=False)
+    core = DecisionCoreV2()
+    claims = core.gather_eligibility_claims(
+        raw,
+        infer_parent_eligibility(measured),
+        measured,
+        brain_result=VoterResult(voter_name="brain_full", guesses=[]),
+        physics_result=None,
+    )
+    final = core.arbiter.adjudicate(
         raw_claim=raw,
         consensus_claims=[instrument],
-        eligibility_claims=[],
-        facts=pitched_loop_facts(outlier_confirms_siren=False),
+        eligibility_claims=claims,
+        facts=measured,
     )
 
     assert final.folder_path == "Instruments/Instrument Loops/Loops"

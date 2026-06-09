@@ -1,3 +1,5 @@
+# Quality tools plus runtime dependencies needed by tests/import checks.
+-r requirements.txt
 # Developer quality tools used by the Makefile.
 pytest>=8,<9
 pytest-cov>=5,<8

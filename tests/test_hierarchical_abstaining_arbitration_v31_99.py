@@ -6,7 +6,7 @@ from dataclasses import replace
 
 from aaron_sound_sorter.domain.models import CategoryGuess, SharedAudioFacts, VoterResult
 from aaron_sound_sorter.engine.decision_core_v2 import DecisionCoreV2
-from aaron_sound_sorter.engine.eligibility import EligibilityDecision
+from aaron_sound_sorter.engine.eligibility import EligibilityDecision, infer_parent_eligibility
 from aaron_sound_sorter.engine.family_claims import claim_from_folder_path
 
 
@@ -47,6 +47,18 @@ def raw_claim(path: str, *, source: str = "strong_consensus", score: float = 5.0
         strength=0.80,
         is_real_candidate=not path.startswith("_TO_REVIEW"),
     )
+
+
+def decide_with_core_claims(core: DecisionCoreV2, raw, measured: SharedAudioFacts):
+    """Route through DecisionCore claim producers, not deleted arbiter post-mutators."""
+    claims = core.gather_eligibility_claims(
+        raw,
+        infer_parent_eligibility(measured),
+        measured,
+        brain_result=VoterResult(voter_name="brain_full", guesses=[]),
+        physics_result=None,
+    )
+    return core.arbiter.adjudicate(raw_claim=raw, consensus_claims=[], eligibility_claims=claims, facts=measured)
 
 
 def eligibility(role: str, broad: str, confidence: float = 0.94) -> EligibilityDecision:
@@ -254,7 +266,7 @@ def test_final_sax_invariant_does_not_steal_clean_low_mid_keys_loop() -> None:
     )
     core = DecisionCoreV2()
 
-    final = core.arbiter.adjudicate(raw_claim=raw, consensus_claims=[], eligibility_claims=[], facts=measured)
+    final = decide_with_core_claims(core, raw, measured)
 
     assert final.folder_path == "Instruments/Instrument Loops/Loops"
     assert final.consensus_status == "strong_consensus"
@@ -299,7 +311,7 @@ def test_final_sax_invariant_does_not_steal_clean_synth_pad_loop() -> None:
     }
     core = DecisionCoreV2()
 
-    final = core.arbiter.adjudicate(raw_claim=raw, consensus_claims=[], eligibility_claims=[], facts=measured)
+    final = decide_with_core_claims(core, raw, measured)
 
     assert final.folder_path == "Instruments/Instrument Loops/Loops"
     assert final.consensus_status == "strong_consensus"
@@ -342,7 +354,7 @@ def test_final_sax_invariant_does_not_steal_clean_mid_vocal_phrase_loop() -> Non
     }
     core = DecisionCoreV2()
 
-    final = core.arbiter.adjudicate(raw_claim=raw, consensus_claims=[], eligibility_claims=[], facts=measured)
+    final = decide_with_core_claims(core, raw, measured)
 
     assert final.folder_path == "Instruments/Instrument Loops/Loops"
     assert final.consensus_status == "strong_consensus"
@@ -379,7 +391,7 @@ def test_final_sax_invariant_does_not_steal_processed_vocal_one_shot() -> None:
     }
     core = DecisionCoreV2()
 
-    final = core.arbiter.adjudicate(raw_claim=raw, consensus_claims=[], eligibility_claims=[], facts=measured)
+    final = decide_with_core_claims(core, raw, measured)
 
     assert final.folder_path == "Instruments/Voice/Phrase/One Shots"
     assert final.consensus_status == "strong_consensus"
@@ -411,7 +423,7 @@ def test_compound_music_physics_broadens_specific_sax_leaf() -> None:
     }
     core = DecisionCoreV2()
 
-    final = core.arbiter.adjudicate(raw_claim=raw, consensus_claims=[], eligibility_claims=[], facts=measured)
+    final = decide_with_core_claims(core, raw, measured)
 
     assert final.folder_path == "Instruments/Instrument Loops/Loops"
     assert final.consensus_status == "final_compound_music_broad_instrument_loop_invariant"
@@ -438,7 +450,7 @@ def test_compound_shape_v2_broadens_specific_sax_leaf_without_identity_claim() -
     )
     core = DecisionCoreV2()
 
-    final = core.arbiter.adjudicate(raw_claim=raw, consensus_claims=[], eligibility_claims=[], facts=measured)
+    final = decide_with_core_claims(core, raw, measured)
 
     assert final.folder_path == "Instruments/Instrument Loops/Loops"
     assert final.consensus_status == "final_compound_music_broad_instrument_loop_invariant"
@@ -460,7 +472,7 @@ def test_solo_isolation_shape_v2_does_not_broaden_sax_leaf() -> None:
     )
     core = DecisionCoreV2()
 
-    final = core.arbiter.adjudicate(raw_claim=raw, consensus_claims=[], eligibility_claims=[], facts=measured)
+    final = decide_with_core_claims(core, raw, measured)
 
     assert final.folder_path == "Instruments/Woodwinds/Saxophone/Loops"
     assert final.consensus_status == "strong_consensus"
@@ -499,7 +511,7 @@ def test_bass_phrase_with_internal_synth_candidate_refines_to_synth_loop() -> No
     }
     core = DecisionCoreV2()
 
-    final = core.arbiter.adjudicate(raw_claim=raw, consensus_claims=[], eligibility_claims=[], facts=measured)
+    final = decide_with_core_claims(core, raw, measured)
 
     assert final.folder_path == "Instruments/Synths/Synth Loops"
     assert final.consensus_status == "final_measured_synth_loop_invariant"
@@ -642,12 +654,8 @@ def test_noisy_bassloop_subpanel_can_refine_broad_instrument_loop_to_bass() -> N
         "instrument_Bass_subpanel_margin": 0.015,
     }
 
-    final = DecisionCoreV2().arbiter.adjudicate(
-        raw_claim=raw,
-        consensus_claims=[],
-        eligibility_claims=[],
-        facts=measured,
-    )
+    core = DecisionCoreV2()
+    final = decide_with_core_claims(core, raw, measured)
 
     assert final.folder_path == "Instruments/Bass/Bass Loops"
 
@@ -710,12 +718,8 @@ def test_candidate_backed_bass_phrase_sax_loop_survives_generic_loop_broadening(
         },
     )
 
-    final = DecisionCoreV2().arbiter.adjudicate(
-        raw_claim=raw,
-        consensus_claims=[],
-        eligibility_claims=[],
-        facts=measured,
-    )
+    core = DecisionCoreV2()
+    final = decide_with_core_claims(core, raw, measured)
 
     assert final.folder_path == "Instruments/Woodwinds/Saxophone/Loops"
     assert final.consensus_status == "final_measured_sax_loop_invariant"
@@ -746,12 +750,8 @@ def test_clean_tonal_reed_body_can_route_to_sax_without_source_name() -> None:
         },
     )
 
-    final = DecisionCoreV2().arbiter.adjudicate(
-        raw_claim=raw,
-        consensus_claims=[],
-        eligibility_claims=[],
-        facts=measured,
-    )
+    core = DecisionCoreV2()
+    final = decide_with_core_claims(core, raw, measured)
 
     assert final.folder_path == "Instruments/Woodwinds/Saxophone/Loops"
     assert final.consensus_status == "final_measured_sax_loop_invariant"
@@ -786,12 +786,8 @@ def test_trumpet_or_synth_support_alone_cannot_trigger_final_sax_invariant() -> 
         },
     )
 
-    final = DecisionCoreV2().arbiter.adjudicate(
-        raw_claim=raw,
-        consensus_claims=[],
-        eligibility_claims=[],
-        facts=measured,
-    )
+    core = DecisionCoreV2()
+    final = decide_with_core_claims(core, raw, measured)
 
     assert "Saxophone" not in final.folder_path
 
@@ -820,12 +816,8 @@ def test_low_heavy_voice_like_phrase_without_sax_candidate_does_not_become_sax()
         },
     )
 
-    final = DecisionCoreV2().arbiter.adjudicate(
-        raw_claim=raw,
-        consensus_claims=[],
-        eligibility_claims=[],
-        facts=measured,
-    )
+    core = DecisionCoreV2()
+    final = decide_with_core_claims(core, raw, measured)
 
     assert "Saxophone" not in final.folder_path
 
@@ -855,12 +847,8 @@ def test_repeated_phrase_loop_with_physics_voice_branch_stays_voice() -> None:
         "instrument_rap_voice_texture": 0.62,
     }
 
-    final = DecisionCoreV2().arbiter.adjudicate(
-        raw_claim=raw,
-        consensus_claims=[],
-        eligibility_claims=[],
-        facts=measured,
-    )
+    core = DecisionCoreV2()
+    final = decide_with_core_claims(core, raw, measured)
 
     assert final.folder_path == "Instruments/Voice/Vocal Loops/Loops"
     assert final.consensus_status == "final_measured_voice_invariant"
@@ -1023,12 +1011,8 @@ def test_physics_fx_role_layer_respects_instrument_conflict() -> None:
         "fx_role_allows_fx": False,
     }
 
-    final = DecisionCoreV2().arbiter.adjudicate(
-        raw_claim=raw,
-        consensus_claims=[],
-        eligibility_claims=[],
-        facts=measured,
-    )
+    core = DecisionCoreV2()
+    final = decide_with_core_claims(core, raw, measured)
 
     assert final.folder_path.startswith("Instruments/")
     assert final.consensus_status != "final_measured_transition_fx_invariant"
@@ -1081,12 +1065,8 @@ def test_percussive_firewall_preserves_strong_snare_leaf() -> None:
         },
     )
 
-    final = DecisionCoreV2().arbiter.adjudicate(
-        raw_claim=raw,
-        consensus_claims=[],
-        eligibility_claims=[],
-        facts=measured,
-    )
+    core = DecisionCoreV2()
+    final = decide_with_core_claims(core, raw, measured)
 
     assert final.folder_path == "Drums/Snares/Acoustic Snare/One Shots"
     assert final.consensus_status == "percussive_one_shot_parent_firewall"
@@ -1129,12 +1109,8 @@ def test_low_heavy_wet_reed_witness_does_not_overrule_stronger_synth_claim() -> 
         },
     )
 
-    final = DecisionCoreV2().arbiter.adjudicate(
-        raw_claim=raw,
-        consensus_claims=[],
-        eligibility_claims=[],
-        facts=measured,
-    )
+    core = DecisionCoreV2()
+    final = decide_with_core_claims(core, raw, measured)
 
     assert final.folder_path == "Instruments/Synths/Synth Loops"
     assert final.consensus_status == "strong_consensus"
@@ -1179,12 +1155,8 @@ def test_clean_synth_loop_with_incidental_sax_candidate_routes_synth_not_piano_o
         },
     )
 
-    final = DecisionCoreV2().arbiter.adjudicate(
-        raw_claim=raw,
-        consensus_claims=[],
-        eligibility_claims=[],
-        facts=measured,
-    )
+    core = DecisionCoreV2()
+    final = decide_with_core_claims(core, raw, measured)
 
     assert final.folder_path == "Instruments/Synths/Synth Lead/Loops"
     assert final.consensus_status == "final_measured_synth_loop_invariant"
@@ -1229,12 +1201,8 @@ def test_synth_panel_can_correct_weak_sax_leaf_without_filename_evidence() -> No
         }
     }
 
-    final = DecisionCoreV2().arbiter.adjudicate(
-        raw_claim=raw,
-        consensus_claims=[],
-        eligibility_claims=[],
-        facts=measured,
-    )
+    core = DecisionCoreV2()
+    final = decide_with_core_claims(core, raw, measured)
 
     assert final.folder_path == "Instruments/Synths/Synth Lead/Loops"
     assert final.consensus_status in {

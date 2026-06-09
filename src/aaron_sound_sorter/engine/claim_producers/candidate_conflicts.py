@@ -25,7 +25,7 @@ class CandidateConflictClaimProducer(
         """Return ordered raw-consensus and role-candidate conflict claims."""
         claims: list[ConsensusClaim] = []
         for claim in (
-            self.raw_consensus_conflict_claim(context.raw),
+            self.raw_consensus_conflict_claim(context.raw, context.facts),
             self.role_candidate_conflict_claim(context.raw, context.eligibility),
         ):
             if claim is not None:

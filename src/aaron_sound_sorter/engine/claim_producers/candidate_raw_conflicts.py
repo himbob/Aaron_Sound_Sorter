@@ -5,14 +5,14 @@
 
 from __future__ import annotations
 
-from aaron_sound_sorter.engine.decision_helpers import _norm_path, _path_has_any
+from aaron_sound_sorter.engine.decision_helpers import _norm_path, _path_has_any, _shape_confidence_from_facts, _shape_vote_from_facts
 from aaron_sound_sorter.engine.family_claims import ConsensusClaim
 
 
 class RawCandidateConflictMixin:
     """Review strong raw winners when nearby candidates contradict the family."""
 
-    def raw_consensus_conflict_claim(self, raw: ConsensusClaim) -> ConsensusClaim | None:
+    def raw_consensus_conflict_claim(self, raw: ConsensusClaim, facts: object | None = None) -> ConsensusClaim | None:
         """Review raw winners that have clearly stronger contradicting evidence."""
         if raw.final_top == "_TO_REVIEW":
             return None
@@ -22,7 +22,7 @@ class RawCandidateConflictMixin:
         if raw.final_top == "FX" and _path_has_any(raw_path, ("slam", "impact", "hit")):
             return self._fx_impact_raw_conflict(raw)
         if raw.final_top == "Drums" and _path_has_any(raw_path, ("drum loops", "drum loop")):
-            return self._drum_loop_bass_raw_conflict(raw)
+            return self._drum_loop_bass_raw_conflict(raw, facts)
         return None
 
     def _human_voice_raw_conflict(self, raw: ConsensusClaim) -> ConsensusClaim | None:
@@ -85,7 +85,11 @@ class RawCandidateConflictMixin:
             )
         return None
 
-    def _drum_loop_bass_raw_conflict(self, raw: ConsensusClaim) -> ConsensusClaim | None:
+    def _drum_loop_bass_raw_conflict(self, raw: ConsensusClaim, facts: object | None = None) -> ConsensusClaim | None:
+        shape = _shape_vote_from_facts(facts)
+        shape_confidence = _shape_confidence_from_facts(facts)
+        if shape in {"beat_loop", "top_loop", "drum_loop"} and shape_confidence >= 0.80:
+            return None
         best_bass = self._best_candidate_score(
             raw,
             include_top={"Instruments"},

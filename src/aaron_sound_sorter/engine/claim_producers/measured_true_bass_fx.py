@@ -38,6 +38,8 @@ class MeasuredTrueBassFxMixin:
         )
         if not (bass_rescue_role and eligibility.confidence >= 0.78):
             return None
+        if raw.final_top == "Drums" and shape in {"beat_loop", "top_loop", "drum_loop"} and shape_conf >= 0.80:
+            return None
         best_bass = self._best_candidate(
             raw,
             include_top={"Instruments"},

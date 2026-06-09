@@ -158,6 +158,12 @@ def build_shared_audio_facts(
     fp = fingerprint_array(physics.fingerprint)
     duration = max(0.0, finite_float(physics.duration_sec, 0.0))
     read_status = str(physics.read_status or "")
+    # Some loaders/analyzers keep a conservative analysis-window duration on
+    # ``physics.duration_sec`` while the named feature row preserves the real
+    # source duration.  Use the larger value for structural gates so valid
+    # ultra-short percussion one-shots are not mislabeled as broken/tiny.
+    feature_values = named_feature_values(fp)
+    duration = max(duration, finite_float(feature_values.get("duration_sec"), duration))
 
     log_transients = safe_feature_value(fp, 35, 0.0)
     event_count = float(np.expm1(max(0.0, log_transients)))
@@ -168,8 +174,15 @@ def build_shared_audio_facts(
     tail_energy = safe_feature_value(fp, 47, 0.0)
     regularity = safe_feature_value(fp, 43, 1.0)
 
+    # ``too_short`` means the sample was shorter than the analysis FFT window,
+    # not that it is unusable.  Many real producer percussion one-shots are
+    # 60-120 ms clicks, ticks, sticks, bells, or tiny hats.  Treat only truly
+    # unreadable/silent/empty files, non-finite durations, or sub-tiny clips as
+    # broken.  The feature extractor pads short audio, so these valid tiny hits
+    # still have usable measured transient/material evidence.
+    fatal_read_status = read_status not in {"", "ok", "too_short"}
     is_broken_or_tiny = (
-        read_status != "ok" or duration <= policy.tiny_duration_sec or not math.isfinite(duration) or fp.size <= 0
+        fatal_read_status or duration <= policy.tiny_duration_sec or not math.isfinite(duration) or fp.size <= 0
     )
     is_long = duration >= policy.long_duration_sec
     loop_like = is_loop_like(
@@ -199,7 +212,6 @@ def build_shared_audio_facts(
         and attack_rise <= 0.24
     )
 
-    feature_values = named_feature_values(fp)
     feature_groups = grouped_feature_values(feature_values)
     measured_roles = measured_roles_from_features(
         is_loop_like=bool((not is_broken_or_tiny) and loop_like),
@@ -210,6 +222,8 @@ def build_shared_audio_facts(
     )
 
     direct_body_view = build_direct_body_view_evidence(physics, policy)
+    third_party_profile = third_party_feature_evidence(physics)
+    third_party_flat = third_party_profile.get("flat", {}) if isinstance(third_party_profile, dict) else {}
     physics_subpanels = build_low_level_physics_subpanels(feature_values)
     physics_subpanel_flat = physics_subpanels.get("flat", {}) if isinstance(physics_subpanels, dict) else {}
     structure_evidence = {
@@ -240,12 +254,32 @@ def build_shared_audio_facts(
             "physics_subpanels": physics_subpanels,
             **physics_subpanel_flat,
             "direct_body_view": direct_body_view,
+            "third_party_features": third_party_profile,
+            **third_party_flat,
         },
         feature_values_by_name=feature_values,
         feature_count=len(feature_values),
         feature_vector=tuple(float(fp[index]) for index in range(FP_SIZE)),
         feature_groups=feature_groups,
     )
+
+
+def third_party_feature_evidence(physics: AudioPhysics) -> dict[str, Any]:
+    """Return third-party measured feature evidence attached to physics.
+
+    The profile is produced from decoded signal data only.  Unknown or missing
+    adapters are diagnostic status, not routing failure.
+    """
+    profile = getattr(physics, "third_party_feature_profile", None)
+    if not isinstance(profile, dict):
+        return {"status": "not_computed", "adapters": {}, "flat": {}}
+    flat = profile.get("flat", {})
+    if not isinstance(flat, dict):
+        flat = {}
+    return {
+        **profile,
+        "flat": {str(name): finite_float(value, 0.0) for name, value in flat.items()},
+    }
 
 
 def build_direct_body_view_evidence(
