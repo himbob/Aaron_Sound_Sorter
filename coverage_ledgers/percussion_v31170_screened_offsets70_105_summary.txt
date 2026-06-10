@@ -1,0 +1,32 @@
+Aaron Sound Sorter v31.170 percussion ZIP screen summary
+Source ZIP: one_shot_percussive_sounds.zip
+Range: offsets 70,75,80,85,90,95,100,105; per-folder 5 each; ordinals 71-110 per source folder
+Total new screened rows: 200
+Drums: 200
+FX: 0
+_TO_REVIEW: 0
+Instruments: 0
+Bulk mode: third-party features disabled for throughput because sandbox hangs; all observed bad/borderline rows were rerun with third-party enabled/bounded before diagnosis and fix.
+Third-party-enabled rerun/fix rows: one_shot_percussive_sounds/1/13913.wav, one_shot_percussive_sounds/4/203838.wav, one_shot_percussive_sounds/4/203859.wav, one_shot_percussive_sounds/5/439764.wav
+Previous trusted/screened total before this pass: 194
+New screened rows this pass: 200
+Cumulative if counting this screen: 394 / 10254 = 3.8424%
+
+By folder:
+  one_shot_percussive_sounds/1: 40
+  one_shot_percussive_sounds/2: 40
+  one_shot_percussive_sounds/3: 40
+  one_shot_percussive_sounds/4: 40
+  one_shot_percussive_sounds/5: 40
+
+Top statuses:
+  final_measured_protected_percussive_parent_claim: 97
+  final_measured_drum_one_shot_invariant: 28
+  final_measured_kick_one_shot_invariant: 20
+  final_protected_percussive_parent_release: 16
+  final_weak_review_measured_drums_release: 15
+  final_decisive_struck_percussion_parent_invariant: 8
+  profile_candidate_kick_claim: 7
+  strong_consensus: 5
+  percussive_one_shot_parent_firewall: 3
+  baby_recall_kick_claim: 1

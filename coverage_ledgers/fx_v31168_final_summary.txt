@@ -1,0 +1,8 @@
+Aaron FX ZIP coverage summary v31.168
+Zip: Aaron_FX_coverage_first_200MB_20260608_201853.zip
+Real audio rows tested: 81 / 81 = 100.00%
+Source groups: {'source_fx': 59, 'source_instrument_or_hybrid': 16, 'source_drums': 6}
+Overall audit statuses: {'PASS_FX': 16, 'FAIL_INSTRUMENT': 22, 'QUESTIONABLE_DRUM': 14, 'PASS_DRUM_ALLOWED': 6, 'QUESTIONABLE_DRUM_IN_SOURCE_INSTRUMENT': 1, 'PASS_DRUM_SOURCE': 6, 'PASS_INSTRUMENT_SOURCE': 15, 'FAIL_REVIEW': 1}
+True FX-source rows: 59
+True FX-source statuses: {'PASS_FX': 16, 'FAIL_INSTRUMENT': 22, 'QUESTIONABLE_DRUM': 14, 'PASS_DRUM_ALLOWED': 6, 'FAIL_REVIEW': 1}
+Changed placements versus v31.167 baseline: 35

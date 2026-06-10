@@ -84,6 +84,52 @@ class PlacementDepthDecider:
 
         current = self._row_for_label(shared, raw_claim.final_label)
         current_depth = label_depth(current) if current is not None else label_depth_from_label(raw_claim.final_label)
+
+        parent = facts.evidence.get("parent_eligibility_v2", {}) if isinstance(facts.evidence, dict) else {}
+        if isinstance(parent, dict):
+            allowed = parent.get("allowed_top_families") or ()
+            parent_path = str(parent.get("broad_folder_path") or "")
+            if (
+                raw_claim.family == "Instruments"
+                and "Drums" in allowed
+                and "Instruments" not in allowed
+                and parent_path.startswith("Drums/")
+            ):
+                return claim_from_folder_path(
+                    folder_path=parent_path,
+                    source="placement_depth_parent_eligible_broad_bucket",
+                    reason=(
+                        "stopped broad Instrument placement because parent eligibility "
+                        "had already blocked Instruments and proved a broad Drums lane"
+                    ),
+                    shared=shared,
+                    raw_candidate_score=raw_claim.raw_candidate_score,
+                    brain_rank=raw_claim.brain_rank,
+                    physics_rank=raw_claim.physics_rank,
+                    shared_winner=parent_path,
+                    can_override=True,
+                    strength=max(0.92, raw_claim.strength),
+                    is_real_candidate=False,
+                )
+
+        if raw_claim.family == "Instruments" and self.facts_support_short_low_percussive_drum_parent(facts):
+            return claim_from_folder_path(
+                folder_path="Drums/Kick Drums/Generic Kick/One Shots",
+                source="placement_depth_low_percussive_parent_broad_bucket",
+                reason=(
+                    "stopped Instrument broadening because measured roles and shape evidence "
+                    "showed a short low percussive one-shot, not an instrument loop"
+                ),
+                shared=shared,
+                raw_candidate_score=raw_claim.raw_candidate_score,
+                brain_rank=raw_claim.brain_rank,
+                physics_rank=raw_claim.physics_rank,
+                shared_winner="Drums/Kick Drums/Generic Kick/One Shots",
+                can_override=True,
+                strength=max(0.90, raw_claim.strength),
+                is_real_candidate=False,
+            )
+
         if current_depth <= 3:
             return None
 
@@ -289,6 +335,54 @@ class PlacementDepthDecider:
         return None
 
     @staticmethod
+    def facts_support_short_low_percussive_drum_parent(facts: SharedAudioFacts) -> bool:
+        """Return True for short low drum hits misread as pitched instrument loops.
+
+        This is placement-depth safety, not final leaf ID.  If the measured role
+        layer already says a file is a strong one-shot hit with almost all
+        energy in the low band, broad Instrument Loop placement is unsafe even
+        when a bass/synth-bass candidate survived the shared-candidate list.
+        """
+        evidence = facts.evidence if isinstance(getattr(facts, "evidence", None), dict) else {}
+        roles = evidence.get("measured_roles", {}) if isinstance(evidence, dict) else {}
+        roles = roles if isinstance(roles, dict) else {}
+        role_evidence = roles.get("evidence", {}) if isinstance(roles.get("evidence", {}), dict) else {}
+        shape = evidence.get("shape_vote", {}) if isinstance(evidence.get("shape_vote", {}), dict) else {}
+
+        duration = _number(evidence.get("duration_sec"), facts.feature_values_by_name.get("duration_sec", 0.0))
+        events = max(_number(evidence.get("event_count_estimate")), _number(evidence.get("onset_count")), _number(shape.get("onset_count")))
+        percussive = max(_number(roles.get("percussive_one_shot")), _number(roles.get("low_kick_like_hit")), _number(role_evidence.get("low_pitched_hit_raw")))
+        bass_loop = _number(roles.get("bass_loop"))
+        pitched_loop = _number(roles.get("pitched_music_loop"))
+        low_total = _number(role_evidence.get("low_total"))
+        if low_total <= 0.0:
+            low_total = _number(facts.feature_values_by_name.get("sub_bass_ratio_lt_150hz")) + _number(facts.feature_values_by_name.get("bass_ratio_150_500hz"))
+        low_event = _number(shape.get("low_event_ratio"), _number(facts.feature_values_by_name.get("low_event_ratio")))
+        high_event = _number(shape.get("high_event_ratio"), _number(facts.feature_values_by_name.get("high_event_ratio")))
+        pitch_conf = _number(role_evidence.get("pitch_confidence"), _number(facts.feature_values_by_name.get("pitch_confidence")))
+        f0_voiced = _number(role_evidence.get("f0_voiced_ratio"), _number(facts.feature_values_by_name.get("f0_voiced_ratio")))
+        attack = _number(role_evidence.get("attack_rise_time_norm"), _number(shape.get("attack_rise_time_norm")))
+        temporal = _number(role_evidence.get("temporal_centroid_ratio"), _number(shape.get("temporal_centroid_ratio")))
+        tail = _number(role_evidence.get("tail_energy_ratio"), _number(shape.get("tail_ratio")))
+        primary_shape = str(shape.get("primary_shape") or shape.get("shape") or "")
+
+        return bool(
+            percussive >= 0.86
+            and bass_loop <= 0.10
+            and pitched_loop <= 0.12
+            and 0.0 < duration <= 0.80
+            and 0.0 < events <= 3.0
+            and max(low_total, low_event) >= 0.84
+            and high_event <= 0.12
+            and pitch_conf >= 0.55
+            and f0_voiced <= 0.08
+            and attack <= 0.16
+            and temporal <= 0.58
+            and tail <= 0.72
+            and primary_shape in {"solo_phrase", "hit_with_tail", "single_hit", "impact_with_tail", "echo_tail_hit", "bass_phrase"}
+        )
+
+    @staticmethod
     def _row_for_label(shared: list[dict[str, Any]], label: str) -> dict[str, Any] | None:
         for row in shared:
             if str(row.get("label", "")) == str(label):
@@ -322,6 +416,16 @@ class PlacementDepthDecider:
             strength=0.86,
             is_real_candidate=not is_synthetic,
         )
+
+
+
+def _number(value: Any, default: float = 0.0) -> float:
+    try:
+        if value is None:
+            return float(default)
+        return float(value)
+    except Exception:
+        return float(default)
 
 
 def is_generic_instrument_loop_bucket(row: dict[str, Any]) -> bool:

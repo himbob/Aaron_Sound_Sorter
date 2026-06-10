@@ -488,6 +488,9 @@ class MeasuredInstrumentBranchClaimProducer:
         )
 
     def _sax_loop_claim(self, context: DecisionContext) -> ConsensusClaim | None:
+        parent_role = str(getattr(context.eligibility, "role_name", "") or "")
+        if parent_role in {"protected_percussive_one_shot", "percussive_one_shot", "low_kick_like_hit"}:
+            return None
         raw = context.raw
         path = _norm_path(raw.folder_path or "")
         if raw.family == "Instruments" and "sax" in path and "loop" in path and "one shot" not in path:

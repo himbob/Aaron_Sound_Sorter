@@ -1,0 +1,23 @@
+previous_trusted_screened_before_v31171: 394
+new_screened_offsets110_145: 200
+new_drums_after_fixes: 199
+new_fx_after_fixes: 0
+new_instruments_after_fixes: 0
+new_review_after_fixes: 1
+new_broken_or_tiny_review_accepted: 1
+new_bad_after_fixes_excluding_broken_tiny: 0
+cumulative_screened: 594
+zip_total_audio: 10254
+cumulative_screened_percent: 5.7929
+notes: Bulk sweep used third-party disabled for throughput; all non-broken failures were rerun/fixed with third-party enabled and bounded.
+
+Fixed rows:
+one_shot_percussive_sounds/1/14491.wav -> Drums/Percussion/Bells and Metallic Percussion/One Shots [final_protected_percussive_parent_release]
+one_shot_percussive_sounds/2/105434.wav -> Drums/Kick Drums/Generic Kick/One Shots [final_parent_low_kick_like_release]
+one_shot_percussive_sounds/4/205973.wav -> Drums/Rims and Sticks/Generic Rim or Stick/One Shots [final_protected_percussive_parent_release]
+one_shot_percussive_sounds/4/207170.wav -> Drums/Rims and Sticks/Rimshot/One Shots [final_weak_review_measured_drums_release]
+one_shot_percussive_sounds/1/14820.wav -> Drums/Toms/Generic Tom/One Shots [final_protected_percussive_parent_release]
+one_shot_percussive_sounds/5/439816.wav -> Drums/Percussion/Guiros Scrapes and Rasps/One Shots [final_protected_percussive_parent_release]
+one_shot_percussive_sounds/1/15312.wav -> Drums/Percussion/Generic Percussion/One Shots [final_protected_percussive_parent_release]
+one_shot_percussive_sounds/1/15314.wav -> Drums/Toms/Generic Tom/One Shots [final_protected_percussive_parent_release]
+one_shot_percussive_sounds/5/439825.wav -> Drums/Toms/Generic Tom/One Shots [final_protected_percussive_parent_release]

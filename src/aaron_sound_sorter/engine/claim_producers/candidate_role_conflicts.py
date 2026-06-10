@@ -247,7 +247,7 @@ class RoleCandidateConflictMixin:
         if (
             raw.final_top == "Drums"
             and pitched_inst
-            and not _path_has_any(raw_path, ("kick", "snare", "clap", "rim", "hat", "cymbal"))
+            and not _path_has_any(raw_path, ("kick", "snare", "clap", "rim", "stick", "sidestick", "hat", "cymbal"))
         ):
             return self._review_from_raw(
                 raw,

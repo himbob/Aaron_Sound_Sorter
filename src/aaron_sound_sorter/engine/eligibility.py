@@ -242,6 +242,33 @@ def infer_parent_eligibility(facts: SharedAudioFacts) -> EligibilityDecision:
             and temporal_centroid <= 0.45
         )
     )
+    early_drum_material_voice_decoy = bool(
+        duration <= 1.00
+        and event_count <= 3.0
+        and primary_shape in {"texture_bed", "noise_texture", "single_hit", "hit_with_tail", "echo_tail_hit", "solo_phrase", "ui_blip"}
+        and _fact_score("role_one_shot_score") >= 0.75
+        and compact_struck_tonal_percussion_score >= 0.74
+        and max(
+            pitched_metal_percussion_score,
+            _fact_score("hand_drum_membrane_score"),
+            _fact_score("struck_wood_score"),
+        ) >= 0.62
+        and max(
+            _fact_score("drum_hit_score"),
+            drum_kick_source_score,
+            _fact_score("drum_snare_source_score"),
+            _fact_score("drum_cymbal_source_score"),
+            _fact_score("drum_guiro_scrape_source_score"),
+            _fact_score("drum_metallic_percussion_source_score"),
+        ) >= 0.72
+        and _fact_score("onset_percussive_onset_score") >= 0.70
+        and _num(feature_values.get("attack_rise_time_norm"), attack_rise) <= 0.08
+        and _num(feature_values.get("temporal_centroid_ratio"), temporal_centroid) <= 0.28
+        and _num(feature_values.get("tail_energy_ratio"), 0.0) <= 0.35
+        and primary_shape not in {"vocal_phrase", "vocal_one_shot"}
+    )
+    processed_vocal_loop_or_stab = processed_vocal_loop_or_stab and not early_drum_material_voice_decoy
+
     tonal_alert_or_siren_fx = (
         duration >= 2.0
         and event_count >= 8.0
@@ -911,6 +938,36 @@ def infer_parent_eligibility(facts: SharedAudioFacts) -> EligibilityDecision:
         and _num(feature_values.get("spectral_flatness_mean"), 0.0) >= 0.28
         and _num(feature_values.get("formant_like_peak_spacing"), 0.0) < 1.05
     )
+    # Short repeated struck gestures are still one-shot percussion in the
+    # producer-library sense: a fast flam/ruff/rasp can contain five closely
+    # spaced pitched events without becoming a playable instrument phrase.
+    # Keep this source-name blind and require noisy/struck/drum evidence so
+    # clean tonal synth/keys riffs do not get swept into Drums.
+    repeated_struck_percussive_gesture = (
+        duration <= 1.10
+        and 4.0 <= event_count <= 8.0
+        and event_rate >= 4.0
+        and _num(feature_values.get("attack_rise_time_norm"), attack_rise) <= 0.10
+        and _num(feature_values.get("temporal_centroid_ratio"), temporal_centroid) <= 0.48
+        and _num(feature_values.get("spectral_flatness_mean"), flatness) >= 0.24
+        and max(
+            compact_struck_tonal_percussion_score,
+            pitched_metal_percussion_score,
+            _fact_score("drum_guiro_scrape_source_score"),
+            _fact_score("drum_metallic_percussion_source_score"),
+            _fact_score("drum_snare_source_score"),
+            _fact_score("drum_kick_source_score"),
+            _fact_score("drum_tom_conga_source_score"),
+            _fact_score("drum_hit_score"),
+        )
+        >= 0.40
+        and not (
+            _num(feature_values.get("spectral_flatness_mean"), flatness) <= 0.16
+            and pitch_conf >= 0.62
+            and loop_pitched >= 0.85
+            and loop_sustained >= 0.75
+        )
+    )
     clean_short_pitched_tonal_hit = (
         (
             duration <= 2.75
@@ -933,6 +990,31 @@ def infer_parent_eligibility(facts: SharedAudioFacts) -> EligibilityDecision:
         _fact_score("human_spoken_voice_score"),
         _fact_score("human_breath_mouth_score"),
         _fact_score("fx_formant_score"),
+    )
+    drum_material_voice_decoy = bool(
+        duration <= 1.00
+        and event_count <= 3.0
+        and primary_shape in {"texture_bed", "noise_texture", "single_hit", "hit_with_tail", "echo_tail_hit", "solo_phrase", "ui_blip"}
+        and _fact_score("role_one_shot_score") >= 0.75
+        and compact_struck_tonal_percussion_score >= 0.74
+        and max(
+            pitched_metal_percussion_score,
+            _fact_score("hand_drum_membrane_score"),
+            _fact_score("struck_wood_score"),
+        ) >= 0.62
+        and max(
+            _fact_score("drum_hit_score"),
+            drum_kick_source_score,
+            _fact_score("drum_snare_source_score"),
+            _fact_score("drum_cymbal_source_score"),
+            _fact_score("drum_guiro_scrape_source_score"),
+            _fact_score("drum_metallic_percussion_source_score"),
+        ) >= 0.72
+        and _fact_score("onset_percussive_onset_score") >= 0.70
+        and _num(feature_values.get("attack_rise_time_norm"), attack_rise) <= 0.08
+        and _num(feature_values.get("temporal_centroid_ratio"), temporal_centroid) <= 0.28
+        and _num(feature_values.get("tail_energy_ratio"), 0.0) <= 0.35
+        and primary_shape not in {"vocal_phrase", "vocal_one_shot"}
     )
     clean_tonal_stab_voice_decoy = bool(
         duration <= 2.75
@@ -963,6 +1045,32 @@ def infer_parent_eligibility(facts: SharedAudioFacts) -> EligibilityDecision:
         and drum_kick_source_score <= 0.52
         and low_total <= 0.30
         and high_total <= 0.16
+    )
+    struck_tonal_percussion_hit = bool(
+        duration <= 1.10
+        and event_count <= 3.0
+        and pitch_conf >= 0.62
+        and loop_pitched >= 0.82
+        and loop_percussive <= 0.12
+        and loop_drumlike <= 0.12
+        and compact_struck_tonal_percussion_score >= 0.82
+        and max(
+            _fact_score("hand_drum_membrane_score"),
+            _fact_score("struck_wood_score"),
+            pitched_metal_percussion_score,
+        ) >= 0.86
+        and _fact_score("role_one_shot_score") >= 0.78
+        and _num(feature_values.get("attack_rise_time_norm"), attack_rise) <= 0.08
+        and _num(feature_values.get("temporal_centroid_ratio"), temporal_centroid) <= 0.18
+        and _num(feature_values.get("tail_energy_ratio"), 0.0) <= 0.12
+        and not (
+            _fact_score("struck_keys_authority_score") >= 0.62
+            and keys_tonal_decay_score >= 0.62
+        )
+        and not (
+            synth_tonal_source_score >= 0.68
+            and compact_struck_tonal_percussion_score < 0.90
+        )
     )
     short_tonal_synth_phrase = bool(
         0.35 <= duration <= 1.75
@@ -1024,6 +1132,31 @@ def infer_parent_eligibility(facts: SharedAudioFacts) -> EligibilityDecision:
         and _num(feature_values.get("spectral_flatness_mean"), 0.0) <= 0.10
         and formant < 1.05
     )
+    if drum_material_voice_decoy:
+        return EligibilityDecision(
+            role_name="protected_percussive_one_shot",
+            confidence=max(0.80, compact_struck_tonal_percussion_score),
+            allowed_top_families=("Drums", "_TO_REVIEW"),
+            blocked_path_fragments=(
+                "FX",
+                "Instruments",
+                "Guitar",
+                "Keys",
+                "Bass",
+                "Voice",
+                "Human",
+                "Animals",
+                "Dog",
+                "Bird",
+                "Cat",
+                "Long FX",
+                "Drum Loops",
+                "Loops",
+            ),
+            broad_folder_path="Drums/Percussion/Generic Percussion/One Shots",
+            reason="measured compact drum-material one-shot; vocal/formant panels are decoys on a struck percussion body",
+        )
+
     vocal_phrase_by_shape = (
         not clean_tonal_reed_phrase
         and primary_shape in {"vocal_phrase", "vocal_one_shot"}
@@ -1186,6 +1319,30 @@ def infer_parent_eligibility(facts: SharedAudioFacts) -> EligibilityDecision:
             broad_folder_path="Drums/Percussion/Bells and Metallic Percussion/One Shots",
             reason="measured short pitched metallic hit; kick, tom, voice, animal, FX, and loop leaves are not eligible",
         )
+    if struck_tonal_percussion_hit and not strong_vocal_identity:
+        return EligibilityDecision(
+            role_name="protected_percussive_one_shot",
+            confidence=max(0.78, compact_struck_tonal_percussion_score),
+            allowed_top_families=("Drums", "_TO_REVIEW"),
+            blocked_path_fragments=(
+                "FX",
+                "Instruments",
+                "Guitar",
+                "Keys",
+                "Bass",
+                "Voice",
+                "Human",
+                "Animals",
+                "Dog",
+                "Bird",
+                "Cat",
+                "Long FX",
+                "Drum Loops",
+                "Loops",
+            ),
+            broad_folder_path="Drums/Percussion/Generic Percussion/One Shots",
+            reason="measured compact struck tonal percussion hit; instrument/FX leaves require stronger positive non-drum evidence",
+        )
     if short_tonal_synth_phrase and not strong_vocal_identity:
         return EligibilityDecision(
             role_name="short_tonal_synth_phrase",
@@ -1261,7 +1418,7 @@ def infer_parent_eligibility(facts: SharedAudioFacts) -> EligibilityDecision:
             reason="measured short low front-loaded one-shot; bass, loop, FX, and instrument leaves are not eligible",
         )
     vocal_shape_identity = primary_shape in {"vocal_phrase", "vocal_one_shot", "hit_with_tail"}
-    if (short_front_loaded or very_short_noisy_hit or hat_cymbal_tail_hit) and not (
+    if (short_front_loaded or very_short_noisy_hit or hat_cymbal_tail_hit or repeated_struck_percussive_gesture) and not (
         strong_vocal_identity and vocal_shape_identity
     ):
         return EligibilityDecision(
@@ -1363,6 +1520,46 @@ def infer_parent_eligibility(facts: SharedAudioFacts) -> EligibilityDecision:
             blocked_path_fragments=("Drums/Kick", "Drums/Drum Loops", "FX", "Animals", "Bird", "Dog"),
             broad_folder_path="Instruments/Bass/Bass Loops",
             reason="measured bass loop; kick/drum/FX leaves are not eligible",
+        )
+
+    short_low_percussive_one_shot = (
+        duration <= 1.25
+        and event_count <= 4.0
+        and low_total >= 0.72
+        and percussive_one_shot >= 0.70
+        and _num(feature_values.get("temporal_centroid_ratio"), temporal_centroid) <= 0.55
+        and _num(feature_values.get("tail_energy_ratio"), 0.0) <= 0.70
+        and not strong_vocal_identity
+        and not (
+            duration >= 1.0
+            and pitch_conf >= 0.80
+            and f0_voiced >= 0.70
+            and loop_percussive <= 0.08
+            and loop_drumlike <= 0.08
+        )
+    )
+    if short_low_percussive_one_shot:
+        return EligibilityDecision(
+            role_name="low_kick_like_hit",
+            confidence=max(0.78, percussive_one_shot),
+            allowed_top_families=("Drums", "FX", "_TO_REVIEW"),
+            blocked_path_fragments=(
+                "Instruments",
+                "Bass Loops",
+                "Instrument Loops",
+                "Guitar",
+                "Keys",
+                "Voice",
+                "Human",
+                "Animals",
+                "Dog",
+                "Bird",
+                "Cat",
+                "Drum Loops",
+                "Long FX",
+            ),
+            broad_folder_path="Drums/Kick Drums/Generic Kick/One Shots",
+            reason="measured short low percussive one-shot; bass/instrument loop leaves require real loop evidence",
         )
 
     clean_keys_loop = (

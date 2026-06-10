@@ -502,6 +502,12 @@ class MeasuredMusicStructureClaimProducer:
     def _parent_role(self, facts: SharedAudioFacts | None) -> str:
         if facts is None:
             return ""
+        if isinstance(getattr(facts, "evidence", None), dict):
+            parent_dict = facts.evidence.get("parent_eligibility_v2", {})
+            if isinstance(parent_dict, dict):
+                parent_role = str(parent_dict.get("role_name") or parent_dict.get("detected_parent_role") or "")
+                if parent_role in {"percussive_one_shot", "protected_percussive_one_shot", "low_kick_like_hit"}:
+                    return parent_role
         parent = _measured_role_from_facts(facts)
         if parent:
             return parent

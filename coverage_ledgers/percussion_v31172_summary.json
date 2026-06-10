@@ -1,0 +1,43 @@
+{
+  "acceptance_counts": {
+    "PASS": 194,
+    "PASS_BROKEN_OR_TINY_REVIEW": 6
+  },
+  "bad_instrument_nonbroken": 0,
+  "bad_review_nonbroken": 0,
+  "broken_or_tiny_review": 6,
+  "coverage_percent": 7.7433,
+  "created": "2026-06-10",
+  "current_screened_total": 794,
+  "new_screened_rows": 200,
+  "offsets": [
+    150,
+    155,
+    160,
+    165,
+    170,
+    175,
+    180,
+    185
+  ],
+  "ordinals": "151-190 per source folder",
+  "per_folder": 5,
+  "previous_screened_total": 594,
+  "third_party_enabled_reruns": [
+    "one_shot_percussive_sounds/1/15582.wav",
+    "one_shot_percussive_sounds/5/439835.wav",
+    "one_shot_percussive_sounds/1/16266.wav",
+    "one_shot_percussive_sounds/1/16268.wav",
+    "one_shot_percussive_sounds/1/16302.wav",
+    "one_shot_percussive_sounds/4/208262.wav",
+    "one_shot_percussive_sounds/5/440218.wav",
+    "one_shot_percussive_sounds/5/441116.wav"
+  ],
+  "top_counts": {
+    "Drums": 194,
+    "_TO_REVIEW": 6
+  },
+  "version": "v31.172",
+  "zip": "one_shot_percussive_sounds.zip",
+  "zip_audio_total": 10254
+}

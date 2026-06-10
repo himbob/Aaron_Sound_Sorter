@@ -1,0 +1,7 @@
+seq,group,source_folder,ordinal,member,reason
+13,3,one_shot_percussive_sounds/3,58,one_shot_percussive_sounds/3/143483.wav,not counted in trusted current-patch coverage; batch/single-file execution timed out before final rerun completed
+14,3,one_shot_percussive_sounds/3,59,one_shot_percussive_sounds/3/143484.wav,not counted in trusted current-patch coverage; batch/single-file execution timed out before final rerun completed
+15,3,one_shot_percussive_sounds/3,60,one_shot_percussive_sounds/3/143499.wav,not counted in trusted current-patch coverage; batch/single-file execution timed out before final rerun completed
+16,4,one_shot_percussive_sounds/4,56,one_shot_percussive_sounds/4/203200.wav,not counted in trusted current-patch coverage; batch/single-file execution timed out before final rerun completed
+18,4,one_shot_percussive_sounds/4,58,one_shot_percussive_sounds/4/203202.wav,not counted in trusted current-patch coverage; batch/single-file execution timed out before final rerun completed
+19,4,one_shot_percussive_sounds/4,59,one_shot_percussive_sounds/4/203203.wav,not counted in trusted current-patch coverage; batch/single-file execution timed out before final rerun completed

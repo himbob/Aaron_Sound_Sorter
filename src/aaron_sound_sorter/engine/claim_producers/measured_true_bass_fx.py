@@ -29,6 +29,7 @@ class MeasuredTrueBassFxMixin:
         measured_role: str,
         shape: str,
         shape_conf: float,
+        facts: SharedAudioFacts | None = None,
     ) -> ConsensusClaim | None:
         """Redirect unsafe generic/FX winners to Bass Loops when well supported."""
         bass_rescue_role = (
@@ -39,6 +40,8 @@ class MeasuredTrueBassFxMixin:
         if not (bass_rescue_role and eligibility.confidence >= 0.78):
             return None
         if raw.final_top == "Drums" and shape in {"beat_loop", "top_loop", "drum_loop"} and shape_conf >= 0.80:
+            return None
+        if self._raw_concrete_fx_should_not_become_bass_loop(raw, raw_path, facts):
             return None
         best_bass = self._best_candidate(
             raw,
@@ -85,6 +88,99 @@ class MeasuredTrueBassFxMixin:
                 "bass-loop true-bucket rescue: measured bass_loop plus Bass candidate support beat unsafe generic/FX family",
             )
         return None
+
+
+    def _raw_concrete_fx_should_not_become_bass_loop(
+        self,
+        raw: ConsensusClaim,
+        raw_path: str,
+        facts: SharedAudioFacts | None,
+    ) -> bool:
+        """Return True when concrete FX evidence should block bass-loop rescue.
+
+        Low, tonal, repeated designed effects can look like bass loops in the
+        measured role layer.  If the raw consensus already found a concrete FX
+        family and the shape layer also reports transition/impact/glitch/FX
+        motion, do not let the broad bass-loop rescue steal it into Instruments.
+        """
+        if raw.final_top != "FX":
+            return False
+        concrete_raw_fx = _path_has_any(
+            raw_path,
+            (
+                "impact",
+                "impacts",
+                "hit",
+                "whoosh",
+                "sweep",
+                "riser",
+                "build",
+                "drop",
+                "downlifter",
+                "reverse",
+                "glitch",
+                "stutter",
+                "hybrid designed",
+                "designed noise",
+                "structural and transitional",
+            ),
+        )
+        if not concrete_raw_fx:
+            return False
+        shape_vote = {}
+        if facts is not None and isinstance(getattr(facts, "evidence", None), dict):
+            candidate = facts.evidence.get("shape_vote", {})
+            if isinstance(candidate, dict):
+                shape_vote = candidate
+        shape_scores_raw = shape_vote.get("shape_scores", ()) if isinstance(shape_vote, dict) else ()
+        shape_scores: dict[str, float] = {}
+        if isinstance(shape_scores_raw, (list, tuple)):
+            for item in shape_scores_raw:
+                if isinstance(item, (list, tuple)) and len(item) >= 2:
+                    try:
+                        shape_scores[str(item[0])] = float(item[1])
+                    except Exception:
+                        pass
+        primary_shape = str(shape_vote.get("primary_shape") or "") if isinstance(shape_vote, dict) else ""
+        fx_shape_score = max(
+            [
+                shape_scores.get("hybrid_fx_motion", 0.0),
+                shape_scores.get("impact_with_tail", 0.0),
+                shape_scores.get("hit_with_tail", 0.0),
+                shape_scores.get("glitch_stutter", 0.0),
+                shape_scores.get("transition_riser", 0.0),
+                shape_scores.get("transition_drop", 0.0),
+                shape_scores.get("reverse_swell", 0.0),
+                shape_scores.get("whoosh_sweep", 0.0),
+                0.64 if primary_shape in {
+                    "hybrid_fx_motion",
+                    "impact_with_tail",
+                    "hit_with_tail",
+                    "glitch_stutter",
+                    "transition_riser",
+                    "transition_drop",
+                    "reverse_swell",
+                    "whoosh_sweep",
+                } else 0.0,
+            ]
+        )
+        if fx_shape_score >= 0.55:
+            return True
+        # Even if the shape scorer overcalls a low beat loop, keep a concrete FX
+        # raw winner when the raw FX candidate is substantially stronger than a
+        # broad bass rescue candidate.  The arbiter can still review later if the
+        # evidence is genuinely contradictory.
+        try:
+            raw_score = float(raw.raw_candidate_score if raw.raw_candidate_score is not None else 9999.0)
+        except Exception:
+            raw_score = 9999.0
+        best_bass = self._best_candidate(
+            raw,
+            include_top={"Instruments"},
+            include_fragments=("bass", "808", "sub bass", "synth bass"),
+        )
+        bass_score = best_bass[0] if best_bass is not None else 9999.0
+        return bool(raw_score + 3.0 <= bass_score)
 
     def _maybe_rescue_concrete_fx_over_generic_instrument(
         self,

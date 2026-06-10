@@ -74,9 +74,23 @@ class MeasuredBucketClaimProducer:
                 + self.music_structures.produce(context)
             )
 
+        # Parent-protected percussion is a measured role/structure decision.
+        # Let it emit before transition/FX shortcuts so a very short noisy
+        # struck hit shaped as ``texture_bed`` does not become a role-conflict
+        # review merely because a weak FX leaf was also available.
+        drum_claims = self.drum_structures.produce(context)
+        if any(
+            claim.source
+            in {
+                "final_measured_protected_percussive_parent_claim",
+                "final_decisive_struck_percussion_parent_invariant",
+            }
+            for claim in drum_claims
+        ):
+            return drum_claims
+
         for producer in (
             self.transition_fx,
-            self.drum_structures,
             self.final_drum_loop,
             self.instrument_branches,
             self.music_structures,
@@ -85,4 +99,6 @@ class MeasuredBucketClaimProducer:
             claims = producer.produce(context)
             if claims:
                 return claims
+        if drum_claims:
+            return drum_claims
         return []

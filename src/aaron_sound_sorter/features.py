@@ -403,7 +403,32 @@ def make_fingerprint_safe(
         signal.signal(signal.SIGALRM, old_handler)
 
 
-def third_party_feature_profile(path: Path) -> dict[str, object]:
+class ThirdPartyFeatureTimeout(Exception):
+    """Raised when supplemental third-party feature extraction exceeds its budget."""
+
+
+def _third_party_timeout_handler(signum, frame):
+    raise ThirdPartyFeatureTimeout("third-party feature extraction timed out")
+
+
+def _third_party_timeout_seconds(default: float = 12.0) -> float:
+    """Return the supplemental third-party DSP timeout budget.
+
+    Librosa/Numba can stall during lazy JIT/import in constrained test shells.
+    These features are useful measured evidence, but they are supplemental; one
+    adapter must never freeze a real sort run.  Aaron can raise or disable this
+    budget from the shell without changing classifier code.
+    """
+    raw = str(os.environ.get("AARON_THIRD_PARTY_TIMEOUT_SECONDS", "")).strip()
+    if not raw:
+        return float(default)
+    try:
+        return max(0.0, float(raw))
+    except ValueError:
+        return float(default)
+
+
+def _third_party_feature_profile_unbounded(path: Path) -> dict[str, object]:
     """Return automatic third-party measured features for one audio file.
 
     This is analysis evidence only.  Adapters may use installed third-party DSP
@@ -419,6 +444,38 @@ def third_party_feature_profile(path: Path) -> dict[str, object]:
         return third_party_feature_profile_from_audio(mono, sr)
     except Exception as exc:
         return {"status": "third_party_feature_error:" + str(exc)[:120], "adapters": {}, "flat": {}}
+
+
+def third_party_feature_profile(path: Path) -> dict[str, object]:
+    """Return bounded third-party measured features for one audio file.
+
+    Third-party APIs improve the measured evidence layer, but they are not the
+    final router and they must not be allowed to hang the sorter.  If an adapter
+    stalls, return an explicit status and let lower-level in-house physics carry
+    the decision for that file.
+    """
+    if str(os.environ.get("AARON_DISABLE_THIRD_PARTY_FEATURES", "")).strip().lower() in {"1", "true", "yes"}:
+        return {
+            "status": "third_party_feature_disabled_by_environment",
+            "adapters": {"librosa": {"status": "disabled_by_environment", "flat": {}}},
+            "flat": {},
+        }
+    timeout_sec = _third_party_timeout_seconds()
+    if timeout_sec <= 0 or not _signals_available_in_current_thread():
+        return _third_party_feature_profile_unbounded(path)
+    old_handler = signal.signal(signal.SIGALRM, _third_party_timeout_handler)
+    signal.setitimer(signal.ITIMER_REAL, float(timeout_sec))
+    try:
+        return _third_party_feature_profile_unbounded(path)
+    except ThirdPartyFeatureTimeout:
+        return {
+            "status": f"third_party_feature_timeout:{timeout_sec:g}s",
+            "adapters": {"librosa": {"status": f"timeout:{timeout_sec:g}s", "flat": {}}},
+            "flat": {},
+        }
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0.0)
+        signal.signal(signal.SIGALRM, old_handler)
 
 
 # ---------------------------------------------------------------------------

@@ -930,6 +930,213 @@ class FamilyClaimArbiter:
             return True
         return bool(percussive_role and anchor >= 0.54 and shape_confidence >= 0.64 and facts.is_short_hit_like)
 
+    @staticmethod
+    def _parent_eligibility_blocks_instruments_for_drum_hit(facts: SharedAudioFacts | None) -> bool:
+        """Return True when lower-level parent eligibility proved a Drums hit lane.
+
+        This accepts the eligibility/voter layer as the source of truth for
+        top-family legality; it prevents later instrument identity releases from
+        undoing a source-name-blind parent decision.
+        """
+        if facts is None or not isinstance(getattr(facts, "evidence", None), dict):
+            return False
+        parent = facts.evidence.get("parent_eligibility_v2", {})
+        if not isinstance(parent, dict):
+            return False
+        if str(parent.get("role_name") or "") not in {
+            "percussive_one_shot",
+            "protected_percussive_one_shot",
+            "low_kick_like_hit",
+        }:
+            return False
+        allowed = parent.get("allowed_top_families", [])
+        if "Drums" not in allowed or "Instruments" in allowed:
+            return False
+        return str(parent.get("broad_folder_path") or "").startswith("Drums/")
+
+    def _facts_support_parent_low_kick_like_hit(self, facts: SharedAudioFacts | None) -> bool:
+        """Return True when lower-level parent eligibility proved a low kick-like one-shot.
+
+        This accepts a lower-level eligibility/claim-producer finding; it is not
+        a broad late instrument override.  It exists because clean low pitched
+        kick/sub hits can otherwise be broadened to Instrument Loops by the
+        instrument identity firewall even after parent eligibility has blocked
+        Instruments.
+        """
+        if facts is None or not isinstance(getattr(facts, "evidence", None), dict):
+            return False
+        parent = facts.evidence.get("parent_eligibility_v2", {})
+        if not isinstance(parent, dict):
+            return False
+        if str(parent.get("role_name") or "") != "low_kick_like_hit":
+            return False
+        allowed = parent.get("allowed_top_families", [])
+        if "Drums" not in allowed or "Instruments" in allowed:
+            return False
+        if facts.is_broken_or_tiny or facts.is_loop_like:
+            return False
+        duration = _feature_number_from_facts(facts, "duration_sec")
+        if duration <= 0.0 or duration > 1.35:
+            return False
+        if self._shape_number(facts, "onset_count") > 4.0:
+            return False
+        if self._shape_number(facts, "low_event_ratio") < 0.72:
+            return False
+        if max(
+            self._measured_role_value(facts, "percussive_one_shot"),
+            self._subpanel_score(facts, "role_one_shot_score"),
+        ) < 0.68:
+            return False
+        if self._shape_number(facts, "temporal_centroid_ratio") > 0.55:
+            return False
+        return True
+
+    def _facts_support_protected_percussive_parent_release(self, facts: SharedAudioFacts | None) -> bool:
+        """Return True when parent eligibility proved a Drums one-shot lane.
+
+        This is intentionally narrower than the general struck-percussion parent
+        invariant.  It is used late in arbitration to keep a measured
+        ``protected_percussive_one_shot`` from being converted into a voice or
+        non-voice Instrument review just because clean pitched resonance confused
+        the brain/physics leaf match.  The predicate remains source-name blind
+        and still refuses true voice shots, clean low tonal instrument hits,
+        loops, and weak/non-material drum evidence.
+        """
+        if facts is None or not isinstance(getattr(facts, "evidence", None), dict):
+            return False
+        parent = facts.evidence.get("parent_eligibility_v2", {})
+        if not isinstance(parent, dict):
+            return False
+        if str(parent.get("role_name") or "") != "protected_percussive_one_shot":
+            return False
+        allowed = parent.get("allowed_top_families", [])
+        if "Drums" not in allowed or "Instruments" in allowed:
+            return False
+        if facts.is_broken_or_tiny:
+            return False
+        duration = _feature_number_from_facts(facts, "duration_sec")
+        if duration <= 0.0 or duration > 1.35:
+            return False
+        shape = _shape_vote_from_facts(facts)
+        short_repeated_candidate = (
+            duration <= 1.10
+            and shape in {"pitched_repetition_phrase", "repeated_phrase_loop", "solo_phrase", "pitched_phrase"}
+            and 4.0 <= self._shape_number(facts, "onset_count") <= 8.0
+        )
+        if facts.is_loop_like and not short_repeated_candidate:
+            return False
+        if self._facts_support_clean_low_tonal_instrument_hit(facts):
+            return False
+        non_drum_voiced_pressure = self._facts_support_non_drum_voiced_phrase_hit(facts)
+        material = max(
+            self._subpanel_score(facts, "compact_struck_tonal_percussion_score"),
+            self._subpanel_score(facts, "hand_drum_membrane_score"),
+            self._subpanel_score(facts, "pitched_metal_percussion_score"),
+            self._subpanel_score(facts, "struck_wood_score"),
+        )
+        onset_percussive = self._subpanel_score(facts, "onset_percussive_onset_score")
+        drum_branch = max(
+            self._subpanel_score(facts, "drum_kick_source_score"),
+            self._subpanel_score(facts, "drum_snare_source_score"),
+            self._subpanel_score(facts, "drum_clap_source_score"),
+            self._subpanel_score(facts, "drum_tom_conga_source_score"),
+            self._subpanel_score(facts, "drum_rim_stick_source_score"),
+            self._subpanel_score(facts, "drum_cymbal_source_score"),
+            self._subpanel_score(facts, "drum_guiro_scrape_source_score"),
+            self._subpanel_score(facts, "drum_metallic_percussion_source_score"),
+            self._subpanel_score(facts, "drum_shaker_tambourine_source_score"),
+            onset_percussive,
+        )
+        voice_like_but_material_tiny_hit = bool(
+            self._facts_support_short_true_voice_one_shot(facts)
+            and duration <= 0.14
+            and material >= 0.76
+            and drum_branch >= 0.40
+            and max(
+                self._subpanel_score(facts, "hand_drum_membrane_score"),
+                self._subpanel_score(facts, "struck_wood_score"),
+            ) >= 0.80
+        )
+        if self._facts_support_short_true_voice_one_shot(facts) and not voice_like_but_material_tiny_hit:
+            return False
+        if non_drum_voiced_pressure and not (
+            self._facts_support_material_struck_drum_one_shot(facts)
+            or (material >= 0.68 and drum_branch >= 0.40)
+        ):
+            return False
+        if (
+            self._facts_support_material_struck_drum_one_shot(facts)
+            and material >= 0.62
+            and drum_branch >= 0.48
+        ):
+            return True
+        strong_material_parent_hit = bool(
+            shape in {"single_hit", "solo_phrase", "hit_with_tail", "ui_blip"}
+            and duration <= 0.55
+            and self._shape_number(facts, "onset_count") <= 2.0
+            and self._shape_number(facts, "attack_rise_time_norm") <= 0.14
+            and self._shape_number(facts, "temporal_centroid_ratio") <= 0.28
+            and material >= 0.68
+            and drum_branch >= 0.40
+            and max(
+                self._subpanel_score(facts, "compact_struck_tonal_percussion_score"),
+                self._subpanel_score(facts, "hand_drum_membrane_score"),
+                self._subpanel_score(facts, "struck_wood_score"),
+            )
+            >= 0.70
+        )
+        noisy_short_parent_hit = bool(
+            shape in {"texture_bed", "noise_texture", "impact_with_tail", "hit_with_tail"}
+            and duration <= 0.55
+            and self._shape_number(facts, "onset_count") <= 3.0
+            and self._subpanel_score(facts, "role_one_shot_score") >= 0.58
+            and self._shape_number(facts, "attack_rise_time_norm") <= 0.04
+            and onset_percussive >= 0.68
+            and material >= 0.58
+            and drum_branch >= 0.52
+        )
+        high_cymbal_texture_parent_hit = bool(
+            shape in {"texture_bed", "noise_texture", "solo_phrase", "hit_with_tail"}
+            and duration <= 0.42
+            and self._shape_number(facts, "onset_count") <= 2.0
+            and self._shape_number(facts, "attack_rise_time_norm") <= 0.16
+            and self._subpanel_score(facts, "drum_cymbal_source_score") >= 0.78
+            and self._subpanel_score(facts, "drum_metallic_percussion_source_score") >= 0.55
+            and self._measured_score(facts, "spectral_flatness_mean") >= 0.38
+            and self._shape_number(facts, "high_event_ratio") >= 0.78
+        )
+        repeated_struck_parent_hit = bool(
+            shape in {"pitched_repetition_phrase", "repeated_phrase_loop", "solo_phrase", "pitched_phrase", "hit_with_tail"}
+            and duration <= 1.10
+            and 4.0 <= self._shape_number(facts, "onset_count") <= 8.0
+            and self._shape_number(facts, "onset_density_hz") >= 4.0
+            and self._shape_number(facts, "attack_rise_time_norm") <= 0.10
+            and self._shape_number(facts, "temporal_centroid_ratio") <= 0.48
+            and (
+                self._measured_score(facts, "spectral_flatness_mean") >= 0.24
+                or (
+                    material >= 0.84
+                    and onset_percussive >= 0.62
+                    and self._shape_number(facts, "low_event_ratio") >= 0.80
+                )
+            )
+            and onset_percussive >= 0.60
+            and material >= 0.50
+            and drum_branch >= 0.34
+            and not (
+                self._measured_score(facts, "physics_subpanel_clean_tone") >= 0.62
+                and self._shape_number(facts, "pitch_confidence") >= 0.62
+                and self._shape_number(facts, "pitched_event_ratio") >= 0.85
+                and material < 0.84
+            )
+        )
+        return (
+            strong_material_parent_hit
+            or noisy_short_parent_hit
+            or high_cymbal_texture_parent_hit
+            or repeated_struck_parent_hit
+        )
+
     def _facts_support_clean_low_tonal_instrument_hit(self, facts: SharedAudioFacts | None) -> bool:
         """Return True when a short low tonal hit is better explained as Bass/Synth.
 
@@ -1002,6 +1209,8 @@ class FamilyClaimArbiter:
     def _facts_support_material_struck_drum_one_shot(self, facts: SharedAudioFacts | None) -> bool:
         """Return True for struck membrane/wood/metal hits with drum corroboration."""
         if facts is None:
+            return False
+        if self._parent_eligibility_blocks_instruments_for_drum_hit(facts):
             return False
         shape = _shape_vote_from_facts(facts)
         voice_panel = max(
@@ -2592,6 +2801,8 @@ class FamilyClaimArbiter:
         duration = _feature_number_from_facts(facts, "duration_sec")
         if duration <= 0.0 or duration > 2.75:
             return False
+        if self._parent_eligibility_blocks_instruments_for_drum_hit(facts):
+            return False
         if self._facts_support_decisive_struck_percussion_parent(facts):
             return False
         # Some real percussion-pack drum hits are very tonal and clean enough
@@ -3005,6 +3216,28 @@ class FamilyClaimArbiter:
             and self._facts_support_clean_bass_loop(facts, winning_claim)
         ):
             return winning_claim
+        if (
+            winning_claim.family == "Instruments"
+            and self._facts_support_protected_percussive_parent_release(facts)
+        ):
+            folder_path = self._measured_struck_percussion_parent_target(facts)
+            return claim_from_folder_path(
+                folder_path=folder_path,
+                source="final_protected_percussive_parent_release",
+                reason=(
+                    "final voice/instrument firewall released a measured protected "
+                    "percussive one-shot back to its Drums parent before weak "
+                    "brain voice or instrument leaf pressure could force review"
+                ),
+                shared=winning_claim.shared_candidates,
+                raw_candidate_score=winning_claim.raw_candidate_score,
+                brain_rank=winning_claim.brain_rank,
+                physics_rank=winning_claim.physics_rank,
+                shared_winner=winning_claim.shared_winner or winning_claim.folder_path,
+                can_override=True,
+                strength=max(0.93, winning_claim.strength),
+                is_real_candidate=winning_claim.is_real_candidate,
+            )
         brain_voice_one_shot = self._brain_voice_one_shot_folder(facts)
         if (
             brain_voice_one_shot
@@ -4108,6 +4341,44 @@ class FamilyClaimArbiter:
             return winning_claim
         if winning_claim.source == "final_measured_branch_loop_broad_bucket":
             return winning_claim
+        if self._facts_support_parent_low_kick_like_hit(facts):
+            target_path = "Drums/Kick Drums/Generic Kick/One Shots"
+            return claim_from_folder_path(
+                folder_path=target_path,
+                source="final_parent_low_kick_like_release",
+                reason=(
+                    "final instrument identity firewall accepted a lower-level "
+                    "low-kick-like parent claim before broad instrument identity "
+                    "repair could steal a short percussive one-shot"
+                ),
+                shared=winning_claim.shared_candidates,
+                raw_candidate_score=winning_claim.raw_candidate_score,
+                brain_rank=winning_claim.brain_rank,
+                physics_rank=winning_claim.physics_rank,
+                shared_winner=target_path,
+                can_override=True,
+                strength=max(0.93, winning_claim.strength),
+                is_real_candidate=winning_claim.is_real_candidate,
+            )
+        if self._facts_support_protected_percussive_parent_release(facts):
+            target_path = self._measured_struck_percussion_parent_target(facts)
+            return claim_from_folder_path(
+                folder_path=target_path,
+                source="final_protected_percussive_parent_release",
+                reason=(
+                    "final instrument identity firewall released a measured protected "
+                    "percussive one-shot back to Drums before broad instrument "
+                    "identity repair could steal it"
+                ),
+                shared=winning_claim.shared_candidates,
+                raw_candidate_score=winning_claim.raw_candidate_score,
+                brain_rank=winning_claim.brain_rank,
+                physics_rank=winning_claim.physics_rank,
+                shared_winner=target_path,
+                can_override=True,
+                strength=max(0.93, winning_claim.strength),
+                is_real_candidate=winning_claim.is_real_candidate,
+            )
         if (
             winning_claim.source in {"final_measured_sax_loop_invariant", "profile_candidate_sax_leaf_claim"}
             and self._measured_score(
@@ -8831,6 +9102,13 @@ class FamilyClaimArbiter:
     ) -> bool:
         if facts is None:
             return False
+        parent = facts.evidence.get("parent_eligibility_v2", {}) if isinstance(getattr(facts, "evidence", None), dict) else {}
+        if isinstance(parent, dict) and str(parent.get("role_name") or "") in {
+            "protected_percussive_one_shot",
+            "percussive_one_shot",
+            "low_kick_like_hit",
+        }:
+            return False
         if self._facts_support_mixed_instrument_loop_sax_decoy(facts, winning_claim):
             return False
         vocal_layer_not_sax = bool(
@@ -9825,6 +10103,53 @@ class FamilyClaimArbiter:
             return raw_claim
         return best_claim
 
+    def _release_weak_review_to_raw_fx_candidate(
+        self,
+        raw_claim: ConsensusClaim,
+        review: ConsensusClaim,
+        facts: SharedAudioFacts | None,
+    ) -> ConsensusClaim | None:
+        """Return raw FX only for explicit callers with FX-motion support.
+
+        v31.168 briefly called this from ``pick_winner`` for all weak review
+        rows.  That was too high-level: stable pitched music conflicts could be
+        hidden by a raw FX candidate.  Keep the helper for narrow regression
+        coverage, but do not use it as a general winner-selection escape hatch.
+        """
+        if facts is None or not review.is_review or raw_claim.family != "FX":
+            return None
+        if review.source not in {
+            "weak_voter_consensus",
+            "measured_shape_conflict_review",
+            "blocked_role_shape_routing_review",
+            "parent_eligibility_review",
+        }:
+            return None
+        if not self._raw_is_specific_candidate(raw_claim):
+            return None
+        if self._facts_support_fx_leaf_pitched_loop_conflict(facts, raw_claim):
+            return None
+        raw_score = self._score_or_default(raw_claim.raw_candidate_score)
+        if raw_score > 28.0:
+            return None
+        close_non_fx = 0
+        close_fx = 0
+        ceiling = raw_score + 6.0
+        for row in raw_claim.shared_candidates or []:
+            top = str(row.get("top_family") or "")
+            score = self._score_or_default(row.get("combined_rank_score"))
+            if score > ceiling:
+                continue
+            if top == "FX":
+                close_fx += 1
+            elif top in {"Instruments", "Drums", "Textures"}:
+                close_non_fx += 1
+        if close_fx >= 2 and close_non_fx == 0:
+            return raw_claim
+        if raw_score <= 12.0 and close_fx >= 1 and close_non_fx <= 1:
+            return raw_claim
+        return None
+
     def _release_weak_review_to_measured_drums(
         self,
         raw_claim: ConsensusClaim,
@@ -10113,6 +10438,8 @@ class FamilyClaimArbiter:
             return None
         blocked.sort(key=lambda claim: (-claim.strength, claim.raw_candidate_score or 9999.0, claim.source))
         strongest = blocked[0]
+        if self._raw_fx_candidate_decisively_beats_blocked_instrument(raw_claim, strongest):
+            return None
         if self._facts_support_measured_transition_fx(facts, raw_claim):
             shape = _shape_vote_from_facts(facts)
             if shape == "transition_riser":
@@ -10221,6 +10548,49 @@ class FamilyClaimArbiter:
             winner=raw_claim,
             strength=max(0.82, strongest.strength),
         )
+
+    def _raw_fx_candidate_decisively_beats_blocked_instrument(
+        self,
+        raw_claim: ConsensusClaim,
+        blocked_claim: ConsensusClaim,
+    ) -> bool:
+        """Return True when a concrete FX raw vote should survive a blocked shortcut.
+
+        This is source-name blind.  It only compares voter candidate evidence.
+        A strong concrete FX leaf should not be turned into review because a
+        later role/shape shortcut guessed a keys/synth/bass/loop identity with
+        much weaker candidate support.
+        """
+        if raw_claim.family != "FX" or blocked_claim.family != "Instruments":
+            return False
+        if not self._raw_is_specific_candidate(raw_claim):
+            return False
+        raw_path = self._norm_claim_path(raw_claim.folder_path or raw_claim.label)
+        if not any(
+            fragment in raw_path
+            for fragment in (
+                "designed noise",
+                "siren",
+                "alarm",
+                "impact",
+                "impacts",
+                "hit",
+                "glitch",
+                "stutter",
+                "blip",
+                "hybrid designed",
+            )
+        ):
+            return False
+        raw_score = self._score_or_default(raw_claim.raw_candidate_score)
+        blocked_score = self._score_or_default(blocked_claim.raw_candidate_score)
+        if raw_score > 12.0:
+            return False
+        # If the blocked claim has no real candidate score, it is only a
+        # role/shape shortcut; do not let it review a strong FX candidate.
+        if blocked_score >= 999.0:
+            return True
+        return bool(raw_score + 8.0 <= blocked_score or raw_score + 2.0 <= blocked_score)
 
     def _facts_support_blocked_fx_release(
         self,
@@ -10349,6 +10719,42 @@ class FamilyClaimArbiter:
         """
         if raw_claim.family in {"Drums", "_TO_REVIEW"}:
             return None
+        if self._facts_support_protected_percussive_parent_release(facts):
+            target_path = self._measured_struck_percussion_parent_target(facts)
+            return claim_from_folder_path(
+                folder_path=target_path,
+                source="final_protected_percussive_parent_release",
+                reason=(
+                    "measured protected percussive one-shot parent evidence kept a "
+                    f"non-drum winner out of Instruments/FX: raw={raw_claim.folder_path}"
+                ),
+                shared=raw_claim.shared_candidates,
+                raw_candidate_score=raw_claim.raw_candidate_score,
+                brain_rank=raw_claim.brain_rank,
+                physics_rank=raw_claim.physics_rank,
+                shared_winner=target_path,
+                can_override=True,
+                strength=max(0.92, raw_claim.strength),
+                is_real_candidate=True,
+            )
+        if self._facts_support_parent_low_kick_like_hit(facts):
+            target_path = "Drums/Kick Drums/Generic Kick/One Shots"
+            return claim_from_folder_path(
+                folder_path=target_path,
+                source="final_parent_low_kick_like_release",
+                reason=(
+                    "lower-level parent eligibility proved a short low percussive "
+                    f"one-shot, so a non-drum winner cannot become an Instrument/FX loop: raw={raw_claim.folder_path}"
+                ),
+                shared=raw_claim.shared_candidates,
+                raw_candidate_score=raw_claim.raw_candidate_score,
+                brain_rank=raw_claim.brain_rank,
+                physics_rank=raw_claim.physics_rank,
+                shared_winner=target_path,
+                can_override=True,
+                strength=max(0.92, raw_claim.strength),
+                is_real_candidate=True,
+            )
         best_drum = self._best_drum_one_shot_candidate(raw_claim)
         if not self._facts_support_percussive_one_shot_firewall(raw_claim, facts, best_drum):
             return None
@@ -10751,6 +11157,15 @@ class FamilyClaimArbiter:
             "stutter",
             "blip",
             "hybrid designed",
+            "riser",
+            "build",
+            "drop",
+            "downlifter",
+            "whoosh",
+            "sweep",
+            "reverse",
+            "reverses",
+            "tail",
         )
         if not any(fragment in raw_path for fragment in concrete_fx_fragments):
             return False
@@ -10824,9 +11239,32 @@ class FamilyClaimArbiter:
             return False
         if self._facts_support_confirmed_tonal_alert_siren(facts):
             return False
-        minimum_strength = 0.90 if claim.source == "final_false_voice_loop_broad_instrument_invariant" else 0.96
-        if claim.source != "final_false_voice_loop_broad_instrument_invariant":
+        allowed_sources = {
+            "candidate_true_bucket_rescue",
+            "parent_eligibility_broad_bucket",
+            "final_shape_review_broad_instrument_loop_invariant",
+            "final_fx_leaf_pitched_loop_broad_instrument_invariant",
+            "final_false_voice_loop_broad_instrument_invariant",
+        }
+        if claim.source not in allowed_sources:
             return False
+        raw_path = self._norm_claim_path(raw_claim.folder_path or raw_claim.label)
+        transition_like_raw_fx = any(
+            token in raw_path
+            for token in (
+                "riser",
+                "build",
+                "drop",
+                "downlifter",
+                "whoosh",
+                "sweep",
+                "reverse",
+                "transition",
+            )
+        )
+        if claim.source != "final_false_voice_loop_broad_instrument_invariant" and not transition_like_raw_fx:
+            return False
+        minimum_strength = 0.90 if claim.source == "final_false_voice_loop_broad_instrument_invariant" else 0.84
         if claim.strength < minimum_strength:
             return False
         roles = facts.evidence.get("measured_roles", {})
@@ -10841,9 +11279,28 @@ class FamilyClaimArbiter:
         )
         shape = _shape_vote_from_facts(facts)
         shape_confidence = _shape_confidence_from_facts(facts)
-        if shape not in {"pitched_phrase", "sustained_pad", "bass_phrase", "vocal_phrase"}:
+        transition_fx_pressure = max(
+            self._subpanel_score(facts, "fx_transition_authority_score"),
+            self._subpanel_score(facts, "fx_riser_build_score"),
+            self._subpanel_score(facts, "fx_drop_downlifter_score"),
+            self._subpanel_score(facts, "fx_whoosh_sweep_score"),
+            self._subpanel_score(facts, "fx_reverse_score"),
+            self._subpanel_score(facts, "fx_motion_score"),
+        )
+        if self._facts_support_measured_transition_fx(facts, raw_claim) or transition_fx_pressure >= 0.42:
             return False
-        if shape_confidence < 0.92 or pitched_strength < 0.90:
+
+        pitched_shape = shape in {"pitched_phrase", "sustained_pad", "bass_phrase", "vocal_phrase"}
+        repeated_tonal_body = bool(
+            shape in {"hybrid_fx_motion", "pitched_repetition_phrase", "repeated_phrase_loop", "mixed_instrument_loop"}
+            and max(
+                _shape_metric_from_facts(facts, "sustained_tonal_frame_ratio"),
+                _shape_metric_from_facts(facts, "true_repetition_score"),
+            ) >= 0.84
+        )
+        if not (pitched_shape or repeated_tonal_body):
+            return False
+        if pitched_strength < 0.84 and not (shape_confidence >= 0.90 and pitched_shape):
             return False
         percussive_ratio = max(
             role_strength(roles, "percussive_drum_loop"),
@@ -10853,7 +11310,8 @@ class FamilyClaimArbiter:
         )
         if percussive_ratio >= 0.35:
             return False
-        if _shape_metric_from_facts(facts, "spectral_flatness_mean") >= 0.35:
+        flatness = _shape_metric_from_facts(facts, "spectral_flatness_mean")
+        if flatness >= 0.35:
             return False
         return True
 
@@ -10887,6 +11345,8 @@ class FamilyClaimArbiter:
                 return False
             return bool(candidate_gap <= 2.0 and claim.strength >= 0.86)
         if claim.family == "Instruments" and claim.sub_family == "Bass Loops":
+            if self._raw_concrete_fx_blocks_bass_loop_parent(raw_claim, claim, facts):
+                return False
             # Bass-loop claims are broad structural/role parent claims.  They may
             # correct a false Drum Loop or FX loop only when a real Bass candidate
             # is at least close, and usually better than the raw winner.  Do not
@@ -10949,7 +11409,10 @@ class FamilyClaimArbiter:
         if self._facts_support_percussion_one_shot_claim(raw_claim, claim, facts):
             return True
         if (
-            claim.source == "final_decisive_struck_percussion_parent_invariant"
+            claim.source in {
+                "final_decisive_struck_percussion_parent_invariant",
+                "final_measured_protected_percussive_parent_claim",
+            }
             and claim.family == "Drums"
         ):
             # This claim is emitted only by MeasuredDrumStructureClaimProducer
@@ -10958,6 +11421,8 @@ class FamilyClaimArbiter:
             # the same predicate; otherwise obvious percussion can fall back to
             # review after the lower voter already proved the drum parent.
             return True
+        if self._raw_concrete_fx_blocks_bass_loop_parent(raw_claim, claim, facts):
+            return False
         if self._facts_support_bass_loop_parent_claim(claim, facts):
             return True
         if (
@@ -12279,6 +12744,8 @@ class FamilyClaimArbiter:
             return False
         if claim.is_review:
             return True
+        if claim.family == "Instruments" and self._parent_eligibility_blocks_instruments_for_drum_hit(facts):
+            return False
         # Measured true-bucket corrections are not old identity shortcuts.
         # Let their own safety rules evaluate before the identity firewall.
         if self._noncandidate_true_bucket_claim_is_safe(raw_claim, claim, facts):
@@ -12290,7 +12757,10 @@ class FamilyClaimArbiter:
         if self._facts_support_percussion_one_shot_claim(raw_claim, claim, facts):
             return True
         if (
-            claim.source == "final_decisive_struck_percussion_parent_invariant"
+            claim.source in {
+                "final_decisive_struck_percussion_parent_invariant",
+                "final_measured_protected_percussive_parent_claim",
+            }
             and claim.family == "Drums"
         ):
             # This claim is emitted only by MeasuredDrumStructureClaimProducer
@@ -13023,6 +13493,92 @@ class FamilyClaimArbiter:
             )
         )
 
+
+    @staticmethod
+    def _raw_concrete_fx_blocks_bass_loop_parent(
+        raw_claim: ConsensusClaim,
+        claim: ConsensusClaim,
+        facts: SharedAudioFacts | None,
+    ) -> bool:
+        """Return True when concrete FX evidence should not broaden to Bass Loops.
+
+        Bass-loop parent claims are useful for real low musical loops, but they
+        are also the main false destination for low repeated designed FX.  If
+        raw consensus already selected concrete FX and the shape layer contains
+        meaningful FX-motion/impact/glitch support, block the Bass parent claim
+        and let the concrete FX raw winner or review logic handle the conflict.
+        """
+        if raw_claim.family != "FX":
+            return False
+        if claim.family != "Instruments" or claim.sub_family != "Bass Loops":
+            return False
+        raw_path = str(raw_claim.folder_path or raw_claim.label or "").lower().replace("\\", "/")
+        concrete_fx_fragments = (
+            "impact",
+            "impacts",
+            "hit",
+            "whoosh",
+            "sweep",
+            "riser",
+            "build",
+            "drop",
+            "downlifter",
+            "reverse",
+            "glitch",
+            "stutter",
+            "hybrid designed",
+            "designed noise",
+            "structural and transitional",
+        )
+        if not any(fragment in raw_path for fragment in concrete_fx_fragments):
+            return False
+        shape_vote = {}
+        if facts is not None and isinstance(getattr(facts, "evidence", None), dict):
+            candidate = facts.evidence.get("shape_vote", {})
+            if isinstance(candidate, dict):
+                shape_vote = candidate
+        shape_scores_raw = shape_vote.get("shape_scores", ()) if isinstance(shape_vote, dict) else ()
+        shape_scores: dict[str, float] = {}
+        if isinstance(shape_scores_raw, (list, tuple)):
+            for item in shape_scores_raw:
+                if isinstance(item, (list, tuple)) and len(item) >= 2:
+                    try:
+                        shape_scores[str(item[0])] = float(item[1])
+                    except Exception:
+                        pass
+        primary_shape = str(shape_vote.get("primary_shape") or "") if isinstance(shape_vote, dict) else ""
+        fx_shape_score = max(
+            shape_scores.get("hybrid_fx_motion", 0.0),
+            shape_scores.get("impact_with_tail", 0.0),
+            shape_scores.get("hit_with_tail", 0.0),
+            shape_scores.get("glitch_stutter", 0.0),
+            shape_scores.get("transition_riser", 0.0),
+            shape_scores.get("transition_drop", 0.0),
+            shape_scores.get("reverse_swell", 0.0),
+            shape_scores.get("whoosh_sweep", 0.0),
+            0.64
+            if primary_shape
+            in {
+                "hybrid_fx_motion",
+                "impact_with_tail",
+                "hit_with_tail",
+                "glitch_stutter",
+                "transition_riser",
+                "transition_drop",
+                "reverse_swell",
+                "whoosh_sweep",
+            }
+            else 0.0,
+        )
+        if fx_shape_score >= 0.55:
+            return True
+        try:
+            raw_score = float(raw_claim.raw_candidate_score if raw_claim.raw_candidate_score is not None else 9999.0)
+            claim_score = float(claim.raw_candidate_score if claim.raw_candidate_score is not None else 9999.0)
+        except Exception:
+            return False
+        return bool(raw_score + 3.0 <= claim_score)
+
     @staticmethod
     def _raw_concrete_fx_has_lane_confirmation(
         raw_claim: ConsensusClaim,
@@ -13253,6 +13809,18 @@ class FamilyClaimArbiter:
             "glitch",
             "stutter",
             "hybrid designed",
+            "impact",
+            "impacts",
+            "hit",
+            "riser",
+            "build",
+            "drop",
+            "downlifter",
+            "whoosh",
+            "sweep",
+            "reverse",
+            "reverses",
+            "tail",
         )
         if not any(fragment in path for fragment in concrete_fx_fragments):
             return False

@@ -269,14 +269,31 @@ def build_one_panel(
 
 
 def flatten_fact_values(facts: SharedAudioFacts | None) -> dict[str, float]:
-    """Flatten numeric evidence values from SharedAudioFacts."""
-    output: dict[str, float] = {}
+    """Flatten numeric evidence values from SharedAudioFacts.
+
+    This can be called many times while the arbiter compares candidate claims for
+    one file.  The facts object is immutable for the duration of that decision,
+    so cache the flattened numeric map on the facts instance instead of walking
+    large nested diagnostic dictionaries repeatedly.
+    """
     if facts is None:
-        return output
+        return {}
+    cached = getattr(facts, "_voter_calibration_flat_values_cache", None)
+    if isinstance(cached, dict):
+        return cached
+    output: dict[str, float] = {}
     for key, value in getattr(facts, "feature_values_by_name", {}).items():
         add_numeric(output, str(key), value)
     for key, value in getattr(facts, "evidence", {}).items():
+        # Private/cache entries are diagnostics for Python runtime, not audio
+        # evidence.  Do not recursively flatten them into panel facts.
+        if str(key).startswith("_"):
+            continue
         flatten_value(output, str(key), value)
+    try:
+        object.__setattr__(facts, "_voter_calibration_flat_values_cache", output)
+    except Exception:
+        pass
     return output
 
 

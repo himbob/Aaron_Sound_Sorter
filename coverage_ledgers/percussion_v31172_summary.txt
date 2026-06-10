@@ -1,0 +1,20 @@
+Aaron Sound Sorter v31.172 percussion sweep summary
+
+ZIP: one_shot_percussive_sounds.zip
+New screened rows: 200
+Range: offsets 150,155,160,165,170,175,180,185; per-folder 5; ordinals 151-190 per source folder
+Previous screened total: 594 / 10,254
+Current screened total: 794 / 10,254 = 7.7433%
+
+Corrected final counts:
+  Drums: 194
+  FX: 0
+  _TO_REVIEW/Broken Or Tiny: 6
+  Instruments failures: 0
+  Non-broken bad review: 0
+
+Notes:
+- Bulk screening used third-party features disabled due sandbox librosa/numba hang behavior.
+- Every bad/borderline row was rerun individually with third-party enabled before diagnosis or correction.
+- 15582.wav and 439835.wav were real failures fixed by low-level eligibility / measured drum structure patches.
+- Six rows reran as Broken Or Tiny with third-party enabled and are treated as acceptable review, not sorter failures.

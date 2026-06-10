@@ -262,11 +262,30 @@ class ShortHitGuardMixin:
             and _shape_metric_from_facts(context.facts, "temporal_centroid_ratio") <= 0.12
         )
         decisive_named_drum = max(tom, snare, rim, cymbal, metallic, guiro) >= 0.68
+        parent = (
+            context.facts.evidence.get("parent_eligibility_v2", {})
+            if isinstance(getattr(context.facts, "evidence", None), dict)
+            else {}
+        )
+        parent_protected_low_membrane_hit = bool(
+            isinstance(parent, dict)
+            and str(parent.get("role_name") or "") == "protected_percussive_one_shot"
+            and "Drums" in (parent.get("allowed_top_families", []) or [])
+            and "Instruments" not in (parent.get("allowed_top_families", []) or [])
+            and event_count <= 2.0
+            and hand_drum >= 0.76
+            and compact_struck >= 0.50
+            and max(tom, snare, rim, cymbal, metallic, guiro) >= 0.34
+            and _shape_metric_from_facts(context.facts, "low_event_ratio") >= 0.72
+            and _shape_metric_from_facts(context.facts, "attack_rise_time_norm") <= 0.20
+            and _shape_metric_from_facts(context.facts, "temporal_centroid_ratio") <= 0.35
+        )
         return not (
             decisive_struck_material
             or resonant_hand_drum_hit
             or resonant_struck_wood_hit
             or decisive_named_drum
+            or parent_protected_low_membrane_hit
         )
 
     @staticmethod

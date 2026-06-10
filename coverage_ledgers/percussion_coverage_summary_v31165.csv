@@ -1,0 +1,15 @@
+metric,value
+previous_trusted_v31164_files,125
+new_current_patch_verified_files,19
+cumulative_trusted_files,144
+percussion_zip_total_audio_files,10254
+cumulative_percent,1.4043
+new_drums,19
+new_fx,0
+new_instruments_failures,0
+new_review_failures,0
+new_verified_one_shot_percussive_sounds/1,5
+new_verified_one_shot_percussive_sounds/2,5
+new_verified_one_shot_percussive_sounds/3,2
+new_verified_one_shot_percussive_sounds/4,2
+new_verified_one_shot_percussive_sounds/5,5

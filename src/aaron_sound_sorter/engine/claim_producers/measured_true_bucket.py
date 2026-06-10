@@ -69,7 +69,7 @@ class MeasuredTrueBucketClaimProducer(
             self.early_adjudicator.adjudicate(raw, eligibility, measured_role, shape, shape_conf, facts),
             self._maybe_keep_stable_drum_loop(raw, raw_path),
             self._maybe_keep_pitched_instrument_over_voice(raw, eligibility, raw_path, measured_role),
-            self._maybe_rescue_bass_loop(raw, eligibility, raw_path, measured_role, shape, shape_conf),
+            self._maybe_rescue_bass_loop(raw, eligibility, raw_path, measured_role, shape, shape_conf, facts),
             self._maybe_rescue_concrete_fx_over_generic_instrument(raw, raw_path),
             self._maybe_rescue_tonal_alert_to_instrument(raw, eligibility, facts),
             self._maybe_keep_pitched_percussion_as_instrument(raw, eligibility, raw_path, measured_role),
@@ -97,6 +97,13 @@ class MeasuredTrueBucketClaimProducer(
         and uses the measured physics layer, not producer filenames.
         """
         if facts is None or not isinstance(getattr(facts, "evidence", None), dict):
+            return None
+        parent = facts.evidence.get("parent_eligibility_v2", {})
+        if isinstance(parent, dict) and str(parent.get("role_name") or "") in {
+            "protected_percussive_one_shot",
+            "percussive_one_shot",
+            "low_kick_like_hit",
+        }:
             return None
         layer = facts.evidence.get("physics_layer_decision", {})
         if not isinstance(layer, dict):

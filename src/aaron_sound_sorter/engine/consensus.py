@@ -41,6 +41,83 @@ def is_voice_phrase_shape(shape_name: str) -> bool:
     return str(shape_name or "") in VOICE_PHRASE_SHAPES
 
 
+
+
+def _fact_number(facts: SharedAudioFacts, key: str) -> float:
+    """Read a numeric measured fact from evidence or feature_values_by_name."""
+    evidence = facts.evidence if isinstance(getattr(facts, "evidence", None), dict) else {}
+    for source in (evidence, getattr(facts, "feature_values_by_name", {}) or {}):
+        if isinstance(source, dict) and key in source:
+            try:
+                return float(source.get(key) or 0.0)
+            except Exception:
+                return 0.0
+    return 0.0
+
+
+def _subpanel_number(facts: SharedAudioFacts, key: str) -> float:
+    evidence = facts.evidence if isinstance(getattr(facts, "evidence", None), dict) else {}
+    panels = evidence.get("physics_subpanels", {}) if isinstance(evidence, dict) else {}
+    flat = panels.get("flat", {}) if isinstance(panels, dict) else {}
+    try:
+        return float(flat.get(key, 0.0) or 0.0) if isinstance(flat, dict) else 0.0
+    except Exception:
+        return 0.0
+
+
+def _shape_texture_conflict_is_really_short_percussion(
+    *,
+    facts: SharedAudioFacts,
+    winner: dict[str, Any],
+    primary_shape: str,
+    confidence: float,
+) -> bool:
+    """Return True when ShapeVoter's texture label should not steal from Drums.
+
+    Some very short cymbal/guiro/metal hits have a noisy tail and get a
+    ``texture_bed``/``noise_texture`` primary shape.  If measured role and
+    drum-material panels already say short percussion, ShapeVoter should stand
+    down instead of emitting an FX/Textural shape-sanity claim.
+    """
+    if str(winner.get("top_family", "")) != "Drums":
+        return False
+    if primary_shape not in {"texture_bed", "noise_texture"}:
+        return False
+    if confidence < 0.82:
+        return False
+    evidence = facts.evidence if isinstance(getattr(facts, "evidence", None), dict) else {}
+    roles = evidence.get("measured_roles", {}) if isinstance(evidence, dict) else {}
+    percussive = max(
+        _role_value(roles if isinstance(roles, dict) else {}, "percussive_one_shot"),
+        _role_value(roles if isinstance(roles, dict) else {}, "protected_percussive_one_shot"),
+        _role_value(roles if isinstance(roles, dict) else {}, "low_kick_like_hit"),
+    )
+    duration = _fact_number(facts, "duration_sec")
+    events = max(_fact_number(facts, "event_count_estimate"), _fact_number(facts, "onset_count"))
+    attack = _fact_number(facts, "attack_rise_time_norm")
+    temporal = _fact_number(facts, "temporal_centroid_ratio")
+    compact = _subpanel_number(facts, "compact_struck_tonal_percussion_score")
+    drum_branch = max(
+        _subpanel_number(facts, "drum_hit_score"),
+        _subpanel_number(facts, "drum_cymbal_source_score"),
+        _subpanel_number(facts, "drum_guiro_scrape_source_score"),
+        _subpanel_number(facts, "drum_metallic_percussion_source_score"),
+        _subpanel_number(facts, "drum_kick_source_score"),
+        _subpanel_number(facts, "drum_snare_source_score"),
+        _subpanel_number(facts, "drum_clap_source_score"),
+        _subpanel_number(facts, "drum_tom_conga_source_score"),
+        _subpanel_number(facts, "drum_rim_stick_source_score"),
+    )
+    return bool(
+        percussive >= 0.72
+        and 0.0 < duration <= 0.65
+        and 0.0 < events <= 3.0
+        and attack <= 0.14
+        and temporal <= 0.30
+        and compact >= 0.62
+        and drum_branch >= 0.58
+    )
+
 def _measured_voice_source_strength(facts: SharedAudioFacts) -> float:
     """Return low-level Human/Voice source strength without using filenames."""
     evidence = facts.evidence if isinstance(facts.evidence, dict) else {}
@@ -304,6 +381,13 @@ class ConsensusRunner:
             return None
         compatible_tops = shape_compatible_tops(primary)
         if not compatible_tops:
+            return None
+        if _shape_texture_conflict_is_really_short_percussion(
+            facts=facts,
+            winner=winner,
+            primary_shape=primary,
+            confidence=confidence,
+        ):
             return None
 
         if is_voice_phrase_shape(primary) and confidence >= 0.75:
