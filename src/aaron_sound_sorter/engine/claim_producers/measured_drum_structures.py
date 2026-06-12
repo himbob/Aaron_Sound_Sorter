@@ -167,7 +167,11 @@ class MeasuredDrumStructureClaimProducer:
             and kick_score >= 0.58
             and sub_hit >= 0.58
         )
-        parent = facts.evidence.get("parent_eligibility_v2", {}) if isinstance(getattr(facts, "evidence", None), dict) else {}
+        parent = (
+            facts.evidence.get("parent_eligibility_v2", {})
+            if isinstance(getattr(facts, "evidence", None), dict)
+            else {}
+        )
         parent_low_kick_hit = bool(
             isinstance(parent, dict)
             and parent.get("role_name") == "low_kick_like_hit"
@@ -177,7 +181,8 @@ class MeasuredDrumStructureClaimProducer:
             and max(
                 self._role_value(facts, "percussive_one_shot"),
                 one_shot,
-            ) >= 0.68
+            )
+            >= 0.68
         )
         kick_candidate = self._facts_have_internal_candidate(
             facts,
@@ -219,7 +224,6 @@ class MeasuredDrumStructureClaimProducer:
             strength=max(0.94, raw.strength),
             is_real_candidate=True,
         )
-
 
     def _protected_percussive_parent_claim(self, context: DecisionContext) -> ConsensusClaim | None:
         """Emit parent-protected percussion before blocked-role review can fire.
@@ -356,11 +360,13 @@ class MeasuredDrumStructureClaimProducer:
                 self._subpanel_score(facts, "drum_cymbal_source_score"),
                 self._subpanel_score(facts, "drum_guiro_scrape_source_score"),
                 self._subpanel_score(facts, "drum_metallic_percussion_source_score"),
-            ) >= 0.73
+            )
+            >= 0.73
             and max(
                 self._subpanel_score(facts, "woodwind_sax_score"),
                 self._subpanel_score(facts, "reed_wind_score"),
-            ) < 0.62
+            )
+            < 0.62
         )
         bright_metallic_voice_decoy_parent_hit = bool(
             shape in {"texture_bed", "noise_texture", "hit_with_tail", "echo_tail_hit", "solo_phrase"}
@@ -376,12 +382,14 @@ class MeasuredDrumStructureClaimProducer:
                 self._subpanel_score(facts, "drum_cymbal_source_score"),
                 self._subpanel_score(facts, "drum_guiro_scrape_source_score"),
                 self._subpanel_score(facts, "drum_metallic_percussion_source_score"),
-            ) >= 0.79
+            )
+            >= 0.79
             and max(
                 self._subpanel_score(facts, "pitched_metal_percussion_score"),
                 self._subpanel_score(facts, "struck_wood_score"),
                 self._subpanel_score(facts, "hand_drum_membrane_score"),
-            ) >= 0.62
+            )
+            >= 0.62
         )
         normal_short_hit = bool(
             shape not in {"texture_bed", "noise_texture"}
@@ -404,7 +412,8 @@ class MeasuredDrumStructureClaimProducer:
                 self._subpanel_score(facts, "human_spoken_voice_score"),
                 self._subpanel_score(facts, "human_breath_mouth_score"),
                 self._subpanel_score(facts, "voice_score"),
-            ) <= 0.68
+            )
+            <= 0.68
         )
         compact_struck_parent_hit = bool(
             shape in {"hit_with_tail", "echo_tail_hit", "single_hit"}
@@ -415,12 +424,14 @@ class MeasuredDrumStructureClaimProducer:
                 self._subpanel_score(facts, "struck_wood_score"),
                 self._subpanel_score(facts, "hand_drum_membrane_score"),
                 self._subpanel_score(facts, "pitched_metal_percussion_score"),
-            ) >= 0.62
+            )
+            >= 0.62
             and self._subpanel_score(facts, "onset_percussive_onset_score") >= 0.72
             and max(
                 _feature_number_from_facts(facts, "role_one_shot_score"),
                 self._subpanel_score(facts, "role_one_shot_score"),
-            ) >= 0.90
+            )
+            >= 0.90
             and self._role_value(facts, "percussive_one_shot") >= 0.80
             and self._role_value(facts, "voiced_one_shot") < 0.68
             and self._role_value(facts, "vocal_music_phrase") <= 0.05
@@ -436,10 +447,7 @@ class MeasuredDrumStructureClaimProducer:
             or compact_struck_parent_hit
         )
 
-
-    def _facts_support_parent_protected_bright_metallic_voice_decoy(
-        self, facts: SharedAudioFacts | None
-    ) -> bool:
+    def _facts_support_parent_protected_bright_metallic_voice_decoy(self, facts: SharedAudioFacts | None) -> bool:
         """True when voice/formant panels are decoys on a bright metallic percussion hit."""
         if facts is None or not isinstance(getattr(facts, "evidence", None), dict):
             return False
@@ -466,17 +474,17 @@ class MeasuredDrumStructureClaimProducer:
                 self._subpanel_score(facts, "drum_cymbal_source_score"),
                 self._subpanel_score(facts, "drum_guiro_scrape_source_score"),
                 self._subpanel_score(facts, "drum_metallic_percussion_source_score"),
-            ) >= 0.79
+            )
+            >= 0.79
             and max(
                 self._subpanel_score(facts, "pitched_metal_percussion_score"),
                 self._subpanel_score(facts, "struck_wood_score"),
                 self._subpanel_score(facts, "hand_drum_membrane_score"),
-            ) >= 0.62
+            )
+            >= 0.62
         )
 
-    def _facts_support_parent_protected_compact_struck_voice_decoy(
-        self, facts: SharedAudioFacts | None
-    ) -> bool:
+    def _facts_support_parent_protected_compact_struck_voice_decoy(self, facts: SharedAudioFacts | None) -> bool:
         """True when voice-like panels are decoys on a compact struck parent hit."""
         if facts is None or not isinstance(getattr(facts, "evidence", None), dict):
             return False
@@ -485,18 +493,25 @@ class MeasuredDrumStructureClaimProducer:
             return False
         if "Drums" not in parent.get("allowed_top_families", []):
             return False
-        if "Voice" not in parent.get("blocked_path_fragments", []) and "Human" not in parent.get("blocked_path_fragments", []):
+        if "Voice" not in parent.get("blocked_path_fragments", []) and "Human" not in parent.get(
+            "blocked_path_fragments", []
+        ):
             return False
         return bool(
             _feature_number_from_facts(facts, "duration_sec") <= 0.30
-            and max(_shape_metric_from_facts(facts, "onset_count"), _feature_number_from_facts(facts, "event_count_estimate")) <= 1.0
+            and max(
+                _shape_metric_from_facts(facts, "onset_count"),
+                _feature_number_from_facts(facts, "event_count_estimate"),
+            )
+            <= 1.0
             and _shape_vote_from_facts(facts) in {"hit_with_tail", "echo_tail_hit", "single_hit"}
             and self._subpanel_score(facts, "compact_struck_tonal_percussion_score") >= 0.78
             and max(
                 self._subpanel_score(facts, "struck_wood_score"),
                 self._subpanel_score(facts, "hand_drum_membrane_score"),
                 self._subpanel_score(facts, "pitched_metal_percussion_score"),
-            ) >= 0.62
+            )
+            >= 0.62
             and self._subpanel_score(facts, "onset_percussive_onset_score") >= 0.72
             and self._role_value(facts, "percussive_one_shot") >= 0.80
             and self._role_value(facts, "voiced_one_shot") < 0.68
@@ -681,19 +696,22 @@ class MeasuredDrumStructureClaimProducer:
         short_rhythmic_struck_phrase = bool(
             duration <= 1.25
             and event_count <= 8.0
-            and shape in {"pitched_repetition_phrase", "repeated_phrase_loop", "beat_loop", "bass_phrase", "solo_phrase"}
+            and shape
+            in {"pitched_repetition_phrase", "repeated_phrase_loop", "beat_loop", "bass_phrase", "solo_phrase"}
             and onset_percussive >= 0.70
             and max(
                 self._subpanel_score(facts, "rhythmic_break_loop_score"),
                 self._shape_number(facts, "true_repetition_score"),
-            ) >= 0.42
+            )
+            >= 0.42
             and max(struck_wood, compact_struck) >= 0.62
             and self._shape_number(facts, "low_event_ratio") >= 0.68
             and self._shape_number(facts, "attack_rise_time_norm") <= 0.03
             and voice_body <= 0.68
         )
         shape_hit = bool(
-            shape in {
+            shape
+            in {
                 "single_hit",
                 "hit_with_tail",
                 "echo_tail_hit",
@@ -704,12 +722,7 @@ class MeasuredDrumStructureClaimProducer:
             }
             or (shape == "pitched_phrase" and struck_percussion_body and event_count <= 6.0)
             or (shape == "bass_phrase" and compact_material_hit and duration <= 1.50 and event_count <= 8.0)
-            or (
-                shape == "ui_blip"
-                and compact_struck >= 0.82
-                and struck_material >= 0.80
-                and drum_branch >= 0.54
-            )
+            or (shape == "ui_blip" and compact_struck >= 0.82 and struck_material >= 0.80 and drum_branch >= 0.54)
         )
         return bool(
             shape_hit

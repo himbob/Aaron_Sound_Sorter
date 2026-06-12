@@ -4,6 +4,7 @@
 Runs one neutralized audio sample per external `timeout` process so decoder or
 third-party DSP hangs cannot stop the sweep. Source paths are kept only in CSV.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -53,16 +54,21 @@ def classify_with_external_timeout(neutral: str, seconds: int, third_party_timeo
     else:
         env.pop("AARON_DISABLE_THIRD_PARTY_FEATURES", None)
     cmd = [
-        "/usr/bin/timeout", "-k", "2s", f"{max(1, int(seconds))}s",
-        sys.executable, str(Path(base.__file__).resolve()), "--classify-one", neutral,
+        "/usr/bin/timeout",
+        "-k",
+        "2s",
+        f"{max(1, int(seconds))}s",
+        sys.executable,
+        str(Path(base.__file__).resolve()),
+        "--classify-one",
+        neutral,
     ]
     t0 = time.time()
     proc = subprocess.run(
         cmd,
         cwd=str(PROJECT),
         env=env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        capture_output=True,
         text=True,
     )
     elapsed = round(time.time() - t0, 2)
@@ -122,7 +128,10 @@ def main() -> int:
             rec.update(out)
             writer.writerow(rec)
             fh.flush()
-            print(f"{seq:04d} g{row['group']} ord={row['ordinal']} {Path(str(row['member'])).name:50s} -> {rec.get('path','')} ok={rec.get('ok_broad')} err={rec.get('error','')} sec={rec.get('seconds')}", flush=True)
+            print(
+                f"{seq:04d} g{row['group']} ord={row['ordinal']} {Path(str(row['member'])).name:50s} -> {rec.get('path', '')} ok={rec.get('ok_broad')} err={rec.get('error', '')} sec={rec.get('seconds')}",
+                flush=True,
+            )
             count += 1
     base.summarize(args.results)
     return 0

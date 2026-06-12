@@ -350,17 +350,33 @@ class PlacementDepthDecider:
         shape = evidence.get("shape_vote", {}) if isinstance(evidence.get("shape_vote", {}), dict) else {}
 
         duration = _number(evidence.get("duration_sec"), facts.feature_values_by_name.get("duration_sec", 0.0))
-        events = max(_number(evidence.get("event_count_estimate")), _number(evidence.get("onset_count")), _number(shape.get("onset_count")))
-        percussive = max(_number(roles.get("percussive_one_shot")), _number(roles.get("low_kick_like_hit")), _number(role_evidence.get("low_pitched_hit_raw")))
+        events = max(
+            _number(evidence.get("event_count_estimate")),
+            _number(evidence.get("onset_count")),
+            _number(shape.get("onset_count")),
+        )
+        percussive = max(
+            _number(roles.get("percussive_one_shot")),
+            _number(roles.get("low_kick_like_hit")),
+            _number(role_evidence.get("low_pitched_hit_raw")),
+        )
         bass_loop = _number(roles.get("bass_loop"))
         pitched_loop = _number(roles.get("pitched_music_loop"))
         low_total = _number(role_evidence.get("low_total"))
         if low_total <= 0.0:
-            low_total = _number(facts.feature_values_by_name.get("sub_bass_ratio_lt_150hz")) + _number(facts.feature_values_by_name.get("bass_ratio_150_500hz"))
+            low_total = _number(facts.feature_values_by_name.get("sub_bass_ratio_lt_150hz")) + _number(
+                facts.feature_values_by_name.get("bass_ratio_150_500hz")
+            )
         low_event = _number(shape.get("low_event_ratio"), _number(facts.feature_values_by_name.get("low_event_ratio")))
-        high_event = _number(shape.get("high_event_ratio"), _number(facts.feature_values_by_name.get("high_event_ratio")))
-        pitch_conf = _number(role_evidence.get("pitch_confidence"), _number(facts.feature_values_by_name.get("pitch_confidence")))
-        f0_voiced = _number(role_evidence.get("f0_voiced_ratio"), _number(facts.feature_values_by_name.get("f0_voiced_ratio")))
+        high_event = _number(
+            shape.get("high_event_ratio"), _number(facts.feature_values_by_name.get("high_event_ratio"))
+        )
+        pitch_conf = _number(
+            role_evidence.get("pitch_confidence"), _number(facts.feature_values_by_name.get("pitch_confidence"))
+        )
+        f0_voiced = _number(
+            role_evidence.get("f0_voiced_ratio"), _number(facts.feature_values_by_name.get("f0_voiced_ratio"))
+        )
         attack = _number(role_evidence.get("attack_rise_time_norm"), _number(shape.get("attack_rise_time_norm")))
         temporal = _number(role_evidence.get("temporal_centroid_ratio"), _number(shape.get("temporal_centroid_ratio")))
         tail = _number(role_evidence.get("tail_energy_ratio"), _number(shape.get("tail_ratio")))
@@ -379,7 +395,8 @@ class PlacementDepthDecider:
             and attack <= 0.16
             and temporal <= 0.58
             and tail <= 0.72
-            and primary_shape in {"solo_phrase", "hit_with_tail", "single_hit", "impact_with_tail", "echo_tail_hit", "bass_phrase"}
+            and primary_shape
+            in {"solo_phrase", "hit_with_tail", "single_hit", "impact_with_tail", "echo_tail_hit", "bass_phrase"}
         )
 
     @staticmethod
@@ -416,7 +433,6 @@ class PlacementDepthDecider:
             strength=0.86,
             is_real_candidate=not is_synthetic,
         )
-
 
 
 def _number(value: Any, default: float = 0.0) -> float:

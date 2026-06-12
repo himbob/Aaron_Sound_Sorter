@@ -89,7 +89,6 @@ class MeasuredTrueBassFxMixin:
             )
         return None
 
-
     def _raw_concrete_fx_should_not_become_bass_loop(
         self,
         raw: ConsensusClaim,
@@ -152,7 +151,9 @@ class MeasuredTrueBassFxMixin:
                 shape_scores.get("transition_drop", 0.0),
                 shape_scores.get("reverse_swell", 0.0),
                 shape_scores.get("whoosh_sweep", 0.0),
-                0.64 if primary_shape in {
+                0.64
+                if primary_shape
+                in {
                     "hybrid_fx_motion",
                     "impact_with_tail",
                     "hit_with_tail",
@@ -161,7 +162,8 @@ class MeasuredTrueBassFxMixin:
                     "transition_drop",
                     "reverse_swell",
                     "whoosh_sweep",
-                } else 0.0,
+                }
+                else 0.0,
             ]
         )
         if fx_shape_score >= 0.55:

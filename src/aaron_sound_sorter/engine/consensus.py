@@ -41,8 +41,6 @@ def is_voice_phrase_shape(shape_name: str) -> bool:
     return str(shape_name or "") in VOICE_PHRASE_SHAPES
 
 
-
-
 def _fact_number(facts: SharedAudioFacts, key: str) -> float:
     """Read a numeric measured fact from evidence or feature_values_by_name."""
     evidence = facts.evidence if isinstance(getattr(facts, "evidence", None), dict) else {}
@@ -117,6 +115,7 @@ def _shape_texture_conflict_is_really_short_percussion(
         and compact >= 0.62
         and drum_branch >= 0.58
     )
+
 
 def _measured_voice_source_strength(facts: SharedAudioFacts) -> float:
     """Return low-level Human/Voice source strength without using filenames."""

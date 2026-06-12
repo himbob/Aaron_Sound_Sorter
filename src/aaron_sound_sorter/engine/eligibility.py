@@ -245,14 +245,16 @@ def infer_parent_eligibility(facts: SharedAudioFacts) -> EligibilityDecision:
     early_drum_material_voice_decoy = bool(
         duration <= 1.00
         and event_count <= 3.0
-        and primary_shape in {"texture_bed", "noise_texture", "single_hit", "hit_with_tail", "echo_tail_hit", "solo_phrase", "ui_blip"}
+        and primary_shape
+        in {"texture_bed", "noise_texture", "single_hit", "hit_with_tail", "echo_tail_hit", "solo_phrase", "ui_blip"}
         and _fact_score("role_one_shot_score") >= 0.75
         and compact_struck_tonal_percussion_score >= 0.74
         and max(
             pitched_metal_percussion_score,
             _fact_score("hand_drum_membrane_score"),
             _fact_score("struck_wood_score"),
-        ) >= 0.62
+        )
+        >= 0.62
         and max(
             _fact_score("drum_hit_score"),
             drum_kick_source_score,
@@ -260,7 +262,8 @@ def infer_parent_eligibility(facts: SharedAudioFacts) -> EligibilityDecision:
             _fact_score("drum_cymbal_source_score"),
             _fact_score("drum_guiro_scrape_source_score"),
             _fact_score("drum_metallic_percussion_source_score"),
-        ) >= 0.72
+        )
+        >= 0.72
         and _fact_score("onset_percussive_onset_score") >= 0.70
         and _num(feature_values.get("attack_rise_time_norm"), attack_rise) <= 0.08
         and _num(feature_values.get("temporal_centroid_ratio"), temporal_centroid) <= 0.28
@@ -994,14 +997,16 @@ def infer_parent_eligibility(facts: SharedAudioFacts) -> EligibilityDecision:
     drum_material_voice_decoy = bool(
         duration <= 1.00
         and event_count <= 3.0
-        and primary_shape in {"texture_bed", "noise_texture", "single_hit", "hit_with_tail", "echo_tail_hit", "solo_phrase", "ui_blip"}
+        and primary_shape
+        in {"texture_bed", "noise_texture", "single_hit", "hit_with_tail", "echo_tail_hit", "solo_phrase", "ui_blip"}
         and _fact_score("role_one_shot_score") >= 0.75
         and compact_struck_tonal_percussion_score >= 0.74
         and max(
             pitched_metal_percussion_score,
             _fact_score("hand_drum_membrane_score"),
             _fact_score("struck_wood_score"),
-        ) >= 0.62
+        )
+        >= 0.62
         and max(
             _fact_score("drum_hit_score"),
             drum_kick_source_score,
@@ -1009,7 +1014,8 @@ def infer_parent_eligibility(facts: SharedAudioFacts) -> EligibilityDecision:
             _fact_score("drum_cymbal_source_score"),
             _fact_score("drum_guiro_scrape_source_score"),
             _fact_score("drum_metallic_percussion_source_score"),
-        ) >= 0.72
+        )
+        >= 0.72
         and _fact_score("onset_percussive_onset_score") >= 0.70
         and _num(feature_values.get("attack_rise_time_norm"), attack_rise) <= 0.08
         and _num(feature_values.get("temporal_centroid_ratio"), temporal_centroid) <= 0.28
@@ -1058,19 +1064,14 @@ def infer_parent_eligibility(facts: SharedAudioFacts) -> EligibilityDecision:
             _fact_score("hand_drum_membrane_score"),
             _fact_score("struck_wood_score"),
             pitched_metal_percussion_score,
-        ) >= 0.86
+        )
+        >= 0.86
         and _fact_score("role_one_shot_score") >= 0.78
         and _num(feature_values.get("attack_rise_time_norm"), attack_rise) <= 0.08
         and _num(feature_values.get("temporal_centroid_ratio"), temporal_centroid) <= 0.18
         and _num(feature_values.get("tail_energy_ratio"), 0.0) <= 0.12
-        and not (
-            _fact_score("struck_keys_authority_score") >= 0.62
-            and keys_tonal_decay_score >= 0.62
-        )
-        and not (
-            synth_tonal_source_score >= 0.68
-            and compact_struck_tonal_percussion_score < 0.90
-        )
+        and not (_fact_score("struck_keys_authority_score") >= 0.62 and keys_tonal_decay_score >= 0.62)
+        and not (synth_tonal_source_score >= 0.68 and compact_struck_tonal_percussion_score < 0.90)
     )
     short_tonal_synth_phrase = bool(
         0.35 <= duration <= 1.75
@@ -1418,9 +1419,9 @@ def infer_parent_eligibility(facts: SharedAudioFacts) -> EligibilityDecision:
             reason="measured short low front-loaded one-shot; bass, loop, FX, and instrument leaves are not eligible",
         )
     vocal_shape_identity = primary_shape in {"vocal_phrase", "vocal_one_shot", "hit_with_tail"}
-    if (short_front_loaded or very_short_noisy_hit or hat_cymbal_tail_hit or repeated_struck_percussive_gesture) and not (
-        strong_vocal_identity and vocal_shape_identity
-    ):
+    if (
+        short_front_loaded or very_short_noisy_hit or hat_cymbal_tail_hit or repeated_struck_percussive_gesture
+    ) and not (strong_vocal_identity and vocal_shape_identity):
         return EligibilityDecision(
             role_name="protected_percussive_one_shot",
             confidence=max(percussive_one_shot, 0.74),

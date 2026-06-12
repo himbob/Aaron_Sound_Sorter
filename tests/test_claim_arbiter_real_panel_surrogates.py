@@ -1210,7 +1210,9 @@ def test_decisive_struck_percussion_claim_beats_voice_review_claim() -> None:
         strength=0.92,
     )
 
-    final = core.arbiter.adjudicate(raw_claim=raw, consensus_claims=[], eligibility_claims=[review, drum_claim], facts=measured)
+    final = core.arbiter.adjudicate(
+        raw_claim=raw, consensus_claims=[], eligibility_claims=[review, drum_claim], facts=measured
+    )
 
     assert final.folder_path == "Drums/Rims and Sticks/Generic Rim or Stick/One Shots"
     assert final.consensus_status == "final_decisive_struck_percussion_parent_invariant"

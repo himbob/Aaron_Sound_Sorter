@@ -5,7 +5,12 @@
 
 from __future__ import annotations
 
-from aaron_sound_sorter.engine.decision_helpers import _norm_path, _path_has_any, _shape_confidence_from_facts, _shape_vote_from_facts
+from aaron_sound_sorter.engine.decision_helpers import (
+    _norm_path,
+    _path_has_any,
+    _shape_confidence_from_facts,
+    _shape_vote_from_facts,
+)
 from aaron_sound_sorter.engine.family_claims import ConsensusClaim
 
 

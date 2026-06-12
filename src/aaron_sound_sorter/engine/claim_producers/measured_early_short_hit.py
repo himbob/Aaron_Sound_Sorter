@@ -177,7 +177,6 @@ class ShortHitGuardMixin:
             )
         return None
 
-
     @staticmethod
     def _subpanel_score_from_context(context: EarlyAdjudicationContext, key: str) -> float:
         """Read flat physics subpanel scores without importing the heavy arbiter.
@@ -217,10 +216,13 @@ class ShortHitGuardMixin:
             return False
         if _shape_metric_from_facts(context.facts, "pitched_event_ratio") < 0.88:
             return False
-        if max(
-            _shape_metric_from_facts(context.facts, "sustained_tonal_frame_ratio"),
-            _shape_metric_from_facts(context.facts, "non_event_tonal_ratio"),
-        ) < 0.86:
+        if (
+            max(
+                _shape_metric_from_facts(context.facts, "sustained_tonal_frame_ratio"),
+                _shape_metric_from_facts(context.facts, "non_event_tonal_ratio"),
+            )
+            < 0.86
+        ):
             return False
         if _shape_metric_from_facts(context.facts, "percussive_event_ratio") > 0.10:
             return False

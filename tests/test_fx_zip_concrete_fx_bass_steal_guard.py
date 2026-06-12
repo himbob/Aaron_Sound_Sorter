@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from aaron_sound_sorter.domain.models import ConsensusDecision, SharedAudioFacts
 from aaron_sound_sorter.engine.decision_core_v2 import DecisionCoreV2
+from aaron_sound_sorter.engine.eligibility import EligibilityDecision
 from aaron_sound_sorter.engine.family_claim_arbiter import FamilyClaimArbiter
 from aaron_sound_sorter.engine.family_claims import claim_from_folder_path, review_claim
-from aaron_sound_sorter.engine.eligibility import EligibilityDecision
 
 
 def candidate(path: str, score: float) -> dict:
@@ -88,7 +88,9 @@ def test_concrete_fx_drop_raw_blocks_close_broad_instrument_loop_parent() -> Non
         source="strong_consensus",
         reason="synthetic concrete drop raw winner",
         shared=[
-            candidate("FX/Structural and Transitional FX/Drops and Downlifters/Generic Drop or Downlifter/Long FX", 7.0),
+            candidate(
+                "FX/Structural and Transitional FX/Drops and Downlifters/Generic Drop or Downlifter/Long FX", 7.0
+            ),
             candidate("Instruments/Instrument Loops/Loops", 11.0),
         ],
         raw_candidate_score=7.0,
@@ -180,8 +182,11 @@ def test_weak_review_releases_to_fx_when_nearby_voter_window_is_fx_dominant() ->
         strength=0.82,
     )
 
-    assert FamilyClaimArbiter()._release_weak_review_to_raw_fx_candidate(
-        raw,
-        review,
-        concrete_fx_motion_facts(),
-    ) == raw
+    assert (
+        FamilyClaimArbiter()._release_weak_review_to_raw_fx_candidate(
+            raw,
+            review,
+            concrete_fx_motion_facts(),
+        )
+        == raw
+    )

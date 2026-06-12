@@ -1,0 +1,7 @@
+FX ZIP probe summary
+zip=/mnt/data/FX_Aaron2.zip
+rows=1
+status_counts={'PASS_INSTRUMENT_SOURCE': 1}
+top_counts={'Instruments': 1}
+source_group_counts={'source_instrument_or_hybrid': 1}
+true_fx_status_counts={}

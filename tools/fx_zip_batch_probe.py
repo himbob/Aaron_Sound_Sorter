@@ -5,26 +5,26 @@ This tool is intentionally outside production routing. It may use source paths
 for external audit expectations, but it never feeds names back into the sorter.
 Each row is flushed after classification so a timeout does not erase progress.
 """
+
 from __future__ import annotations
 
 import argparse
 import csv
 import json
 import os
+import sys
 import tempfile
 import time
 import traceback
 import zipfile
 from collections import Counter
 from pathlib import Path
-from typing import Dict, List
-import sys
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from Aaron_Sound_Sorter import build_sorter, declare_voters
+from Aaron_Sound_Sorter import build_sorter, declare_voters  # noqa: E402
 
 AUDIO_EXTS = {".wav", ".aif", ".aiff", ".flac", ".ogg", ".au"}
 
@@ -53,11 +53,21 @@ def external_expected_family(member: str) -> str:
         return "Instruments_or_FX_Sub"
     if any(token in text for token in ["/loop/vocals/", "/one_shot/vocals/", "/vocal", "/voice", "breath"]):
         return "Instruments_or_FX_Human"
-    if any(token in text for token in [
-        "/loop/synth", "/one_shot/synth", "/loop/keys", "/keys/",
-        "/loop/guitars", "/guitars/", "/strings/", "/brass_woodwind",
-        "/multi_instrument", "/pitched_percussion",
-    ]):
+    if any(
+        token in text
+        for token in [
+            "/loop/synth",
+            "/one_shot/synth",
+            "/loop/keys",
+            "/keys/",
+            "/loop/guitars",
+            "/guitars/",
+            "/strings/",
+            "/brass_woodwind",
+            "/multi_instrument",
+            "/pitched_percussion",
+        ]
+    ):
         return "Instruments_or_FX_Designed"
     if any(token in text for token in ["/fx/", "/sound_effect/", "/sfx", "fx_aaron", "sfx library"]):
         return "FX"
@@ -92,10 +102,26 @@ def audit_status(member: str, folder_path: str, error_status: str = "") -> str:
     if expected.startswith("Instruments_or_FX") and top == "DRUMS":
         return "QUESTIONABLE_DRUM_IN_SOURCE_INSTRUMENT"
     if top == "DRUMS":
-        if any(token in low for token in [
-            "/drums/", "/drum", "/kick/", "/snares", "thump", "hit", "impact",
-            "tray", "rattle", "crash", "bell", "body", "plate", "punch", "snare",
-        ]):
+        if any(
+            token in low
+            for token in [
+                "/drums/",
+                "/drum",
+                "/kick/",
+                "/snares",
+                "thump",
+                "hit",
+                "impact",
+                "tray",
+                "rattle",
+                "crash",
+                "bell",
+                "body",
+                "plate",
+                "punch",
+                "snare",
+            ]
+        ):
             return "PASS_DRUM_ALLOWED"
         return "QUESTIONABLE_DRUM"
     if top == "_TO_REVIEW":
@@ -105,18 +131,26 @@ def audit_status(member: str, folder_path: str, error_status: str = "") -> str:
     return "FAIL_OTHER"
 
 
-def read_existing_rows(path: Path) -> List[Dict[str, str]]:
+def read_existing_rows(path: Path) -> list[dict[str, str]]:
     if not path.exists():
         return []
     with path.open("r", encoding="utf-8", newline="") as file_handle:
         return list(csv.DictReader(file_handle))
 
 
-def write_rows(path: Path, rows: List[Dict[str, str]]) -> None:
+def write_rows(path: Path, rows: list[dict[str, str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fields = [
-        "index", "zip_member", "expected_external_audit", "source_group", "folder_path", "top_family",
-        "audit_status", "seconds", "reason", "error",
+        "index",
+        "zip_member",
+        "expected_external_audit",
+        "source_group",
+        "folder_path",
+        "top_family",
+        "audit_status",
+        "seconds",
+        "reason",
+        "error",
     ]
     with path.open("w", encoding="utf-8", newline="") as file_handle:
         writer = csv.DictWriter(file_handle, fieldnames=fields)
@@ -127,7 +161,7 @@ def write_rows(path: Path, rows: List[Dict[str, str]]) -> None:
 
 def load_brains(project_root: Path) -> tuple[dict, dict]:
     brain = json.loads((project_root / "stage4_folder_brain.json").read_text(encoding="utf-8"))
-    babies: Dict[str, dict | None] = {}
+    babies: dict[str, dict | None] = {}
     for lane, filename in [
         ("core_baby", "stage4_folder_brain_core_baby.json"),
         ("spread_baby", "stage4_folder_brain_spread_baby.json"),
@@ -145,7 +179,11 @@ def main() -> int:
     parser.add_argument("--start", type=int, default=1, help="1-based first sorted audio member ordinal")
     parser.add_argument("--limit", type=int, default=0, help="number of rows to attempt; 0 means all")
     parser.add_argument("--candidate-count", type=int, default=40)
-    parser.add_argument("--disable-third-party", action="store_true", help="disable optional 3rd-party feature adapter for speed/debugging")
+    parser.add_argument(
+        "--disable-third-party",
+        action="store_true",
+        help="disable optional 3rd-party feature adapter for speed/debugging",
+    )
     args = parser.parse_args()
 
     project_root = Path.cwd()
@@ -159,8 +197,10 @@ def main() -> int:
     os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
 
     with zipfile.ZipFile(args.zip, "r") as zip_file:
-        members = sorted(info.filename for info in zip_file.infolist() if not info.is_dir() and is_audio_member(info.filename))
-        selected = members[max(0, args.start - 1):]
+        members = sorted(
+            info.filename for info in zip_file.infolist() if not info.is_dir() and is_audio_member(info.filename)
+        )
+        selected = members[max(0, args.start - 1) :]
         if args.limit > 0:
             selected = selected[: args.limit]
         if not selected:
@@ -172,7 +212,7 @@ def main() -> int:
 
         with tempfile.TemporaryDirectory(prefix="aaron_fx_zip_probe_") as temp_dir:
             input_root = Path(temp_dir) / "input"
-            for ordinal, member in enumerate(members, start=1):
+            for _ordinal, member in enumerate(members, start=1):
                 if member not in selected:
                     continue
                 target = input_root / member
@@ -180,7 +220,9 @@ def main() -> int:
                 target.write_bytes(zip_file.read(member))
 
             brain, babies = load_brains(project_root)
-            sorter = build_sorter(declare_voters(candidate_count=args.candidate_count), candidate_count=args.candidate_count)
+            sorter = build_sorter(
+                declare_voters(candidate_count=args.candidate_count), candidate_count=args.candidate_count
+            )
 
             for member in selected:
                 ordinal = members.index(member) + 1
@@ -221,7 +263,10 @@ def main() -> int:
                 row["seconds"] = f"{time.monotonic() - started:.3f}"
                 rows.append(row)
                 write_rows(args.out, rows)
-                print(f"{ordinal:03d}/{len(members):03d} {row['audit_status']:24s} {member} => {row['folder_path']}", flush=True)
+                print(
+                    f"{ordinal:03d}/{len(members):03d} {row['audit_status']:24s} {member} => {row['folder_path']}",
+                    flush=True,
+                )
 
     counts = Counter(row.get("audit_status", "") for row in rows)
     tops = Counter(row.get("top_family", "") for row in rows)

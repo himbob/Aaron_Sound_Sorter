@@ -774,7 +774,6 @@ def test_compact_struck_tonal_percussion_stays_drum_eligible_not_instrument() ->
     assert "Instruments" in eligibility.blocked_path_fragments
 
 
-
 def _short_low_percussive_hit_facts() -> SharedAudioFacts:
     """105434-style short low pitched hit: strong one-shot, not an instrument loop."""
     return SharedAudioFacts(
@@ -899,7 +898,6 @@ def test_parent_low_kick_like_release_blocks_final_instrument_steal() -> None:
     assert winner.source == "final_parent_low_kick_like_release"
 
 
-
 def test_short_repeated_struck_percussion_parent_release_beats_instrument_identity() -> None:
     """205973-style bright repeated struck hit should honor protected drum parent."""
     facts = SharedAudioFacts(
@@ -973,7 +971,6 @@ def test_short_repeated_struck_percussion_parent_release_beats_instrument_identi
     assert winner is not None
     assert winner.folder_path.startswith("Drums/")
     assert winner.source == "final_protected_percussive_parent_release"
-
 
 
 def test_voice_like_tiny_material_hit_still_honors_protected_percussion_parent() -> None:

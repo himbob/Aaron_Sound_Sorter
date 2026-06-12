@@ -6,18 +6,19 @@ extracted to neutral names, and producer/source paths are kept only in the CSV
 for external audit.  Each selected slice writes its own CSV immediately, and the
 optional child-process mode records timeouts instead of losing the whole run.
 """
+
 from __future__ import annotations
 
 import argparse
 import csv
 import json
 import os
+import shutil
 import signal
 import subprocess
 import sys
 import time
 import zipfile
-import shutil
 from collections import defaultdict
 from pathlib import Path
 
@@ -232,7 +233,13 @@ def child_classify(row: dict[str, object], timeout: int) -> dict[str, object]:
                 pass
         # Do not wait for decoder/numba cleanup after a hard timeout; record
         # the failure and let the next sample continue from the CSV ledger.
-        return {"ok_broad": "False", "review": "False", "instrument_steal": "False", "seconds": round(time.time() - t0, 2), "error": f"child_timeout_after_{timeout}s"}
+        return {
+            "ok_broad": "False",
+            "review": "False",
+            "instrument_steal": "False",
+            "seconds": round(time.time() - t0, 2),
+            "error": f"child_timeout_after_{timeout}s",
+        }
     completed_returncode = proc.returncode
     record: dict[str, object] | None = None
     for line in stdout.splitlines():
@@ -243,7 +250,13 @@ def child_classify(row: dict[str, object], timeout: int) -> dict[str, object]:
                 record = None
     if record is None:
         err = (stderr or stdout or "child produced no JSON_RESULT").strip().replace("\n", " ")
-        return {"ok_broad": "False", "review": "False", "instrument_steal": "False", "seconds": round(time.time() - t0, 2), "error": err[:500]}
+        return {
+            "ok_broad": "False",
+            "review": "False",
+            "instrument_steal": "False",
+            "seconds": round(time.time() - t0, 2),
+            "error": err[:500],
+        }
     record.setdefault("seconds", round(time.time() - t0, 2))
     if completed_returncode != 0 and not record.get("error"):
         record["error"] = (stderr or f"child_exit_{completed_returncode}").strip()[:500]
@@ -297,13 +310,23 @@ def classify_rows(
                     if hasattr(signal, "SIGALRM"):
                         signal.alarm(0)
                 print(
-                    f"{seq:04d} g{row['group']} {Path(str(row['member'])).name[:55]:55s} -> {rec.get('path','')} ({rec.get('seconds', round(time.time()-t0,2))}s) ok={rec.get('ok_broad')}",
+                    f"{seq:04d} g{row['group']} {Path(str(row['member'])).name[:55]:55s} -> {rec.get('path', '')} ({rec.get('seconds', round(time.time() - t0, 2))}s) ok={rec.get('ok_broad')}",
                     flush=True,
                 )
             except Exception as exc:
                 if hasattr(signal, "SIGALRM"):
                     signal.alarm(0)
-                rec.update({"path": "", "top": "", "ok_broad": "False", "review": "False", "instrument_steal": "False", "seconds": round(time.time() - t0, 2), "error": repr(exc)})
+                rec.update(
+                    {
+                        "path": "",
+                        "top": "",
+                        "ok_broad": "False",
+                        "review": "False",
+                        "instrument_steal": "False",
+                        "seconds": round(time.time() - t0, 2),
+                        "error": repr(exc),
+                    }
+                )
                 print(f"ERR {seq:04d} g{row['group']} {Path(str(row['member'])).name[:55]:55s} {repr(exc)}", flush=True)
             writer.writerow(rec)
             outfh.flush()
@@ -321,7 +344,20 @@ def summarize(results_path: Path) -> dict[str, int]:
     fx = [row for row in rows if row.get("top") == "FX"]
     print("\nSUMMARY")
     print("results", results_path)
-    print("tested", len(rows), "drums", len(drums), "fx", len(fx), "bad", len(bad), "review", len(review), "instrument", len(inst))
+    print(
+        "tested",
+        len(rows),
+        "drums",
+        len(drums),
+        "fx",
+        len(fx),
+        "bad",
+        len(bad),
+        "review",
+        len(review),
+        "instrument",
+        len(inst),
+    )
     by: dict[str, list[int]] = defaultdict(lambda: [0, 0, 0, 0, 0])
     for row in rows:
         bucket = by[row["folder"]]
@@ -335,8 +371,25 @@ def summarize(results_path: Path) -> dict[str, int]:
     if bad:
         print("\nBAD FIRST 30")
         for row in bad[:30]:
-            print(row["seq"], row["member"], "=>", row.get("path"), row.get("error"), "shape", row.get("shape"), "source", row.get("final_source"))
-    return {"tested": len(rows), "drums": len(drums), "fx": len(fx), "bad": len(bad), "review": len(review), "instrument": len(inst)}
+            print(
+                row["seq"],
+                row["member"],
+                "=>",
+                row.get("path"),
+                row.get("error"),
+                "shape",
+                row.get("shape"),
+                "source",
+                row.get("final_source"),
+            )
+    return {
+        "tested": len(rows),
+        "drums": len(drums),
+        "fx": len(fx),
+        "bad": len(bad),
+        "review": len(review),
+        "instrument": len(inst),
+    }
 
 
 def main() -> int:
@@ -346,7 +399,11 @@ def main() -> int:
     parser.add_argument("--max-rows", type=int, default=None)
     parser.add_argument("--start-at", type=int, default=0, help="1-based selected-row index to skip before classifying")
     parser.add_argument("--timeout", type=int, default=45)
-    parser.add_argument("--child-process", action="store_true", help="classify each sample in a child process so hard hangs are recorded")
+    parser.add_argument(
+        "--child-process",
+        action="store_true",
+        help="classify each sample in a child process so hard hangs are recorded",
+    )
     parser.add_argument("--results", type=Path, default=None)
     parser.add_argument("--reset", action="store_true")
     parser.add_argument("--classify-one", default="", help=argparse.SUPPRESS)

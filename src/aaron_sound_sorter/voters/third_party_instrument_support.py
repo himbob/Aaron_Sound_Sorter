@@ -323,8 +323,12 @@ def third_party_instrument_support(facts: SharedAudioFacts | None) -> dict[str, 
         "api_low_register_pitch": round(clamp01(inverse_ramp(f0_median, 45.0, 220.0) if f0_median > 0.0 else 0.0), 6),
         "api_mid_register_pitch": round(clamp01(ramp(f0_median, 130.0, 620.0) if f0_median > 0.0 else 0.0), 6),
         "api_high_register_pitch": round(clamp01(ramp(f0_median, 500.0, 1800.0) if f0_median > 0.0 else 0.0), 6),
-        "api_eventful_tonal_phrase": round(clamp01(_mean_strength(g["eventful_phrase"], g["clean_tone"], not_drumlike)), 6),
-        "api_short_clean_tonal_event": round(clamp01(_geo_strength(g["short_event"], g["clean_tone"], g["stable_electronic"])), 6),
+        "api_eventful_tonal_phrase": round(
+            clamp01(_mean_strength(g["eventful_phrase"], g["clean_tone"], not_drumlike)), 6
+        ),
+        "api_short_clean_tonal_event": round(
+            clamp01(_geo_strength(g["short_event"], g["clean_tone"], g["stable_electronic"])), 6
+        ),
         "api_breath_noise_texture": round(clamp01(g["breath_noise"]), 6),
         "api_smooth_bow_texture": round(clamp01(g["smooth_bow_noise"]), 6),
         "api_instrument_identity_top_score": round(clamp01(top_score), 6),

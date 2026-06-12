@@ -1178,7 +1178,8 @@ class ProfileInstrumentClaimMixin:
         return bool(
             0.0 < duration <= 1.25
             and event_count <= 8.0
-            and shape in {"pitched_repetition_phrase", "repeated_phrase_loop", "beat_loop", "bass_phrase", "solo_phrase"}
+            and shape
+            in {"pitched_repetition_phrase", "repeated_phrase_loop", "beat_loop", "bass_phrase", "solo_phrase"}
             and onset_percussive >= 0.70
             and rhythm >= 0.42
             and max(struck_material, compact_struck) >= 0.62

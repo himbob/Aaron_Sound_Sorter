@@ -20,15 +20,51 @@ they require model files and are not allowed to own final routing.
 
 from __future__ import annotations
 
-from functools import lru_cache
-from typing import Any
+import os
 import warnings
+from functools import lru_cache
+from pathlib import Path
+from typing import Any
 
 import numpy as np
 
 HOP_LENGTH = 512
 N_FFT = 2048
 MAX_THIRD_PARTY_SECONDS = 4.0
+DEFAULT_NUMBA_CACHE_DIR = "/private/tmp/aaron_sound_sorter_numba_cache"
+
+
+def _prepare_optional_runtime_cache() -> None:
+    """Point numba-backed audio libraries at a writable transient cache.
+
+    Args:
+        None.
+
+    Returns:
+        None.
+
+    Side effects:
+        Creates a temporary cache directory and sets ``NUMBA_CACHE_DIR`` when
+        the caller has not already chosen one.
+
+    Raises:
+        None. Cache setup is best-effort so import-safe metadata commands remain
+        robust on restricted systems.
+
+    Important constraints:
+        This function must not inspect producer filenames, source folders, ZIP
+        member names, sample-pack labels, or user corrections. It only prepares
+        process-level runtime state for optional audio libraries.
+    """
+    cache_dir = os.environ.get("AARON_SOUND_SORTER_NUMBA_CACHE_DIR", DEFAULT_NUMBA_CACHE_DIR)
+    try:
+        Path(cache_dir).mkdir(parents=True, exist_ok=True)
+    except OSError:
+        return
+    os.environ.setdefault("NUMBA_CACHE_DIR", cache_dir)
+
+
+_prepare_optional_runtime_cache()
 
 
 @lru_cache(maxsize=1)
@@ -40,6 +76,7 @@ def _load_librosa() -> Any:
     the shell accidentally uses a Python environment that lacks librosa.  Keep
     the failure local to actual third-party feature extraction.
     """
+    _prepare_optional_runtime_cache()
     try:
         import librosa as _librosa  # type: ignore[import-not-found]
     except ModuleNotFoundError:
@@ -183,7 +220,6 @@ def third_party_feature_profile_from_audio(mono: np.ndarray, sr: int) -> dict[st
     profile["adapters"].update(_declared_model_scout_slots())
     profile["flat"] = flat
     return profile
-
 
 
 def _empty_yin_summary() -> dict[str, float]:
@@ -404,11 +440,7 @@ def _librosa_feature_profile(y: np.ndarray, sr: int, duration: float) -> dict[st
         # YIN is useful for instrument identity, but it is one of the more
         # expensive API calls.  Gate it with cheap tonal evidence so unpitched
         # drums/FX do not pay for F0 tracking on every smoke case.
-        yin_tonal_gate = bool(
-            chroma_peak >= 0.14
-            or spectral_contrast_mean >= 12.0
-            or spectral_flatness_mean <= 0.18
-        )
+        yin_tonal_gate = bool(chroma_peak >= 0.14 or spectral_contrast_mean >= 12.0 or spectral_flatness_mean <= 0.18)
         yin_noise_skip = bool(
             onset_event_count >= 1
             and chroma_peak < 0.10
@@ -416,9 +448,7 @@ def _librosa_feature_profile(y: np.ndarray, sr: int, duration: float) -> dict[st
             and spectral_contrast_mean < 16.0
         )
         yin_summary = (
-            _librosa_yin_summary(librosa, y, sr)
-            if yin_tonal_gate and not yin_noise_skip
-            else _empty_yin_summary()
+            _librosa_yin_summary(librosa, y, sr) if yin_tonal_gate and not yin_noise_skip else _empty_yin_summary()
         )
 
         onset_strength_mean = _safe_mean(onset_env)

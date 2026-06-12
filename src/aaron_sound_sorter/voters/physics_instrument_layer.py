@@ -1748,7 +1748,10 @@ class PhysicsInstrumentLayer:
             # above string-loop decoys caused by wet sax vibrato/reverb.
             branch_scores["Woodwinds"] = max(
                 branch_scores["Woodwinds"],
-                min(0.96, max(branch_scores["MixedInstrument"], branch_scores["Strings"], branch_scores["KeysPiano"]) + 0.026),
+                min(
+                    0.96,
+                    max(branch_scores["MixedInstrument"], branch_scores["Strings"], branch_scores["KeysPiano"]) + 0.026,
+                ),
             )
             branch_scores["MixedInstrument"] = min(branch_scores["MixedInstrument"], branch_scores["Woodwinds"] - 0.024)
             branch_scores["Strings"] = min(branch_scores["Strings"], branch_scores["Woodwinds"] - 0.026)

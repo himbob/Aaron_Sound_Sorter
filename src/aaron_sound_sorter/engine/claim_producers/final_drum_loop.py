@@ -168,17 +168,26 @@ class FinalDrumLoopClaimProducer:
                 self._measured_score(facts, "rhythmic_break_loop_score"),
             )
 
-        low_event_has_drum_loop_corroboration = bool(
-            low_event >= 0.88
-            and (
-                drum_loop_strength >= 0.40
-                or self._measured_score(facts, "drum_loop_source_score") >= 0.24
-                or max(percussive_event, drumlike_event) >= 0.12
-                or (layer_drum_branch == "DrumLoop" and layer_drum_confidence >= 0.50)
-            )
+        bass_identity = self._measured_score(
+            facts,
+            "bass_synth_score",
+            "bass_sub_score",
+            "bass_electric_score",
+            "low_end_source_score",
+            "bass_808_score",
+            "instruments_bass_generic_bass_one_shots_score",
+            "instruments_bass_synth_bass_one_shots_score",
+            "instruments_bass_sub_bass_one_shots_score",
         )
-        clean_bass_phrase = bool(
-            shape == "bass_phrase"
+        weak_drum_loop_source = (
+            max(
+                self._measured_score(facts, "drum_loop_source_score"),
+                self._measured_score(facts, "rhythmic_break_loop_score"),
+            )
+            <= 0.44
+        )
+        clean_low_tonal_bass_loop = bool(
+            shape in {"bass_phrase", "beat_loop", "pitched_repetition_phrase"}
             and shape_confidence >= 0.88
             and pitched_event >= 0.90
             and sustained_tonal >= 0.86
@@ -188,9 +197,10 @@ class FinalDrumLoopClaimProducer:
             and percussive_event <= 0.08
             and drumlike_event <= 0.08
             and pitch_confidence >= 0.70
-            and not low_event_has_drum_loop_corroboration
+            and bass_identity >= 0.62
+            and (shape == "bass_phrase" or weak_drum_loop_source)
         )
-        if clean_bass_phrase:
+        if clean_low_tonal_bass_loop:
             return False
         strong_pitched_nonpercussive_loop = bool(
             shape in TONAL_PHRASE_SHAPES

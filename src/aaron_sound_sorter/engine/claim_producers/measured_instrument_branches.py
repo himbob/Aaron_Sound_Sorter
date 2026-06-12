@@ -47,6 +47,8 @@ class MeasuredInstrumentBranchClaimProducer:
             self._short_synth_one_shot_claim,
             self._one_shot_leaf_measured_branch_loop_claim,
             self._false_sax_leaf_non_woodwind_branch_claim,
+            self._mixed_low_melody_loop_claim,
+            self._mixed_reed_woodwind_loop_claim,
             self._bass_loop_claim,
             self._synth_loop_claim,
             self._keys_loop_claim,
@@ -204,6 +206,72 @@ class MeasuredInstrumentBranchClaimProducer:
             shared_winner=raw.shared_winner or raw.folder_path,
             can_override=True,
             strength=max(0.91, raw.strength),
+            is_real_candidate=False,
+        )
+
+    def _mixed_low_melody_loop_claim(self, context: DecisionContext) -> ConsensusClaim | None:
+        """Emit a broad mixed-instrument loop claim for low melody loops.
+
+        A loop can have a huge bass/sub body and still function as a melodic
+        multi-sample instrumental loop. The raw candidate window often exposes
+        this as a Bass *one-shot* leaf because the low band dominates. This
+        lower claim keeps the decision at the musical role level when measured
+        loop evidence is strong and non-bass tonal panels also agree.
+        """
+        raw = context.raw
+        raw_path = _norm_path(raw.folder_path or raw.label)
+        if raw.family != "Instruments" or "one shot" not in raw_path:
+            return None
+        if not self._facts_support_low_mixed_melodic_loop(context.facts):
+            return None
+        return claim_from_folder_path(
+            folder_path="Instruments/Instrument Loops/Loops",
+            source="mixed_instrument_loop_role_claim",
+            reason=(
+                "measured mixed-instrument loop claim: low/bass body was present, "
+                "but strong pitched-loop evidence and non-bass tonal panels showed "
+                "a broad melodic instrumental loop before final arbitration"
+            ),
+            shared=raw.shared_candidates,
+            raw_candidate_score=raw.raw_candidate_score,
+            brain_rank=raw.brain_rank,
+            physics_rank=raw.physics_rank,
+            shared_winner=raw.shared_winner or raw.folder_path,
+            can_override=True,
+            strength=0.98,
+            is_real_candidate=False,
+        )
+
+    def _mixed_reed_woodwind_loop_claim(self, context: DecisionContext) -> ConsensusClaim | None:
+        """Emit a brass/woodwind loop claim for ensemble-like reed loops.
+
+        Some sax/brass ensemble loops are detected by the physics branch as
+        MixedInstrument because multiple tonal sources are active. When the
+        parent role is a pitched reed/instrument loop and the woodwind/reed
+        panels are credible, emit a branch-level claim instead of letting a weak
+        FX or generic review row win.
+        """
+        raw = context.raw
+        raw_path = _norm_path(raw.folder_path or raw.label)
+        if raw.family == "Instruments" and ("brass" in raw_path or "woodwind" in raw_path or "sax" in raw_path):
+            return None
+        if not self._facts_support_mixed_reed_woodwind_loop(context.facts):
+            return None
+        return claim_from_folder_path(
+            folder_path="Instruments/Brass and Woodwinds/Loops",
+            source="final_measured_branch_loop_broad_bucket",
+            reason=(
+                "measured reed/woodwind ensemble loop claim: pitched loop body, "
+                "reed/woodwind panel support, and mixed-instrument branch evidence "
+                "were available before final arbitration"
+            ),
+            shared=raw.shared_candidates,
+            raw_candidate_score=raw.raw_candidate_score,
+            brain_rank=raw.brain_rank,
+            physics_rank=raw.physics_rank,
+            shared_winner=raw.shared_winner or raw.folder_path,
+            can_override=True,
+            strength=0.97,
             is_real_candidate=False,
         )
 
@@ -524,11 +592,105 @@ class MeasuredInstrumentBranchClaimProducer:
             is_real_candidate=False,
         )
 
+    def _facts_support_low_mixed_melodic_loop(self, facts: SharedAudioFacts | None) -> bool:
+        if facts is None:
+            return False
+        shape = _shape_vote_from_facts(facts)
+        if shape not in {"beat_loop", "bass_phrase", "pitched_repetition_phrase", "repeated_phrase_loop"}:
+            return False
+        if _shape_confidence_from_facts(facts) < 0.84:
+            return False
+        if max(self._role_value(facts, "pitched_music_loop"), self._role_value(facts, "bass_loop")) < 0.82:
+            return False
+        bass_support = max(
+            self._measured_score(facts, "bass_synth_score"),
+            self._measured_score(facts, "bass_sub_score"),
+            self._measured_score(facts, "bass_electric_score"),
+            self._measured_score(facts, "low_end_source_score"),
+        )
+        non_bass_tonal = max(
+            self._measured_score(facts, "keys_tonal_decay_score", "struck_keys_score", "keys_chord_density_score"),
+            self._measured_score(
+                facts, "synth_tonal_source_score", "synth_pad_score", "synth_lead_score", "synth_chord_score"
+            ),
+            self._measured_score(facts, "pitched_mallet_instrument_score"),
+            self._measured_score(facts, "string_violin_score", "string_cello_score", "bowed_string_score"),
+        )
+        return bool(
+            bass_support >= 0.62
+            and non_bass_tonal >= 0.66
+            and self._shape_number(facts, "pitched_event_ratio") >= 0.88
+            and self._shape_number(facts, "sustained_tonal_frame_ratio") >= 0.82
+            and self._shape_number(facts, "non_event_tonal_ratio") >= 0.82
+            and self._shape_number(facts, "onset_count") >= 6.0
+            and self._shape_number(facts, "onset_span_ratio") >= 0.50
+            and self._shape_number(facts, "percussive_event_ratio") <= 0.12
+            and self._shape_number(facts, "drumlike_frame_ratio") <= 0.12
+            and self._measured_score(facts, "drum_loop_source_score") <= 0.70
+            and not self._facts_support_true_voice_role(facts)
+        )
+
+    def _facts_support_mixed_reed_woodwind_loop(self, facts: SharedAudioFacts | None) -> bool:
+        if facts is None:
+            return False
+        shape = _shape_vote_from_facts(facts)
+        if shape not in {"pitched_repetition_phrase", "repeated_phrase_loop", "pitched_phrase", "sustained_pad"}:
+            return False
+        if _shape_confidence_from_facts(facts) < 0.78:
+            return False
+        if (
+            max(
+                self._role_value(facts, "pitched_reed_or_instrument_loop"),
+                self._role_value(facts, "pitched_music_loop"),
+            )
+            < 0.76
+        ):
+            return False
+        layer = self._physics_layer(facts)
+        branch = str(layer.get("instrument_branch_selected") or layer.get("physics_layer_branch") or "")
+        woodwind_branch = self._safe_float(layer.get("instrument_branch_Woodwinds"), 0.0)
+        compound_strength = self._safe_float(layer.get("compound_music_strength"), 0.0)
+        wood_sub = str(layer.get("instrument_Woodwinds_subpanel_selected") or "")
+        wood_sub_score = self._safe_float(layer.get("instrument_Woodwinds_subpanel_confidence"), 0.0)
+        reed_score = max(
+            self._measured_score(facts, "reed_wind_score"),
+            self._measured_score(facts, "woodwind_sax_score"),
+            self._safe_float(layer.get("instrument_panel_Woodwinds_Sax"), 0.0),
+        )
+        voice_like = max(
+            self._measured_score(facts, "voice_score"),
+            self._measured_score(facts, "human_spoken_voice_score"),
+            self._measured_score(facts, "human_breath_mouth_score"),
+        )
+        if voice_like >= 0.82 and reed_score < voice_like - 0.10 and woodwind_branch < 0.66:
+            return False
+        credible_reed = bool(
+            reed_score >= 0.54
+            or woodwind_branch >= 0.58
+            or (wood_sub in {"Sax", "AiryWoodwind", "Clarinet"} and wood_sub_score >= 0.66)
+        )
+        mixed_or_woodwind_branch = bool(
+            branch in {"Woodwinds", "ReedWoodwind", "Brass"}
+            or (branch == "MixedInstrument" and compound_strength >= 0.60 and woodwind_branch >= 0.55)
+        )
+        return bool(
+            credible_reed
+            and mixed_or_woodwind_branch
+            and self._shape_number(facts, "pitched_event_ratio") >= 0.86
+            and self._shape_number(facts, "f0_voiced_ratio") >= 0.70
+            and self._shape_number(facts, "sustained_tonal_frame_ratio") >= 0.80
+            and self._shape_number(facts, "onset_count") >= 6.0
+            and self._shape_number(facts, "onset_span_ratio") >= 0.45
+            and self._shape_number(facts, "percussive_event_ratio") <= 0.12
+            and self._shape_number(facts, "drumlike_frame_ratio") <= 0.12
+            and self._measured_score(facts, "drum_loop_source_score") <= 0.35
+        )
+
     def _facts_support_clean_bass_loop(self, facts: SharedAudioFacts | None) -> bool:
         if facts is None:
             return False
         shape = _shape_vote_from_facts(facts)
-        if shape != "bass_phrase":
+        if shape not in {"bass_phrase", "beat_loop", "pitched_repetition_phrase"}:
             return False
         if _shape_confidence_from_facts(facts) < 0.82:
             return False
@@ -557,6 +719,21 @@ class MeasuredInstrumentBranchClaimProducer:
         )
         if bass_role < 0.55 and not pure_low_bass_body:
             return False
+        if shape != "bass_phrase":
+            # A ShapeVoter beat-loop can still be a bass loop when the audio is
+            # extremely low, clean, pitched, and bass-branch dominated.  Do not
+            # accept generic beat-loop shape alone; require weak drum-loop source
+            # evidence so true drum loops stay protected.
+            if not (
+                pure_low_bass_body
+                and bass_role >= 0.80
+                and self._shape_number(facts, "pitched_event_ratio") >= 0.90
+                and self._shape_number(facts, "sustained_tonal_frame_ratio") >= 0.86
+                and self._shape_number(facts, "non_event_tonal_ratio") >= 0.86
+                and self._measured_score(facts, "drum_loop_source_score") <= 0.24
+                and self._measured_score(facts, "rhythmic_break_loop_score") <= 0.44
+            ):
+                return False
         duration = _feature_number_from_facts(facts, "duration_sec")
         event_count = max(
             _shape_metric_from_facts(facts, "onset_count"),
@@ -609,14 +786,16 @@ class MeasuredInstrumentBranchClaimProducer:
                 self._measured_score(facts, "hand_drum_membrane_score"),
                 self._measured_score(facts, "pitched_metal_percussion_score"),
                 self._measured_score(facts, "struck_wood_score"),
-            ) >= 0.70
+            )
+            >= 0.70
             and max(
                 self._measured_score(facts, "drum_hit_score"),
                 self._measured_score(facts, "drum_tom_conga_source_score"),
                 self._measured_score(facts, "drum_rim_stick_source_score"),
                 self._measured_score(facts, "drum_snare_source_score"),
                 self._measured_score(facts, "drum_metallic_percussion_source_score"),
-            ) >= 0.34
+            )
+            >= 0.34
         ):
             return False
         if shape not in {
@@ -860,6 +1039,28 @@ class MeasuredInstrumentBranchClaimProducer:
         true_repetition = self._shape_number(facts, "true_repetition_score")
         low_event = self._shape_number(facts, "low_event_ratio")
         high_event = self._shape_number(facts, "high_event_ratio")
+        bass_counter_witness = bool(
+            _shape_vote_from_facts(facts) in {"beat_loop", "pitched_repetition_phrase", "bass_phrase"}
+            and self._role_value(facts, "bass_loop") >= 0.88
+            and self._shape_number(facts, "low_event_ratio") >= 0.88
+            and self._shape_number(facts, "pitched_event_ratio") >= 0.90
+            and self._shape_number(facts, "sustained_tonal_frame_ratio") >= 0.86
+            and self._shape_number(facts, "percussive_event_ratio") <= 0.08
+            and self._shape_number(facts, "drumlike_frame_ratio") <= 0.08
+            and self._measured_score(facts, "drum_loop_source_score") <= 0.24
+            and self._measured_score(facts, "rhythmic_break_loop_score") <= 0.44
+            and self._measured_score(
+                facts,
+                "bass_synth_score",
+                "bass_sub_score",
+                "bass_electric_score",
+                "low_end_source_score",
+                "bass_808_score",
+            )
+            >= 0.62
+        )
+        if bass_counter_witness:
+            return False
         return bool(
             measured_drum_loop >= 0.58
             and onset_count >= 6.0
