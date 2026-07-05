@@ -30,3 +30,6 @@ training/
 *.mp3
 *.m4a
 *.zip
+
+# Generated brain training runs
+stage4_brain_family_training/run_*/
