@@ -60,6 +60,135 @@ class DrumFxRescueMixin:
             _direct_body_role_strength_from_facts(context.facts, "percussive_drum_loop"),
         )
 
+    @staticmethod
+    def _fact_score(context: EarlyAdjudicationContext, name: str, default: float = 0.0) -> float:
+        facts = context.facts
+        if facts is None or not isinstance(facts.evidence, dict):
+            return default
+        try:
+            if name in facts.feature_values_by_name:
+                return float(facts.feature_values_by_name.get(name, default) or default)
+        except Exception:
+            pass
+        try:
+            if name in facts.evidence:
+                return float(facts.evidence.get(name, default) or default)
+        except Exception:
+            pass
+        feature_values = facts.evidence.get("feature_values_by_name")
+        if isinstance(feature_values, dict) and name in feature_values:
+            try:
+                return float(feature_values.get(name, default) or default)
+            except Exception:
+                return default
+        flat = (facts.evidence.get("physics_subpanels") or {}).get("flat")
+        if isinstance(flat, dict) and name in flat:
+            try:
+                return float(flat.get(name, default) or default)
+            except Exception:
+                return default
+        roles = facts.evidence.get("measured_roles")
+        if isinstance(roles, dict) and isinstance(roles.get("evidence"), dict):
+            try:
+                return float(roles["evidence"].get(name, default) or default)
+            except Exception:
+                return default
+        return default
+
+    @staticmethod
+    def _shape_score(context: EarlyAdjudicationContext, name: str, default: float = 0.0) -> float:
+        facts = context.facts
+        if facts is None or not isinstance(facts.evidence, dict):
+            return default
+        shape_vote = facts.evidence.get("shape_vote")
+        if not isinstance(shape_vote, dict):
+            return default
+        scores = shape_vote.get("shape_scores")
+        if isinstance(scores, (list, tuple)):
+            for item in scores:
+                if isinstance(item, (list, tuple)) and len(item) >= 2 and str(item[0]) == name:
+                    try:
+                        return float(item[1] or default)
+                    except Exception:
+                        return default
+        return default
+
+    def _best_fx_motion_candidate_path(self, raw: ConsensusClaim) -> str:
+        """Return the best concrete FX motion candidate from voter candidates."""
+        best_score: float | None = None
+        best_path = ""
+        preferred = (
+            "glitch",
+            "stutter",
+            "sweep",
+            "whoosh",
+            "riser",
+            "build",
+            "drop",
+            "downlifter",
+            "reverse",
+            "hybrid designed",
+            "designed noise",
+            "radio",
+            "electrical",
+        )
+        for candidate in raw.shared_candidates or []:
+            folder_path = str(candidate.get("folder_path") or candidate.get("label") or "")
+            if not folder_path.startswith("FX/"):
+                continue
+            if not _path_has_any(folder_path, preferred):
+                continue
+            score = self._safe_candidate_score(candidate)
+            if best_score is None or score < best_score:
+                best_score = score
+                best_path = folder_path
+        return best_path
+
+    def _designed_fx_motion_shape_blocks_drum_redirect(self, context: EarlyAdjudicationContext) -> bool:
+        """Return True when a rhythmic loop is really measured FX motion.
+
+        This is intentionally stricter than generic shape compatibility: it
+        requires a close FX candidate plus strong motion/sweep/stutter evidence.
+        It exists for laser/sweep/uplifter loops that trigger drum-loop roles
+        through repeated transients even though their time-shape is designed FX.
+        """
+        has_fx_candidate = bool(context.raw.final_top == "FX" or self._best_fx_motion_candidate_path(context.raw))
+        if not has_fx_candidate:
+            return False
+
+        motion_shape = max(
+            self._shape_score(context, "whoosh_sweep"),
+            self._shape_score(context, "designed_motion_fx_loop"),
+            self._shape_score(context, "hybrid_fx_motion"),
+            self._shape_score(context, "transition_riser"),
+            self._shape_score(context, "transition_drop"),
+            self._shape_score(context, "reverse_swell"),
+            self._shape_score(context, "glitch_stutter"),
+        )
+        fx_panel = max(
+            self._fact_score(context, "fx_glitch_stutter_score"),
+            self._fact_score(context, "fx_radio_electrical_score"),
+            self._fact_score(context, "fx_whoosh_sweep_score"),
+            self._fact_score(context, "fx_motion_score"),
+            self._fact_score(context, "fx_transition_authority_score"),
+            self._fact_score(context, "fx_reverse_score"),
+            self._fact_score(context, "fx_siren_score"),
+            self._fact_score(context, "fx_alarm_score"),
+            self._fact_score(context, "fx_formant_score"),
+        )
+        slope = abs(_shape_metric_from_facts(context.facts, "centroid_slope_norm"))
+        tail = _shape_metric_from_facts(context.facts, "tail_ratio")
+        temporal_centroid = _shape_metric_from_facts(context.facts, "temporal_centroid_ratio")
+        pulse = _shape_metric_from_facts(context.facts, "pulse_regularity")
+
+        raw_fx_motion = bool(
+            context.raw.final_top == "FX"
+            and motion_shape >= 0.74
+            and (tail >= 0.80 or temporal_centroid >= 0.70 or fx_panel >= 0.65)
+        )
+        strong_sweep_motion = bool(motion_shape >= 0.78 and fx_panel >= 0.70 and slope >= 0.35 and pulse <= 0.48)
+        return raw_fx_motion or strong_sweep_motion
+
     def _maybe_redirect_low_rhythmic_drum_loop(
         self,
         context: EarlyAdjudicationContext,
@@ -74,6 +203,16 @@ class DrumFxRescueMixin:
             pitch_confidence = _shape_metric_from_facts(context.facts, "pitch_confidence")
             if sustain_ratio >= 0.50 and pitch_confidence >= 0.72:
                 return None  # Too sustained/pitched for pure drum redirect
+
+            if self._designed_fx_motion_shape_blocks_drum_redirect(context):
+                if context.raw.final_top == "FX":
+                    return None
+                fx_target = self._best_fx_motion_candidate_path(context.raw) or "FX/Hybrid Designed FX"
+                return self._redirect_from_raw(
+                    context.raw,
+                    fx_target,
+                    "designed FX motion shape blocked low-rhythmic drum redirect",
+                )
 
             return self._redirect_from_raw(
                 context.raw,

@@ -216,6 +216,8 @@ class FinalDrumLoopClaimProducer:
         )
         if strong_pitched_nonpercussive_loop:
             return False
+        if self._raw_fx_loop_shape_is_designed_fx_decoy(context, facts):
+            return False
         measured_loop = bool(
             drum_loop_strength >= 0.76
             and shape in DRUM_LOOP_SHAPES
@@ -248,9 +250,84 @@ class FinalDrumLoopClaimProducer:
             or decisive_measured_role
         )
 
+    def _raw_fx_loop_shape_is_designed_fx_decoy(self, context: DecisionContext, facts: SharedAudioFacts) -> bool:
+        """Return True when a raw FX loop was falsely claimed as a drum loop.
+
+        Fast lasers, chopped alarms, and stutter FX often look like top/beat
+        loops because they have many sharp high-band events.  They should not
+        become Drum Loops unless there is real drum-loop authority: regular
+        pulse, strong drum material, or decisive drum-family support.
+        """
+        raw = context.raw
+        if raw.family != "FX":
+            return False
+        shape = _shape_vote_from_facts(facts)
+        shape_confidence = _shape_confidence_from_facts(facts)
+        if shape not in {"top_loop", "beat_loop", "repeated_phrase_loop"} or shape_confidence < 0.84:
+            return False
+        designed_shape = max(
+            self._shape_score(facts, "designed_tonal_fx"),
+            self._shape_score(facts, "designed_motion_fx_loop"),
+            self._shape_score(facts, "glitch_stutter"),
+            self._shape_score(facts, "siren_alarm_tone"),
+        )
+        fx_design = max(
+            self._measured_score(facts, "fx_glitch_stutter_score"),
+            self._measured_score(facts, "fx_siren_score"),
+            self._measured_score(facts, "fx_alarm_score"),
+            self._measured_score(facts, "fx_formant_score"),
+            self._measured_score(facts, "fx_radio_electrical_score"),
+            self._measured_score(facts, "fx_motion_score"),
+        )
+        if max(designed_shape, fx_design) < 0.66:
+            return False
+
+        pulse = self._shape_number(facts, "pulse_regularity")
+        drum_material = max(
+            self._measured_score(facts, "drum_kick_source_score"),
+            self._measured_score(facts, "drum_snare_source_score"),
+            self._measured_score(facts, "drum_closed_hat_source_score"),
+            self._measured_score(facts, "drum_cymbal_source_score"),
+            self._measured_score(facts, "drum_shaker_tambourine_source_score"),
+            self._measured_score(facts, "drum_hit_score"),
+        )
+        drum_loop_source = self._measured_score(facts, "drum_loop_source_score")
+        # rhythmic_break_loop_score mostly measures repeated transient activity;
+        # lasers/stutters can trigger it.  Require the source/material drum loop
+        # score for the real-drum counter, not rhythmic repetition alone.
+        real_drum_loop_counter = bool(
+            pulse >= 0.24
+            or (
+                drum_material >= 0.74
+                and drum_loop_source >= 0.62
+                and self._has_candidate_support(context, DRUM_LOOP_FRAGMENTS, top_family="Drums")
+            )
+        )
+        if real_drum_loop_counter:
+            return False
+        return bool(
+            pulse <= 0.16
+            and drum_material < 0.74
+            and drum_loop_source <= 0.70
+            and self._shape_number(facts, "onset_count") >= 8.0
+        )
+
     @staticmethod
     def _shape_number(facts: SharedAudioFacts, metric_name: str) -> float:
         return max(_shape_metric_from_facts(facts, metric_name), _feature_number_from_facts(facts, metric_name))
+
+    @staticmethod
+    def _shape_score(facts: SharedAudioFacts, shape_name: str) -> float:
+        if not isinstance(getattr(facts, "evidence", None), dict):
+            return 0.0
+        container = facts.evidence.get("shape_vote")
+        scores = container.get("shape_scores") if isinstance(container, dict) else None
+        if not isinstance(scores, (list, tuple)):
+            return 0.0
+        for item in scores:
+            if isinstance(item, (list, tuple)) and len(item) >= 2 and str(item[0]) == shape_name:
+                return min(1.0, max(0.0, FinalDrumLoopClaimProducer._safe_float(item[1])))
+        return 0.0
 
     @staticmethod
     def _physics_layer(facts: SharedAudioFacts) -> dict:

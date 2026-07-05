@@ -30,6 +30,9 @@ from aaron_sound_sorter.voters.base import Voter, clamp01
 SHAPE_TOP = "_SHAPE_DIAGNOSTIC"
 PITCHED_PHRASE_SHAPE = "pitched_phrase_shape"
 PITCHED_REPETITION_PHRASE = "pitched_repetition_phrase"
+DESIGNED_LOW_FX_SHAPE = "designed_low_fx"
+DESIGNED_MOTION_FX_LOOP = "designed_motion_fx_loop"
+DESIGNED_TONAL_FX_SHAPE = "designed_tonal_fx"
 
 
 @dataclass(frozen=True)
@@ -201,27 +204,27 @@ def classify_shape(values: Mapping[str, float], *, facts: SharedAudioFacts) -> S
     plucked_authority = evidence_number(facts, "plucked_string_authority_score")
     synth_source = evidence_number(facts, "synth_tonal_source_score")
     keys_authority = evidence_number(facts, "struck_keys_authority_score")
-    measured_fx_motion = evidence_number(facts, "fx_motion_score")
-    measured_transition = evidence_number(facts, "fx_transition_authority_score")
+    measured_fx_motion = measured_number(facts, "fx_motion_score")
+    measured_transition = measured_number(facts, "fx_transition_authority_score")
     measured_texture = max(
-        evidence_number(facts, "texture_bed_score"),
-        evidence_number(facts, "texture_water_ocean_score"),
-        evidence_number(facts, "texture_rain_score"),
-        evidence_number(facts, "texture_wind_score"),
-        evidence_number(facts, "texture_fire_score"),
-        evidence_number(facts, "texture_thunder_score"),
-        evidence_number(facts, "texture_noise_static_score"),
+        measured_number(facts, "texture_bed_score"),
+        measured_number(facts, "texture_water_ocean_score"),
+        measured_number(facts, "texture_rain_score"),
+        measured_number(facts, "texture_wind_score"),
+        measured_number(facts, "texture_fire_score"),
+        measured_number(facts, "texture_thunder_score"),
+        measured_number(facts, "texture_noise_static_score"),
     )
     measured_fx_tail = max(
-        evidence_number(facts, "fx_impact_score"),
-        evidence_number(facts, "fx_reverse_score"),
-        evidence_number(facts, "fx_whoosh_sweep_score"),
-        evidence_number(facts, "fx_riser_build_score"),
-        evidence_number(facts, "fx_drop_downlifter_score"),
+        measured_number(facts, "fx_impact_score"),
+        measured_number(facts, "fx_reverse_score"),
+        measured_number(facts, "fx_whoosh_sweep_score"),
+        measured_number(facts, "fx_riser_build_score"),
+        measured_number(facts, "fx_drop_downlifter_score"),
         measured_transition,
     )
     raw_measured_drum_loop = max(
-        evidence_number(facts, "drum_loop_source_score"),
+        measured_number(facts, "drum_loop_source_score"),
         role_number(facts, "percussive_drum_loop"),
         role_number(facts, "bright_drum_loop"),
     )
@@ -232,11 +235,11 @@ def classify_shape(values: Mapping[str, float], *, facts: SharedAudioFacts) -> S
     high_total = clamp01(v(values, "presence_ratio_2000_8000hz") + v(values, "air_ratio_gt_8000hz"))
     mid_total = clamp01(v(values, "mid_ratio_500_2000hz"))
     bass_identity_source = max(
-        evidence_number(facts, "bass_synth_score"),
-        evidence_number(facts, "bass_sub_score"),
-        evidence_number(facts, "bass_808_score"),
-        evidence_number(facts, "bass_electric_score"),
-        evidence_number(facts, "low_end_source_score"),
+        measured_number(facts, "bass_synth_score"),
+        measured_number(facts, "bass_sub_score"),
+        measured_number(facts, "bass_808_score"),
+        measured_number(facts, "bass_electric_score"),
+        measured_number(facts, "low_end_source_score"),
     )
     pure_low_bass_loop_body = bool(
         bass_identity_source >= 0.70
@@ -376,6 +379,13 @@ def classify_shape(values: Mapping[str, float], *, facts: SharedAudioFacts) -> S
         inverse_ramp(drumlike, 0.10, 0.40),
         inverse_ramp(high_event, 0.08, 0.35),
     )
+    # Bass phrase is allowed to be tonal, but it still needs a bass-band
+    # owner.  Otherwise midrange voiced/formant phrases can win ``bass_phrase``
+    # just because they are pitched, sustained, and not drumlike.
+    bass_band_owner = max(low_total, low_event, v(values, "sub_bass_ratio_lt_150hz"))
+    bass_identity_hint = max(measured_number(facts, "bass_sub_score"), measured_number(facts, "bass_synth_score"))
+    if bass_band_owner < 0.26 and not (bass_identity_hint >= 0.70 and low_total >= 0.20):
+        scores["bass_phrase"] = min(scores["bass_phrase"], 0.52)
     # This used to be named "vocal_phrase".  That was a category leak:
     # formant/voicing shape is useful structure evidence, but it is not proof
     # of source identity.  Keep the measured score, but use a source-safe name.
@@ -386,6 +396,17 @@ def classify_shape(values: Mapping[str, float], *, facts: SharedAudioFacts) -> S
         ramp(duration, 0.35, 1.5),
         inverse_ramp(drumlike, 0.08, 0.32),
     )
+    source_safe_voiced_phrase_body = bool(
+        formant >= 1.45
+        and f0_voiced >= 0.72
+        and pitch_conf >= 0.72
+        and max(drumlike, percussive) <= 0.12
+        and bass_band_owner < 0.30
+    )
+    if source_safe_voiced_phrase_body:
+        voiced_floor = max(scores[PITCHED_PHRASE_SHAPE], 0.86)
+        scores[PITCHED_PHRASE_SHAPE] = voiced_floor
+        scores["bass_phrase"] = min(scores["bass_phrase"], voiced_floor - 0.08)
     scores["pitched_phrase"] = average(
         ramp(pitch_conf, 0.45, 0.85),
         ramp(f0_voiced, 0.42, 0.86),
@@ -484,6 +505,8 @@ def classify_shape(values: Mapping[str, float], *, facts: SharedAudioFacts) -> S
         + 0.10 * inverse_ramp(flatness, 0.04, 0.34)
         + 0.08 * inverse_ramp(low_total, 0.42, 0.82)
     )
+    if source_safe_voiced_phrase_body:
+        scores["siren_alarm_tone"] = min(scores["siren_alarm_tone"], scores[PITCHED_PHRASE_SHAPE] - 0.07)
     scores["hybrid_fx_motion"] = clamp01(
         0.28 * noise_wash
         + 0.22 * ramp(abs(slope), 0.035, 0.18)
@@ -502,6 +525,69 @@ def classify_shape(values: Mapping[str, float], *, facts: SharedAudioFacts) -> S
             0.78,
         )
         + 0.08 * inverse_ramp(max(pitched, harmonic), 0.20, 0.76)
+    )
+    fx_low_design = max(
+        measured_number(facts, "fx_sub_hit_score"),
+        measured_number(facts, "fx_boom_score"),
+        measured_number(facts, "fx_impact_score"),
+        measured_number(facts, "fx_drop_downlifter_score"),
+        measured_number(facts, "fx_siren_score"),
+        measured_number(facts, "fx_formant_score"),
+        measured_number(facts, "fx_whoosh_sweep_score"),
+        measured_fx_motion,
+        measured_transition,
+    )
+    fx_tonal_design = max(
+        measured_number(facts, "fx_formant_score"),
+        measured_number(facts, "fx_siren_score"),
+        measured_number(facts, "fx_alarm_score"),
+        measured_number(facts, "fx_glitch_stutter_score"),
+        measured_number(facts, "fx_radio_electrical_score"),
+        measured_number(facts, "fx_reverse_score"),
+        measured_fx_motion,
+        measured_transition,
+    )
+    fx_motion_design = max(
+        measured_fx_motion,
+        measured_transition,
+        measured_fx_tail,
+        measured_number(facts, "fx_whoosh_sweep_score"),
+        measured_number(facts, "fx_glitch_stutter_score"),
+        measured_number(facts, "fx_machine_mechanical_score"),
+    )
+    # These are still shape labels, not destinations.  They mark common FX
+    # decoys where normal pitch/rhythm morphology is present, but the measured
+    # spectrum/envelope behaves like designed motion, designed low-end, or
+    # designed tonal/formant effects.  Later claim producers must still require
+    # compatible FX evidence before routing to FX.
+    scores[DESIGNED_LOW_FX_SHAPE] = clamp01(
+        0.24 * ramp(low_event, 0.52, 0.88)
+        + 0.22 * ramp(fx_low_design, 0.48, 0.72)
+        + 0.16 * ramp(tail, 0.30, 0.82)
+        + 0.14 * ramp(max(noise_wash, entropy), 0.34, 0.72)
+        + 0.10 * ramp(duration, 0.35, 2.2)
+        + 0.08 * ramp(abs(slope), 0.025, 0.14)
+        + 0.06 * inverse_ramp(max(drumlike, percussive), 0.04, 0.30)
+        - 0.14 * ramp(bass_identity_source, 0.68, 0.92)
+    )
+    scores[DESIGNED_MOTION_FX_LOOP] = clamp01(
+        0.24 * true_repetition
+        + 0.22 * ramp(fx_motion_design, 0.38, 0.72)
+        + 0.16 * ramp(max(scores["whoosh_sweep"], scores["glitch_stutter"], scores["hybrid_fx_motion"]), 0.52, 0.82)
+        + 0.12 * ramp(max(noise_wash, timbre_diversity), 0.38, 0.72)
+        + 0.10 * ramp(stereo_width, 0.32, 0.78)
+        + 0.08 * ramp(abs(slope), 0.025, 0.16)
+        + 0.08 * inverse_ramp(max(drumlike, percussive), 0.32, 0.76)
+    )
+    scores[DESIGNED_TONAL_FX_SHAPE] = clamp01(
+        0.24 * tonal_presence
+        + 0.22 * ramp(fx_tonal_design, 0.46, 0.74)
+        + 0.16 * ramp(max(scores["siren_alarm_tone"], scores["glitch_stutter"], scores["hybrid_fx_motion"]), 0.50, 0.82)
+        + 0.12 * ramp(max(noise_wash, inharmonicity, timbre_diversity), 0.24, 0.66)
+        + 0.10 * ramp(tail, 0.22, 0.78)
+        + 0.08 * ramp(duration, 0.35, 2.4)
+        + 0.08 * inverse_ramp(max(drumlike, percussive), 0.08, 0.36)
+        - 0.10 * ramp(max(plucked_authority, keys_authority), 0.58, 0.88)
     )
     scores["echo_tail_hit"] = echo_tail
     repeated_phrase_score = true_repetition
@@ -598,6 +684,83 @@ def classify_shape(values: Mapping[str, float], *, facts: SharedAudioFacts) -> S
         and not clean_bass_shape_evidence
         and not pitched_repetition_shape_counter
     )
+    directional_fx_motion = max(
+        measured_fx_motion,
+        measured_transition,
+        measured_number(facts, "fx_whoosh_sweep_score"),
+        measured_number(facts, "fx_glitch_stutter_score"),
+        measured_number(facts, "fx_drop_downlifter_score"),
+        measured_number(facts, "fx_riser_build_score"),
+        measured_number(facts, "fx_reverse_score"),
+        measured_number(facts, "fx_radio_electrical_score"),
+    )
+    strong_directional_fx_motion = bool(
+        abs(slope) >= 0.30
+        and directional_fx_motion >= 0.68
+        and max(scores["whoosh_sweep"], scores["glitch_stutter"], scores["hybrid_fx_motion"]) >= 0.62
+    )
+    if strong_directional_fx_motion:
+        # Pulsed sweeps/downlifters can contain many sharp broadband events, so
+        # generic drum-loop detectors often fire.  A strong monotonic spectral
+        # move with FX-motion support is a stronger structural owner than the
+        # repeated-noisy drum-loop shortcut.  Later claim producers still need
+        # compatible FX evidence before routing this to FX.
+        repeated_noisy_drum_loop_body = False
+    real_drum_material_body = bool(
+        drum_material_branch >= 0.58
+        and max(percussive, drumlike, percussive_onset) >= 0.44
+        and not strong_directional_fx_motion
+        and directional_fx_motion < 0.58
+    )
+    designed_low_fx_body = bool(
+        scores[DESIGNED_LOW_FX_SHAPE] >= 0.60
+        and fx_low_design >= 0.56
+        and not real_drum_material_body
+        and not (clean_bass_shape_evidence and fx_low_design < bass_identity_source + 0.08)
+    )
+    designed_motion_directional_or_unpitched = bool(
+        abs(slope) >= 0.22
+        or pitch_conf <= 0.35
+        or pitched <= 0.35
+        or (fx_motion_design >= 0.74 and max(sustained_tonal, non_event_tonal) <= 0.48)
+    )
+    designed_motion_fx_loop_body = bool(
+        scores[DESIGNED_MOTION_FX_LOOP] >= 0.62
+        and fx_motion_design >= 0.48
+        and true_repetition >= 0.50
+        and designed_motion_directional_or_unpitched
+        and not real_drum_material_body
+    )
+    designed_tonal_fx_body = bool(
+        not source_safe_voiced_phrase_body
+        and scores[DESIGNED_TONAL_FX_SHAPE] >= 0.62
+        and fx_tonal_design >= 0.54
+        and not real_drum_material_body
+        and not (
+            max(plucked_authority, keys_authority, synth_source) >= 0.72
+            and noise_wash <= 0.34
+            and max(measured_fx_motion, measured_transition) < 0.42
+        )
+    )
+    if designed_low_fx_body:
+        designed_low_floor = min(0.94, max(scores[DESIGNED_LOW_FX_SHAPE], fx_low_design + 0.08))
+        scores[DESIGNED_LOW_FX_SHAPE] = max(scores[DESIGNED_LOW_FX_SHAPE], designed_low_floor)
+        scores["bass_phrase"] = min(scores["bass_phrase"], designed_low_floor - 0.03)
+        scores[PITCHED_REPETITION_PHRASE] = min(scores[PITCHED_REPETITION_PHRASE], designed_low_floor - 0.04)
+        scores["beat_loop"] = min(scores["beat_loop"], designed_low_floor - 0.05)
+    if designed_motion_fx_loop_body:
+        designed_motion_floor = min(0.95, max(scores[DESIGNED_MOTION_FX_LOOP], fx_motion_design + 0.08))
+        scores[DESIGNED_MOTION_FX_LOOP] = max(scores[DESIGNED_MOTION_FX_LOOP], designed_motion_floor)
+        scores["hybrid_fx_motion"] = max(scores["hybrid_fx_motion"], min(0.93, designed_motion_floor - 0.02))
+        scores["beat_loop"] = min(scores["beat_loop"], designed_motion_floor - 0.04)
+        scores["top_loop"] = min(scores["top_loop"], designed_motion_floor - 0.04)
+        scores["repeated_phrase_loop"] = min(scores["repeated_phrase_loop"], designed_motion_floor - 0.03)
+    if designed_tonal_fx_body:
+        designed_tonal_floor = min(0.94, max(scores[DESIGNED_TONAL_FX_SHAPE], fx_tonal_design + 0.06))
+        scores[DESIGNED_TONAL_FX_SHAPE] = max(scores[DESIGNED_TONAL_FX_SHAPE], designed_tonal_floor)
+        scores["pitched_phrase"] = min(scores["pitched_phrase"], designed_tonal_floor - 0.03)
+        scores[PITCHED_PHRASE_SHAPE] = min(scores[PITCHED_PHRASE_SHAPE], designed_tonal_floor - 0.03)
+        scores[PITCHED_REPETITION_PHRASE] = min(scores[PITCHED_REPETITION_PHRASE], designed_tonal_floor - 0.03)
     voice_body = max(
         evidence_number(facts, "voice_score"),
         evidence_number(facts, "human_spoken_voice_score"),
@@ -618,6 +781,7 @@ def classify_shape(values: Mapping[str, float], *, facts: SharedAudioFacts) -> S
         and measured_drum_loop >= 0.54
         and max(percussive, drumlike, percussive_onset) >= 0.50
         and measured_texture < 0.82
+        and not strong_directional_fx_motion
         and not clean_bass_shape_evidence
         and not pitched_repetition_shape_counter
     )
@@ -766,6 +930,7 @@ def classify_shape(values: Mapping[str, float], *, facts: SharedAudioFacts) -> S
         scores["top_loop"] = min(scores["top_loop"], max(0.0, scores[PITCHED_REPETITION_PHRASE] - 0.05))
     rhythmic_break_has_drum_body = bool(
         not pitched_repetition_drum_decoy
+        and not strong_directional_fx_motion
         and (
             max(percussive, drumlike) >= 0.52
             or (high_event >= 0.42 and high_total >= 0.18 and percussive_onset >= pitched_onset - 0.04)
@@ -904,6 +1069,27 @@ def evidence_number(facts: SharedAudioFacts, name: str, default: float = 0.0) ->
         return float(default)
 
 
+def subpanel_number(facts: SharedAudioFacts, name: str, default: float = 0.0) -> float:
+    """Read one measured low-level physics subpanel score, if present."""
+    evidence = getattr(facts, "evidence", {})
+    if not isinstance(evidence, Mapping):
+        return float(default)
+    subpanels = evidence.get("physics_subpanels")
+    if isinstance(subpanels, Mapping):
+        flat = subpanels.get("flat")
+        if isinstance(flat, Mapping):
+            try:
+                return float(flat.get(name, default) or default)
+            except Exception:
+                return float(default)
+    return float(default)
+
+
+def measured_number(facts: SharedAudioFacts, name: str, default: float = 0.0) -> float:
+    """Read a numeric feature from either top-level evidence or subpanel evidence."""
+    return max(evidence_number(facts, name, default), subpanel_number(facts, name, default))
+
+
 def role_number(facts: SharedAudioFacts, name: str, default: float = 0.0) -> float:
     """Read measured-role strength from the nested role packet."""
     evidence = getattr(facts, "evidence", {})
@@ -978,6 +1164,9 @@ def shape_compatible_tops(primary_shape: str) -> list[str]:
         "foley_action",
         "mechanical_motion",
         "hybrid_fx_motion",
+        DESIGNED_LOW_FX_SHAPE,
+        DESIGNED_MOTION_FX_LOOP,
+        DESIGNED_TONAL_FX_SHAPE,
     }:
         return ["FX"]
     if primary_shape in {"noise_texture", "static_bed"}:

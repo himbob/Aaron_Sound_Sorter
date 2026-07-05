@@ -789,6 +789,8 @@ class ProfileInstrumentClaimMixin:
             return None
         if self._facts_have_strong_human_voice_identity(facts) and not synth_lead_like_body:
             return None
+        if self._facts_support_clean_designed_tonal_keys_loop(facts):
+            return None
 
         shared_synth = self.best_shared_candidate(
             raw,
@@ -2722,6 +2724,8 @@ class ProfileInstrumentClaimMixin:
             facts,
         ):
             return None
+        if self._facts_support_clean_designed_tonal_keys_loop(facts):
+            return None
 
         best_guess = self.best_brain_guess(
             brain_result,
@@ -2799,6 +2803,61 @@ class ProfileInstrumentClaimMixin:
             shared_winner=folder_path,
             shared_candidates=raw.shared_candidates,
             is_real_candidate=False,
+        )
+
+    @staticmethod
+    def _facts_support_clean_designed_tonal_keys_loop(facts: SharedAudioFacts | None) -> bool:
+        """Return True when split candidates should yield to a clean keys loop.
+
+        This is a source-name-blind stand-down for the broad mixed-loop claim.
+        Some electric/acoustic piano loops expose guitar, reed, synth, and voice
+        neighbors in candidate space, but the measured body is a very clean,
+        low-flatness, mid-band tonal keys loop with no drum or FX motion.
+        """
+        if facts is None:
+            return False
+
+        def subpanel_value(name: str) -> float:
+            if not isinstance(getattr(facts, "evidence", None), dict):
+                return 0.0
+            panels = facts.evidence.get("physics_subpanels", {})
+            flat = panels.get("flat", {}) if isinstance(panels, dict) else {}
+            if not isinstance(flat, dict):
+                return 0.0
+            return _safe_float(flat.get(name))
+
+        keys_support = max(
+            _feature_number_from_facts(facts, "struck_keys_score"),
+            _feature_number_from_facts(facts, "keys_tonal_decay_score"),
+            _feature_number_from_facts(facts, "struck_keys_authority_score"),
+            subpanel_value("struck_keys_score"),
+            subpanel_value("keys_tonal_decay_score"),
+            subpanel_value("struck_keys_authority_score"),
+        )
+        fx_motion = max(
+            _feature_number_from_facts(facts, "fx_motion_score"),
+            _feature_number_from_facts(facts, "fx_transition_authority_score"),
+            subpanel_value("fx_motion_score"),
+            subpanel_value("fx_transition_authority_score"),
+        )
+        return bool(
+            _shape_vote_from_facts(facts) == "designed_tonal_fx"
+            and _shape_confidence_from_facts(facts) >= 0.74
+            and keys_support >= 0.54
+            and max(
+                _feature_number_from_facts(facts, "keys_tonal_decay_score"),
+                subpanel_value("keys_tonal_decay_score"),
+            )
+            >= 0.70
+            and _shape_metric_from_facts(facts, "pitched_event_ratio") >= 0.90
+            and _shape_metric_from_facts(facts, "sustained_tonal_frame_ratio") >= 0.86
+            and _shape_metric_from_facts(facts, "non_event_tonal_ratio") >= 0.86
+            and 0.50 <= _shape_metric_from_facts(facts, "mid_event_ratio") <= 0.90
+            and _shape_metric_from_facts(facts, "high_event_ratio") <= 0.05
+            and _shape_metric_from_facts(facts, "spectral_flatness_mean") <= 0.03
+            and _shape_metric_from_facts(facts, "percussive_event_ratio") <= 0.10
+            and _shape_metric_from_facts(facts, "drumlike_frame_ratio") <= 0.10
+            and fx_motion < 0.50
         )
 
     def _mixed_instrument_loop_spread_support(

@@ -107,6 +107,8 @@ class MeasuredDrumStructureClaimProducer:
         )
         if not (clean_top_hat_loop or high_repetition_drum_loop):
             return None
+        if self._designed_motion_shape_blocks_hat_loop(facts):
+            return None
         target = "Drums/Hi Hats/Closed Hat/Loops" if clean_top_hat_loop else "Drums/Drum Loops/Loops"
         return claim_from_folder_path(
             folder_path=target,
@@ -1168,6 +1170,49 @@ class MeasuredDrumStructureClaimProducer:
 
     def _shape_number(self, facts: SharedAudioFacts | None, metric_name: str) -> float:
         return max(_shape_metric_from_facts(facts, metric_name), _feature_number_from_facts(facts, metric_name))
+
+    def _shape_score(self, facts: SharedAudioFacts | None, name: str) -> float:
+        if facts is None or not isinstance(getattr(facts, "evidence", None), dict):
+            return 0.0
+        shape_vote = facts.evidence.get("shape_vote")
+        if not isinstance(shape_vote, dict):
+            return 0.0
+        scores = shape_vote.get("shape_scores")
+        if isinstance(scores, (list, tuple)):
+            for item in scores:
+                if isinstance(item, (list, tuple)) and len(item) >= 2 and str(item[0]) == name:
+                    return self._safe_float(item[1])
+        return 0.0
+
+    def _designed_motion_shape_blocks_hat_loop(self, facts: SharedAudioFacts | None) -> bool:
+        """Block hat-loop claims for rhythmic sweeps/lasers with strong motion.
+
+        Some designed FX loops are full of bright onsets, so the closed-hat
+        panel fires.  Do not let that claim own the parent when the shape stack
+        shows a broad sweep/stutter body with a large spectral-motion slope.
+        """
+        motion_shape = max(
+            self._shape_score(facts, "whoosh_sweep"),
+            self._shape_score(facts, "designed_motion_fx_loop"),
+            self._shape_score(facts, "hybrid_fx_motion"),
+            self._shape_score(facts, "transition_riser"),
+            self._shape_score(facts, "transition_drop"),
+            self._shape_score(facts, "reverse_swell"),
+            self._shape_score(facts, "glitch_stutter"),
+        )
+        fx_panel = max(
+            self._subpanel_score(facts, "fx_glitch_stutter_score"),
+            self._subpanel_score(facts, "fx_radio_electrical_score"),
+            self._subpanel_score(facts, "fx_whoosh_sweep_score"),
+            self._subpanel_score(facts, "fx_motion_score"),
+            self._subpanel_score(facts, "fx_transition_authority_score"),
+            self._subpanel_score(facts, "fx_reverse_score"),
+            self._subpanel_score(facts, "fx_siren_score"),
+            self._subpanel_score(facts, "fx_alarm_score"),
+        )
+        slope = abs(self._shape_number(facts, "centroid_slope_norm"))
+        pulse = self._shape_number(facts, "pulse_regularity")
+        return bool(motion_shape >= 0.78 and fx_panel >= 0.70 and slope >= 0.35 and pulse <= 0.48)
 
     def _role_value(self, facts: SharedAudioFacts | None, role_name: str) -> float:
         roles = (

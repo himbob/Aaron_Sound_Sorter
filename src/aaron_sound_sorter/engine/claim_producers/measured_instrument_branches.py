@@ -222,6 +222,10 @@ class MeasuredInstrumentBranchClaimProducer:
         raw_path = _norm_path(raw.folder_path or raw.label)
         if raw.family != "Instruments" or "one shot" not in raw_path:
             return None
+        if self._facts_support_clean_keys_loop(context.facts) or self._facts_support_clean_vintage_keys_loop(
+            context.facts
+        ):
+            return None
         if not self._facts_support_low_mixed_melodic_loop(context.facts):
             return None
         return claim_from_folder_path(
@@ -528,6 +532,7 @@ class MeasuredInstrumentBranchClaimProducer:
             branch in {"Woodwinds", "ReedWoodwind"}
             and self._measured_score(context.facts, "woodwind_sax_score", "reed_wind_score") >= 0.64
             and self._measured_score(context.facts, "keys_hammer_attack_score") < 0.40
+            and not self._facts_support_designed_tonal_keys_loop(context.facts)
         ):
             return None
         if not (
@@ -560,6 +565,8 @@ class MeasuredInstrumentBranchClaimProducer:
         if parent_role in {"protected_percussive_one_shot", "percussive_one_shot", "low_kick_like_hit"}:
             return None
         raw = context.raw
+        if self._raw_rank_one_concrete_non_sax_instrument(raw):
+            return None
         path = _norm_path(raw.folder_path or "")
         if raw.family == "Instruments" and "sax" in path and "loop" in path and "one shot" not in path:
             return None
@@ -592,13 +599,59 @@ class MeasuredInstrumentBranchClaimProducer:
             is_real_candidate=False,
         )
 
+    def _raw_rank_one_concrete_non_sax_instrument(self, raw: ConsensusClaim) -> bool:
+        """Return whether a concrete rank-one instrument claim should stand.
+
+        Args:
+            raw: Raw shared voter claim before measured branch producers add
+                synthetic safety claims.
+
+        Returns:
+            True when both Brain and Physics already agree on the same concrete
+            non-sax instrument label at rank one.
+
+        Side Effects:
+            None.
+
+        Raises:
+            No intentional exceptions.
+
+        Important Constraints:
+            This uses internal candidate metadata only.  It must not inspect
+            producer filenames or source folder paths.
+        """
+        if raw.family != "Instruments" or not raw.is_real_candidate:
+            return False
+        if raw.source != "strong_consensus":
+            return False
+        if raw.brain_rank != 1 or raw.physics_rank != 1:
+            return False
+        try:
+            if float(raw.raw_candidate_score or 9999.0) > 2.0:
+                return False
+        except Exception:
+            return False
+        path = _norm_path(raw.folder_path or raw.label)
+        if not path or "sax" in path or "saxophone" in path:
+            return False
+        broad_parent_fragments = ("instrument loops", "mixed musical loops", "brass and woodwinds")
+        return not any(fragment in path for fragment in broad_parent_fragments)
+
     def _facts_support_low_mixed_melodic_loop(self, facts: SharedAudioFacts | None) -> bool:
         if facts is None:
             return False
         shape = _shape_vote_from_facts(facts)
-        if shape not in {"beat_loop", "bass_phrase", "pitched_repetition_phrase", "repeated_phrase_loop"}:
+        if shape not in {
+            "beat_loop",
+            "bass_phrase",
+            "pitched_repetition_phrase",
+            "repeated_phrase_loop",
+            "designed_low_fx",
+            "designed_tonal_fx",
+        }:
             return False
-        if _shape_confidence_from_facts(facts) < 0.84:
+        minimum_confidence = 0.82 if shape in {"designed_low_fx", "designed_tonal_fx"} else 0.84
+        if _shape_confidence_from_facts(facts) < minimum_confidence:
             return False
         if max(self._role_value(facts, "pitched_music_loop"), self._role_value(facts, "bass_loop")) < 0.82:
             return False
@@ -807,6 +860,8 @@ class MeasuredInstrumentBranchClaimProducer:
             "pitched_phrase_shape",
             "sustained_pad",
             "vocal_phrase",
+            "designed_low_fx",
+            "designed_tonal_fx",
         }:
             return False
         if shape_conf < 0.70:
@@ -902,6 +957,7 @@ class MeasuredInstrumentBranchClaimProducer:
             "repeated_phrase_loop",
             "sustained_pad",
             "vocal_phrase",
+            "designed_tonal_fx",
         }:
             return False
         keys_support = max(
@@ -909,6 +965,8 @@ class MeasuredInstrumentBranchClaimProducer:
             self._measured_score(facts, "keys_tonal_decay_score"),
             self._measured_score(facts, "struck_keys_authority_score"),
         )
+        if self._facts_support_designed_tonal_keys_loop(facts):
+            return True
         return bool(
             _shape_confidence_from_facts(facts) >= 0.78
             and keys_support >= 0.54
@@ -924,13 +982,43 @@ class MeasuredInstrumentBranchClaimProducer:
             and self._measured_score(facts, "woodwind_sax_score", "reed_wind_score") < keys_support + 0.18
         )
 
+    def _facts_support_designed_tonal_keys_loop(self, facts: SharedAudioFacts | None) -> bool:
+        if facts is None:
+            return False
+        keys_support = max(
+            self._measured_score(facts, "struck_keys_score"),
+            self._measured_score(facts, "keys_tonal_decay_score"),
+            self._measured_score(facts, "struck_keys_authority_score"),
+        )
+        return bool(
+            _shape_vote_from_facts(facts) == "designed_tonal_fx"
+            and _shape_confidence_from_facts(facts) >= 0.74
+            and keys_support >= 0.54
+            and self._measured_score(facts, "keys_tonal_decay_score") >= 0.70
+            and self._shape_number(facts, "pitched_event_ratio") >= 0.90
+            and self._shape_number(facts, "sustained_tonal_frame_ratio") >= 0.86
+            and self._shape_number(facts, "non_event_tonal_ratio") >= 0.86
+            and 0.50 <= self._shape_number(facts, "mid_event_ratio") <= 0.90
+            and self._shape_number(facts, "high_event_ratio") <= 0.05
+            and self._shape_number(facts, "spectral_flatness_mean") <= 0.03
+            and self._shape_number(facts, "percussive_event_ratio") <= 0.10
+            and self._shape_number(facts, "drumlike_frame_ratio") <= 0.10
+        )
+
     def _facts_support_clean_vintage_keys_loop(self, facts: SharedAudioFacts | None) -> bool:
         if facts is None:
             return False
         shape = _shape_vote_from_facts(facts)
         return bool(
             shape
-            in {"vocal_phrase", "pitched_phrase", "repeated_phrase_loop", "sustained_pad", "pitched_repetition_phrase"}
+            in {
+                "vocal_phrase",
+                "pitched_phrase",
+                "repeated_phrase_loop",
+                "sustained_pad",
+                "pitched_repetition_phrase",
+                "designed_tonal_fx",
+            }
             and _shape_confidence_from_facts(facts) >= 0.80
             and self._shape_number(facts, "pitched_event_ratio") >= 0.90
             and self._shape_number(facts, "sustained_tonal_frame_ratio") >= 0.78
@@ -966,15 +1054,6 @@ class MeasuredInstrumentBranchClaimProducer:
             return False
         shape = _shape_vote_from_facts(facts)
         shape_conf = _shape_confidence_from_facts(facts)
-        if shape not in {
-            "pitched_repetition_phrase",
-            "pitched_phrase",
-            "vocal_phrase",
-            "repeated_phrase_loop",
-            "transition_drop",
-            "transition_riser",
-        }:
-            return False
         layer = self._physics_layer(facts)
         sax_panel = max(
             self._measured_score(facts, "woodwind_sax_score"),
@@ -988,6 +1067,35 @@ class MeasuredInstrumentBranchClaimProducer:
         )
         synth_panel = self._measured_score(facts, "synth_tonal_source_score", "synth_lead_score", "synth_pad_score")
         keys_panel = self._measured_score(facts, "struck_keys_score", "keys_tonal_decay_score")
+        siren_alarm_tonal_reed_loop = bool(
+            shape == "siren_alarm_tone"
+            and shape_conf >= 0.68
+            and self._shape_number(facts, "pitched_event_ratio") >= 0.92
+            and self._shape_number(facts, "f0_voiced_ratio") >= 0.86
+            and self._shape_number(facts, "sustained_tonal_frame_ratio") >= 0.86
+            and self._shape_number(facts, "non_event_tonal_ratio") >= 0.86
+            and self._shape_number(facts, "true_repetition_score") >= 0.70
+            and self._measured_score(facts, "loop_pulse_clarity", "loop_tempo_confidence") >= 0.62
+            and self._shape_number(facts, "percussive_event_ratio") <= 0.08
+            and self._shape_number(facts, "drumlike_frame_ratio") <= 0.08
+            and max(sax_panel, reed_panel) >= 0.58
+            and self._measured_score(facts, "fx_motion_score", "fx_transition_authority_score") <= 0.38
+            and synth_panel < sax_panel + 0.16
+            and keys_panel < sax_panel + 0.16
+        )
+        if (
+            shape
+            not in {
+                "pitched_repetition_phrase",
+                "pitched_phrase",
+                "vocal_phrase",
+                "repeated_phrase_loop",
+                "transition_drop",
+                "transition_riser",
+            }
+            and not siren_alarm_tonal_reed_loop
+        ):
+            return False
         branch = str(layer.get("instrument_branch_selected") or layer.get("physics_layer_branch") or "")
         dark_low_mid_reed_branch = bool(
             branch in {"Woodwinds", "ReedWoodwind"}
@@ -1005,6 +1113,8 @@ class MeasuredInstrumentBranchClaimProducer:
             and self._shape_number(facts, "drumlike_frame_ratio") <= 0.16
         )
         if dark_low_mid_reed_branch and clean_loop_shape:
+            return True
+        if siren_alarm_tonal_reed_loop:
             return True
         if branch in {"Woodwinds", "ReedWoodwind"} and clean_loop_shape and sax_panel >= 0.64:
             return True

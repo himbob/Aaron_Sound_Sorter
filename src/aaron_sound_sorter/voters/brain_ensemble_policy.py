@@ -116,6 +116,8 @@ def brain_role_fit_multiplier(
     """Use measured-role diagnostics to damp unsupported cross-family guesses."""
     if guess is None or not isinstance(guess.evidence, dict):
         return 1.0
+    if bool(guess.evidence.get("human_override_exact_audio_match")):
+        return 1.85
     family = guess.evidence.get("family_compatibility", {})
     compatible = True
     if isinstance(family, dict):

@@ -382,6 +382,58 @@ def test_profile_candidate_broadens_false_voice_when_true_voice_evidence_is_abse
     assert claims[0].is_real_candidate is False
 
 
+def test_profile_synth_candidate_stands_down_for_clean_designed_tonal_keys_loop() -> None:
+    producer = ProfileCandidateClaimProducer()
+    measured = facts(
+        "designed_tonal_fx",
+        0.757,
+        role_evidence={"pitched_music_loop": 0.92},
+    )
+    measured.evidence["shape_vote"].update(
+        {
+            "mid_event_ratio": 0.66,
+            "high_event_ratio": 0.019,
+            "pitched_event_ratio": 1.0,
+            "sustained_tonal_frame_ratio": 1.0,
+            "non_event_tonal_ratio": 1.0,
+            "percussive_event_ratio": 0.0,
+            "drumlike_frame_ratio": 0.0,
+            "spectral_flatness_mean": 0.003,
+        }
+    )
+    measured.evidence["physics_subpanels"] = {
+        "flat": {
+            "struck_keys_score": 0.56,
+            "keys_tonal_decay_score": 0.75,
+            "struck_keys_authority_score": 0.46,
+            "fx_motion_score": 0.22,
+            "fx_transition_authority_score": 0.30,
+        }
+    }
+    synth_path = "Instruments/Synths/Synth Lead/One Shots"
+    context = DecisionContext(
+        raw=raw_claim(
+            "Instruments/Instrument Loops/Loops",
+            score=10.0,
+            shared=[
+                {
+                    "folder_path": synth_path,
+                    "label": synth_path,
+                    "top_family": "Instruments",
+                    "combined_rank_score": 7.0,
+                }
+            ],
+        ),
+        eligibility=eligibility("pitched_music_loop"),
+        facts=measured,
+        brain_result=VoterResult(voter_name="brain", guesses=[guess(synth_path, 1)]),
+    )
+
+    claims = producer.produce(context)
+
+    assert all(claim.source != "profile_candidate_synth_claim" for claim in claims)
+
+
 def test_profile_candidate_preserves_direct_terminal_identity_from_both_voters() -> None:
     producer = ProfileCandidateClaimProducer()
     rhodes_path = "Instruments/Keys/Rhodes/Loops"

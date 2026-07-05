@@ -11,6 +11,7 @@ from aaron_sound_sorter.domain.facts import fingerprint_array
 from aaron_sound_sorter.domain.models import AudioPhysics, SharedAudioFacts, VoterResult
 from aaron_sound_sorter.domain.policies import BrainVoterPolicy, ConsensusPolicy
 from aaron_sound_sorter.voters.base import Voter
+from aaron_sound_sorter.voters.human_override_recall import human_override_recall_match
 from aaron_sound_sorter.voters.scoring_tools import (
     centroid_distance,
     feature_weights,
@@ -108,6 +109,19 @@ class BrainVoter(Voter):
                 weights,
                 use_scalar_fallback=not use_vectorized_fallback,
             )
+            human_override = human_override_recall_match(
+                brain,
+                label,
+                weighted_query_vector=weighted_vector,
+                scaler_mean=mean,
+                scaler_std=std,
+                feature_weight_vector=weights,
+            )
+            human_override_evidence = human_override.evidence()
+            if human_override.matched:
+                score = min(float(score), float(human_override.ranking_score))
+                raw_distance = min(float(raw_distance), float(human_override.nearest_distance))
+                mode = "human_override_fingerprint_teacher_match"
             if use_vectorized_fallback and not np.isfinite(float(score)):
                 fallback_vectors[label] = weighted_vector
             pending_rows.append(
@@ -117,6 +131,7 @@ class BrainVoter(Voter):
                     "raw_distance": float(raw_distance),
                     "mode": str(mode),
                     "used_vectorized_fallback": False,
+                    "human_override_evidence": human_override_evidence,
                 }
             )
 
@@ -155,6 +170,7 @@ class BrainVoter(Voter):
                         "score_is_raw_voter_score": abs(float(role_delta)) < 1e-9,
                         "used_vectorized_centroid_fallback": bool(row.get("used_vectorized_fallback")),
                         "vectorized_centroid_fallback_label_count": int(vectorized_count),
+                        **dict(row.get("human_override_evidence", {})),
                         **role_evidence,
                         "structure_gate": "candidate_pre_filtered",
                     },

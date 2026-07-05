@@ -164,6 +164,58 @@ def test_mixed_instrument_loop_role_claim_does_not_fire_for_single_source_synth(
     assert all(claim.source != "mixed_instrument_loop_role_claim" for claim in claims)
 
 
+def test_mixed_instrument_loop_role_claim_stands_down_for_clean_designed_tonal_keys_loop() -> None:
+    """Clean measured keys-loop evidence should beat broad mixed-loop fallback."""
+    shared = [
+        shared_row("Instruments/Guitar/Nylon Guitar/One Shots", 4.0, brain_rank=1, physics_rank=8),
+        shared_row("Instruments/Synths/Synth Chord/One Shots", 7.0, brain_rank=3, physics_rank=6),
+        shared_row("Instruments/Keys/Electric Piano/Loops", 12.0, brain_rank=8, physics_rank=5),
+        shared_row("Instruments/Instrument Loops/Loops", 10.0, brain_rank=10, physics_rank=1),
+    ]
+    measured = facts("designed_tonal_fx", 0.757)
+    measured.evidence["shape_vote"].update(
+        {
+            "low_event_ratio": 0.32,
+            "mid_event_ratio": 0.66,
+            "high_event_ratio": 0.019,
+            "pitched_event_ratio": 1.0,
+            "sustained_tonal_frame_ratio": 1.0,
+            "non_event_tonal_ratio": 1.0,
+            "percussive_event_ratio": 0.0,
+            "drumlike_frame_ratio": 0.0,
+            "spectral_flatness_mean": 0.003,
+        }
+    )
+    measured.evidence["physics_subpanels"] = {
+        "flat": {
+            "struck_keys_score": 0.56,
+            "keys_tonal_decay_score": 0.75,
+            "struck_keys_authority_score": 0.46,
+            "fx_motion_score": 0.22,
+            "fx_transition_authority_score": 0.30,
+        }
+    }
+    producer = ProfileCandidateClaimProducer()
+    context = DecisionContext(
+        raw=raw_claim("Instruments/Instrument Loops/Loops", shared, score=10.0),
+        eligibility=eligibility("pitched_music_loop"),
+        facts=measured,
+        brain_result=VoterResult(
+            voter_name="brain_full",
+            guesses=[
+                guess("Instruments/Guitar/Nylon Guitar/One Shots", 1),
+                guess("Instruments/Synths/Synth Chord/One Shots", 3),
+                guess("Instruments/Keys/Electric Piano/Loops", 8),
+            ],
+        ),
+        physics_result=VoterResult(voter_name="physics", guesses=[guess("Instruments/Instrument Loops/Loops", 1)]),
+    )
+
+    claims = producer.produce(context)
+
+    assert all(claim.source != "mixed_instrument_loop_role_claim" for claim in claims)
+
+
 def test_mixed_instrument_loop_role_claim_preserves_decisive_terminal_identity() -> None:
     """Brain and physics agreement on the same terminal leaf blocks broadening."""
     rhodes_path = "Instruments/Keys/Electric Piano/Loops"

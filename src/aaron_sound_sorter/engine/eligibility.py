@@ -71,7 +71,22 @@ def infer_parent_eligibility(facts: SharedAudioFacts) -> EligibilityDecision:
         shape_vote = {}
 
     def _fact_score(name: str, default: float = 0.0) -> float:
-        return _num(evidence.get(name), _num(feature_values.get(name), default))
+        direct = _num(evidence.get(name), _num(feature_values.get(name), default))
+        if direct != default:
+            return direct
+        panels = evidence.get("physics_subpanels", {})
+        flat = panels.get("flat", {}) if isinstance(panels, dict) else {}
+        if isinstance(flat, dict) and name in flat:
+            return _num(flat.get(name), default)
+        return direct
+
+    def _shape_score(name: str, default: float = 0.0) -> float:
+        scores = shape_vote.get("shape_scores")
+        if isinstance(scores, (list, tuple)):
+            for item in scores:
+                if isinstance(item, (list, tuple)) and len(item) >= 2 and str(item[0]) == name:
+                    return _num(item[1], default)
+        return default
 
     primary_shape = str(shape_vote.get("primary_shape", ""))
     shape_confidence = _num(shape_vote.get("confidence"), 0.0)
@@ -836,6 +851,167 @@ def infer_parent_eligibility(facts: SharedAudioFacts) -> EligibilityDecision:
             ),
             broad_folder_path="Drums/Drum Loops/Loops",
             reason="measured dense pitched percussion loop; generic instrument, voice, ambience, and FX leaves are not eligible",
+        )
+
+    centroid_slope_abs = abs(
+        _num(shape_vote.get("centroid_slope_norm"), _num(feature_values.get("centroid_slope_norm"), 0.0))
+    )
+    clear_directional_fx_motion_owner = (
+        centroid_slope_abs >= 0.30
+        and max(
+            fx_motion_score,
+            fx_transition_authority_score,
+            _fact_score("fx_whoosh_sweep_score"),
+            _fact_score("fx_drop_downlifter_score"),
+            _fact_score("fx_riser_build_score"),
+            _fact_score("fx_glitch_stutter_score"),
+            _fact_score("fx_radio_electrical_score"),
+        )
+        >= 0.60
+        and loop_pitched <= 0.25
+    )
+    protected_repeated_music_or_drum_owner = (
+        primary_shape
+        in {
+            "top_loop",
+            "beat_loop",
+            "repeated_phrase_loop",
+            "pitched_repetition_phrase",
+            "designed_motion_fx_loop",
+            "designed_tonal_fx",
+            "designed_low_fx",
+        }
+        and shape_confidence >= 0.78
+        and max(event_count, _num(shape_vote.get("onset_count"), 0.0)) >= 8.0
+        and onset_span >= 0.62
+        and _num(shape_vote.get("true_repetition_score"), 0.0) >= 0.62
+        and not clear_directional_fx_motion_owner
+        and (
+            (
+                loop_pitched >= 0.72
+                and max(loop_sustained, loop_non_event_tonal) >= 0.62
+                and pitch_conf >= 0.55
+                and centroid_slope_abs < 0.28
+            )
+            or (
+                max(
+                    _num(shape_vote.get("pulse_regularity"), _fact_score("pulse_regularity")),
+                    event_low_ratio,
+                    event_mid_ratio * 0.65,
+                )
+                >= 0.16
+                and max(
+                    loop_percussive,
+                    loop_drumlike,
+                    _fact_score("drum_loop_source_score"),
+                    _fact_score("drum_hit_score"),
+                    drum_loop,
+                )
+                >= 0.18
+                and centroid_slope_abs < 0.45
+            )
+        )
+    )
+
+    designed_fx_loop_decoy = (
+        primary_shape in {"top_loop", "beat_loop", "repeated_phrase_loop"}
+        and shape_confidence >= 0.84
+        and max(event_count, _num(shape_vote.get("onset_count"), 0.0)) >= 8.0
+        and _num(shape_vote.get("pulse_regularity"), _fact_score("pulse_regularity")) <= 0.16
+        and max(
+            _shape_score("designed_tonal_fx"),
+            _shape_score("designed_motion_fx_loop"),
+            _shape_score("glitch_stutter"),
+            _shape_score("siren_alarm_tone"),
+            _fact_score("fx_glitch_stutter_score"),
+            _fact_score("fx_alarm_score"),
+            _fact_score("fx_siren_score"),
+            _fact_score("fx_formant_score"),
+            _fact_score("fx_radio_electrical_score"),
+            fx_motion_score,
+        )
+        >= 0.66
+        and max(
+            _fact_score("drum_kick_source_score"),
+            _fact_score("drum_snare_source_score"),
+            _fact_score("drum_closed_hat_source_score"),
+            _fact_score("drum_cymbal_source_score"),
+            _fact_score("drum_shaker_tambourine_source_score"),
+            _fact_score("drum_hit_score"),
+        )
+        < 0.74
+        and _fact_score("drum_loop_source_score") <= 0.70
+        and not protected_repeated_music_or_drum_owner
+    )
+
+    designed_fx_motion_body = (
+        primary_shape in {"hybrid_fx_motion", "transition_riser", "transition_drop", "reverse_swell", "whoosh_sweep"}
+        and shape_confidence >= 0.74
+        and max(event_count, _num(shape_vote.get("onset_count"), 0.0)) >= 4.0
+        and max(
+            _shape_score("hybrid_fx_motion"),
+            _shape_score("transition_riser"),
+            _shape_score("transition_drop"),
+            _shape_score("reverse_swell"),
+            _shape_score("whoosh_sweep"),
+            _shape_score("designed_motion_fx_loop"),
+        )
+        >= 0.74
+        and max(
+            _fact_score("fx_reverse_score"),
+            _fact_score("fx_formant_score"),
+            _fact_score("fx_whoosh_sweep_score"),
+            _fact_score("fx_motion_score"),
+            _fact_score("fx_transition_authority_score"),
+            _fact_score("fx_glitch_stutter_score"),
+            _fact_score("fx_radio_electrical_score"),
+            _fact_score("fx_siren_score"),
+            _fact_score("fx_alarm_score"),
+        )
+        >= 0.60
+        and (
+            _num(shape_vote.get("tail_ratio"), 0.0) >= 0.78
+            or _num(shape_vote.get("temporal_centroid_ratio"), temporal_centroid) >= 0.70
+            or abs(_num(shape_vote.get("centroid_slope_norm"), 0.0)) >= 0.30
+        )
+        and not (
+            _fact_score("drum_loop_source_score") >= 0.78
+            and _num(shape_vote.get("pulse_regularity"), _fact_score("pulse_regularity")) >= 0.50
+        )
+    )
+
+    # Designed FX loops/stutters/laser phrases can look like drum loops because
+    # they contain many sharp transients.  Let shape own the parent only when
+    # there is strong designed-FX morphology and weak real drum material.  A
+    # real groove with pulse/drum-source anchors still falls through to Drums.
+    if designed_fx_loop_decoy or designed_fx_motion_body:
+        return EligibilityDecision(
+            role_name="designed_fx_loop_shape" if designed_fx_loop_decoy else "designed_fx_motion_shape",
+            confidence=max(shape_confidence, 0.78),
+            allowed_top_families=("FX", "_TO_REVIEW"),
+            blocked_path_fragments=(
+                "Drums",
+                "Drum Loops",
+                "Percussion",
+                "Kick",
+                "Snare",
+                "Cymbal",
+                "Hi Hats",
+                "Instruments",
+                "Bass",
+                "Guitar",
+                "Keys",
+                "Saxophone",
+                "Woodwinds",
+                "Voice",
+                "Human",
+                "Animals",
+                "Dog",
+                "Bird",
+                "Cat",
+            ),
+            broad_folder_path="FX/Hybrid Designed FX",
+            reason="measured designed FX motion/loop shape; repeated transients are not enough to prove drum-loop identity",
         )
 
     if pitched_percussion_conflict_loop:

@@ -70,6 +70,7 @@ class MeasuredBucketClaimProducer:
             return (
                 true_claims
                 + self.drum_structures.produce(context)
+                + self.transition_fx.produce(context)
                 + self.instrument_branches.produce(context)
                 + self.music_structures.produce(context)
             )

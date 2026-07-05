@@ -25,12 +25,15 @@ from aaron_sound_sorter.features import (
     trim_and_normalize,
 )
 from aaron_sound_sorter.voters.base import Voter
+from aaron_sound_sorter.voters.human_override_recall import human_override_recall_match
 from aaron_sound_sorter.voters.physics_layers import LayeredPhysicsScorer
 from aaron_sound_sorter.voters.scoring_tools import (
+    feature_weights,
     label_maps,
     profile_residual_score,
     role_compatibility_adjustment,
     role_strength,
+    scaler_for_label,
     structure_penalty,
 )
 
@@ -1607,6 +1610,8 @@ class PhysicsVoter(Voter):
                 "physics_layer_leaf_strategy": layer_decision.leaf_strategy,
             }
         direct_vector = self.direct_body_feature_vector(brain, facts)
+        full_vector = np.asarray(physics.fingerprint, dtype=np.float32)
+        weights = feature_weights(brain)
         # Parallelization note: label scoring is independent after first-arrival and
         # layer decisions. This release keeps it synchronous for deterministic evidence logs.
         for label in labels:
@@ -1650,6 +1655,20 @@ class PhysicsVoter(Voter):
                 first_arrival_telemetry=first_arrival_telemetry,
             )
             score, layered_evidence = self.layered_scorer.apply(folder_path, score, layer_decision)
+            mean, std = scaler_for_label(brain, label)
+            safe_std = np.where(np.abs(std) < 1e-6, 1.0, std)
+            weighted_vector = ((full_vector - mean) / safe_std) * weights
+            human_override = human_override_recall_match(
+                brain,
+                label,
+                weighted_query_vector=weighted_vector,
+                scaler_mean=mean,
+                scaler_std=std,
+                feature_weight_vector=weights,
+            )
+            human_override_evidence = human_override.evidence()
+            if human_override.matched:
+                score = min(float(score), float(human_override.ranking_score))
             rows.append(
                 {
                     "label": label,
@@ -1663,11 +1682,16 @@ class PhysicsVoter(Voter):
                         **piano_struck_evidence,
                         **reed_sax_evidence,
                         **layered_evidence,
+                        **human_override_evidence,
                         "raw_profile_score": round(float(profile_score), 6),
                         "structure_penalty": round(float(structure_delta), 6),
                         "structure_penalty_reason": structure_reason,
                         "physics_score_after_adjustments": round(float(score), 6),
-                        "score_is_raw_voter_score": structure_delta == 0.0 and abs(float(role_delta)) < 1e-9,
+                        "score_is_raw_voter_score": (
+                            structure_delta == 0.0
+                            and abs(float(role_delta)) < 1e-9
+                            and not bool(human_override.matched)
+                        ),
                         **role_evidence,
                         "structure_gate": "candidate_pre_filtered",
                     },

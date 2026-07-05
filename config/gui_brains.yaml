@@ -1,0 +1,20 @@
+# Default brain family used by the Aaron Sound Sorter GUI.
+#
+# Paths may be absolute or relative to the project root.
+# The GUI uses these automatically so users do not need to understand
+# full brains, baby brains, harmonic lanes, or internal voter wiring.
+brains:
+  full: stage4_folder_brain.json
+  baby:
+    legacy: stage4_folder_brain_baby.json
+    core: stage4_folder_brain_core_baby.json
+    spread: stage4_folder_brain_spread_baby.json
+    outlier: stage4_folder_brain_outlier_baby.json
+  harmonic_baby:
+    core: stage4_folder_brain_harmonic_core_baby.json
+    spread: stage4_folder_brain_harmonic_spread_baby.json
+    outlier: stage4_folder_brain_harmonic_outlier_baby.json
+
+options:
+  use_baby_brains_in_sort: true
+  use_harmonic_brains_in_sort: false
