@@ -40,6 +40,43 @@ def facts(shape: str, confidence: float, roles: dict[str, float]) -> SharedAudio
     )
 
 
+def designed_tonal_piano_agreement_facts(*, fx_motion: float) -> SharedAudioFacts:
+    """Return a tonal, loop-like Instrument case whose shape resembles designed FX."""
+    return SharedAudioFacts(
+        is_broken_or_tiny=False,
+        is_loop_like=True,
+        is_single_event_like=False,
+        is_short_hit_like=False,
+        is_long=True,
+        evidence={
+            "shape_vote": {
+                "primary_shape": "designed_tonal_fx",
+                "confidence": 0.88,
+                "shape_scores": [
+                    ["designed_tonal_fx", 0.88],
+                    ["pitched_repetition_phrase", 0.84],
+                    ["hybrid_fx_motion", fx_motion],
+                ],
+            },
+            "measured_roles": {"pitched_music_loop": 0.94, "pitched_music_phrase": 0.90},
+            "physics_subpanels": {
+                "flat": {
+                    "struck_keys_score": 0.56,
+                    "struck_keys_authority_score": 0.46,
+                    "keys_tonal_decay_score": 0.81,
+                    "synth_tonal_source_score": 0.68,
+                    "fx_motion_score": fx_motion,
+                    "fx_transition_authority_score": min(0.62, fx_motion + 0.08),
+                    "fx_riser_build_score": 0.20,
+                    "fx_drop_downlifter_score": 0.20,
+                    "fx_whoosh_sweep_score": 0.20,
+                    "fx_reverse_score": 0.20,
+                }
+            },
+        },
+    )
+
+
 def test_baby_reed_recall_must_not_narrow_safe_instrument_loop() -> None:
     """Generic Instrument Loops must not be turned into sax/brass by baby recall."""
     raw = candidate("Instruments/Instrument Loops/Loops", 4.0)
@@ -90,3 +127,31 @@ def test_bass_phrase_shape_does_not_steal_measured_drum_loop_to_synth_bass() -> 
     )
 
     assert claim is None
+
+
+def test_low_motion_designed_tonal_shape_does_not_review_rank_one_piano_consensus() -> None:
+    """Synthetic/processed tone alone should not veto concrete Piano agreement."""
+    shared = [candidate("Instruments/Keys/Piano/Loops", 2.0, brain_rank=1, physics_rank=1)]
+
+    claim = ConsensusRunner().shape_sanity_decision(
+        shared=shared,
+        winner=shared[0],
+        facts=designed_tonal_piano_agreement_facts(fx_motion=0.23),
+    )
+
+    assert claim is None
+
+
+def test_high_motion_designed_tonal_shape_can_still_review_piano_consensus() -> None:
+    """Real FX motion still protects against filing a transition as Piano."""
+    shared = [candidate("Instruments/Keys/Piano/Loops", 2.0, brain_rank=1, physics_rank=1)]
+
+    claim = ConsensusRunner().shape_sanity_decision(
+        shared=shared,
+        winner=shared[0],
+        facts=designed_tonal_piano_agreement_facts(fx_motion=0.56),
+    )
+
+    assert claim is not None
+    assert claim.folder_path == "_TO_REVIEW/Shape Conflict"
+    assert claim.source == "measured_shape_conflict_review"

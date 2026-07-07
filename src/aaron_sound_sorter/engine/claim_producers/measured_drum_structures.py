@@ -1036,8 +1036,11 @@ class MeasuredDrumStructureClaimProducer:
         path = str(guess.get("folder_path") or guess.get("label") or "").strip("/")
         if not path.lower().startswith("drums/"):
             return ""
-        if "drum loops" in path.lower():
+        lower_path = path.lower()
+        if "drum loops" in lower_path:
             return "Drums/Percussion/Generic Percussion/One Shots"
+        if lower_path.endswith("/loops"):
+            return f"{path.rsplit('/', 1)[0]}/One Shots"
         return path
 
     def _top_physics_guess_path(self, facts: SharedAudioFacts | None) -> str:

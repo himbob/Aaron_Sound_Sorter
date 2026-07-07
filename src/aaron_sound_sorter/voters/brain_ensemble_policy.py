@@ -118,6 +118,8 @@ def brain_role_fit_multiplier(
         return 1.0
     if bool(guess.evidence.get("human_override_exact_audio_match")):
         return 1.85
+    if bool(guess.evidence.get("human_override_generalized_audio_match")):
+        return 1.35
     family = guess.evidence.get("family_compatibility", {})
     compatible = True
     if isinstance(family, dict):

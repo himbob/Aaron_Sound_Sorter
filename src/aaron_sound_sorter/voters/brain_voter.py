@@ -121,7 +121,10 @@ class BrainVoter(Voter):
             if human_override.matched:
                 score = min(float(score), float(human_override.ranking_score))
                 raw_distance = min(float(raw_distance), float(human_override.nearest_distance))
-                mode = "human_override_fingerprint_teacher_match"
+                if human_override.exact_match:
+                    mode = "human_override_fingerprint_teacher_match"
+                else:
+                    mode = f"human_override_{human_override.match_kind}_match"
             if use_vectorized_fallback and not np.isfinite(float(score)):
                 fallback_vectors[label] = weighted_vector
             pending_rows.append(

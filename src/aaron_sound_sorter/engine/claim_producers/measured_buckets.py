@@ -88,6 +88,18 @@ class MeasuredBucketClaimProducer:
             }
             for claim in drum_claims
         ):
+            music_claims = self.music_structures.produce(context)
+            tonal_stab_claims = [
+                claim
+                for claim in music_claims
+                if claim.source
+                in {
+                    "final_measured_voice_before_tonal_stab_invariant",
+                    "final_measured_tonal_chord_stab_invariant",
+                }
+            ]
+            if tonal_stab_claims:
+                return tonal_stab_claims + drum_claims
             return drum_claims
 
         for producer in (

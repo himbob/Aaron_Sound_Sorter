@@ -272,6 +272,83 @@ def test_final_sax_invariant_does_not_steal_clean_low_mid_keys_loop() -> None:
     assert final.consensus_status == "strong_consensus"
 
 
+def test_rank_one_concrete_piano_consensus_blocks_synthetic_sax_invariant() -> None:
+    """Synthetic sax-depth claims cannot replace a concrete shared Piano winner."""
+    raw = raw_claim(
+        "Instruments/Keys/Piano/Loops",
+        score=2.0,
+        shared=[shared_row("Instruments/Keys/Piano/Loops", 2.0, brain_rank=1, physics_rank=1)],
+    )
+    measured = facts(
+        "bass_phrase",
+        0.99,
+        role="pitched_music_loop",
+        shape_metrics={
+            "low_event_ratio": 0.70,
+            "mid_event_ratio": 0.30,
+            "high_event_ratio": 0.0,
+            "onset_count": 46.0,
+            "pitch_confidence": 0.82,
+        },
+    )
+    measured.evidence["physics_layer_decision"] = {
+        "instrument_branch_selected": "Woodwinds",
+        "physics_layer_branch": "Woodwinds",
+        "instrument_branch_Woodwinds": 0.92,
+        "instrument_dark_low_mid_reed_loop_signal": True,
+        "instrument_Woodwinds_subpanel_selected": "Sax",
+        "instrument_Woodwinds_subpanel_confidence": 0.88,
+    }
+    measured.evidence["woodwind_sax_score"] = 0.72
+    measured.evidence["reed_wind_score"] = 0.70
+    core = DecisionCoreV2()
+
+    final = decide_with_core_claims(core, raw, measured)
+
+    assert final.folder_path == "Instruments/Keys/Piano/Loops"
+    assert final.consensus_status == "strong_consensus"
+
+
+def test_human_taught_shared_piano_consensus_blocks_synthetic_sax_invariant() -> None:
+    """GUI-taught Piano consensus in shared rows blocks later synthetic Sax claims."""
+    piano_row = shared_row("Instruments/Keys/Piano/Loops", 8.0, brain_rank=1, physics_rank=1)
+    piano_row["brain_evidence"] = {
+        "human_override_matched": True,
+        "human_override_exact_audio_match": True,
+        "human_override_match_kind": "fingerprint",
+    }
+    raw = raw_claim("Instruments/Keys/Piano/Loops", score=8.0, shared=[piano_row])
+    measured = facts(
+        "solo_phrase",
+        0.76,
+        role="pitched_music_phrase",
+        role_strengths={"pitched_music_phrase": 0.94, "pitched_music_loop": 0.93},
+        shape_metrics={
+            "onset_count": 44.0,
+            "pitch_confidence": 0.82,
+            "low_event_ratio": 0.70,
+            "mid_event_ratio": 0.30,
+            "high_event_ratio": 0.0,
+        },
+    )
+    measured.evidence["physics_layer_decision"] = {
+        "instrument_branch_selected": "Woodwinds",
+        "physics_layer_branch": "Woodwinds",
+        "instrument_branch_Woodwinds": 0.92,
+        "instrument_dark_low_mid_reed_loop_signal": True,
+        "instrument_Woodwinds_subpanel_selected": "Sax",
+        "instrument_Woodwinds_subpanel_confidence": 0.88,
+    }
+    measured.evidence["woodwind_sax_score"] = 0.72
+    measured.evidence["reed_wind_score"] = 0.70
+    core = DecisionCoreV2()
+
+    final = decide_with_core_claims(core, raw, measured)
+
+    assert final.folder_path == "Instruments/Keys/Piano/Loops"
+    assert final.consensus_status == "strong_consensus"
+
+
 def test_final_sax_invariant_does_not_steal_clean_synth_pad_loop() -> None:
     """Sustained low/highless synth pads are not sax just because they are shiny."""
     raw = raw_claim("Instruments/Instrument Loops/Loops", score=5.0)

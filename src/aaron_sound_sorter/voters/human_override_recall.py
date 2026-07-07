@@ -22,13 +22,22 @@ class HumanOverrideRecallMatch:
     Args:
         matched: True when the nearest GUI correction is close enough to act as
             teacher-level recall evidence.
+        exact_match: True when the current audio is close enough to a stored
+            correction to be treated as the same measured fingerprint region.
+        generalized_match: True when the current audio is close to a supported
+            human-taught label neighborhood, but not close enough to be called
+            the same measured fingerprint region.
+        match_kind: Diagnostic match type.  Expected values are ``none``,
+            ``fingerprint``, ``teacher_prototype``, and ``teacher_cloud``.
         nearest_distance: Weighted feature distance to the nearest human-taught
             fingerprint.
         effective_weight: Human override support weight stored for the label.
         example_count: Number of GUI correction examples inspected.
         confirmation_count: Total confirmation count across inspected examples.
         ranking_score: Lower-is-better score used when ``matched`` is true.
-        threshold: Maximum distance accepted for teacher-level recall.
+        threshold: Active maximum distance accepted for this match.
+        exact_threshold: Maximum distance for exact fingerprint recall.
+        generalized_threshold: Maximum distance for broader teacher recall.
 
     Side Effects:
         None.
@@ -42,12 +51,17 @@ class HumanOverrideRecallMatch:
     """
 
     matched: bool
+    exact_match: bool
+    generalized_match: bool
+    match_kind: str
     nearest_distance: float
     effective_weight: int
     example_count: int
     confirmation_count: int
     ranking_score: float
     threshold: float
+    exact_threshold: float
+    generalized_threshold: float
 
     def evidence(self) -> dict[str, Any]:
         """Return flat diagnostics suitable for voter evidence dictionaries."""
@@ -55,14 +69,19 @@ class HumanOverrideRecallMatch:
             return {}
         return {
             "human_override_recall_candidate": True,
-            "human_override_exact_audio_match": bool(self.matched),
+            "human_override_matched": bool(self.matched),
+            "human_override_exact_audio_match": bool(self.exact_match),
+            "human_override_generalized_audio_match": bool(self.generalized_match),
+            "human_override_match_kind": str(self.match_kind),
             "human_override_nearest_distance": round(float(self.nearest_distance), 6),
             "human_override_distance_threshold": round(float(self.threshold), 6),
+            "human_override_exact_distance_threshold": round(float(self.exact_threshold), 6),
+            "human_override_generalized_distance_threshold": round(float(self.generalized_threshold), 6),
             "human_override_effective_weight": int(self.effective_weight),
             "human_override_example_count": int(self.example_count),
             "human_override_confirmation_count": int(self.confirmation_count),
             "human_override_ranking_score": round(float(self.ranking_score), 6),
-            "human_override_recall_policy": "weighted_fingerprint_teacher_match",
+            "human_override_recall_policy": "weighted_fingerprint_and_teacher_cloud_match",
         }
 
 
@@ -87,8 +106,9 @@ def human_override_recall_match(
         feature_weight_vector: Feature weights used by the active brain.
 
     Returns:
-        ``HumanOverrideRecallMatch`` with ``matched`` true only when the current
-        audio is close to a stored GUI correction for this same label.
+        ``HumanOverrideRecallMatch`` with ``matched`` true when the current
+        audio is close to a stored GUI correction or to a supported correction
+        neighborhood for this same label.
 
     Side Effects:
         None.
@@ -134,16 +154,50 @@ def human_override_recall_match(
     if valid_count <= 0:
         return no_human_override_match(example_count=len(examples), effective_weight=effective_weight)
 
-    threshold = human_override_distance_threshold(effective_weight)
-    matched = bool(nearest <= threshold)
+    exact_threshold = human_override_distance_threshold(effective_weight)
+    support_count = max(valid_count, confirmation_count)
+    prototype_threshold = human_override_prototype_distance_threshold(effective_weight)
+    cloud_threshold = human_override_teacher_cloud_distance_threshold(
+        effective_weight,
+        example_count=valid_count,
+        support_count=support_count,
+    )
+    generalized_threshold = cloud_threshold if valid_count >= 2 else prototype_threshold
+
+    exact_match = bool(nearest <= exact_threshold)
+    cloud_match = bool(valid_count >= 2 and nearest <= cloud_threshold)
+    prototype_match = bool(valid_count == 1 and nearest <= prototype_threshold)
+    generalized_match = bool(not exact_match and (cloud_match or prototype_match))
+    matched = bool(exact_match or generalized_match)
+    if exact_match:
+        match_kind = "fingerprint"
+        threshold = exact_threshold
+        ranking_score = human_override_ranking_score(effective_weight, nearest)
+    elif cloud_match:
+        match_kind = "teacher_cloud"
+        threshold = cloud_threshold
+        ranking_score = human_override_teacher_cloud_ranking_score(effective_weight, support_count, nearest)
+    elif prototype_match:
+        match_kind = "teacher_prototype"
+        threshold = prototype_threshold
+        ranking_score = human_override_teacher_prototype_ranking_score(effective_weight, nearest)
+    else:
+        match_kind = "none"
+        threshold = exact_threshold
+        ranking_score = float("inf")
     return HumanOverrideRecallMatch(
         matched=matched,
+        exact_match=exact_match,
+        generalized_match=generalized_match,
+        match_kind=match_kind,
         nearest_distance=nearest,
         effective_weight=effective_weight,
         example_count=valid_count,
         confirmation_count=confirmation_count,
-        ranking_score=human_override_ranking_score(effective_weight, nearest),
+        ranking_score=ranking_score,
         threshold=threshold,
+        exact_threshold=exact_threshold,
+        generalized_threshold=generalized_threshold,
     )
 
 
@@ -194,12 +248,59 @@ def human_override_distance_threshold(effective_weight: int) -> float:
     return min(2.25, max(0.35, 0.35 + math.log1p(weight) / 7.0))
 
 
+def human_override_prototype_distance_threshold(effective_weight: int) -> float:
+    """Return the accepted distance for a single human-taught prototype.
+
+    A single GUI correction should help near neighbors, but it should not become
+    a broad class override.  This threshold is intentionally wider than exact
+    recall and narrower than the multi-example teacher cloud.
+    """
+    exact = human_override_distance_threshold(effective_weight)
+    weight = max(1, int(effective_weight or 0))
+    return min(2.85, exact + 0.30 + math.log1p(weight) / 16.0)
+
+
+def human_override_teacher_cloud_distance_threshold(
+    effective_weight: int,
+    *,
+    example_count: int,
+    support_count: int,
+) -> float:
+    """Return the accepted distance for multi-example human-taught recall."""
+    exact = human_override_distance_threshold(effective_weight)
+    support = max(2, int(example_count or 0), int(support_count or 0))
+    return min(3.65, exact + 0.45 + math.log1p(support) / 3.5)
+
+
 def human_override_ranking_score(effective_weight: int, nearest_distance: float) -> float:
     """Return a lower-is-better score for a matched GUI correction."""
     weight = max(1, int(effective_weight or 0))
     authority = min(2.4, 0.45 + math.log1p(weight) / 3.0)
     distance_cost = min(0.35, max(0.0, float(nearest_distance)) * 0.08)
     return -max(0.25, authority - distance_cost)
+
+
+def human_override_teacher_prototype_ranking_score(effective_weight: int, nearest_distance: float) -> float:
+    """Return a conservative score for one nearby human-taught prototype."""
+    exact = human_override_distance_threshold(effective_weight)
+    weight = max(1, int(effective_weight or 0))
+    authority = min(1.65, 0.30 + math.log1p(weight) / 5.0)
+    distance_cost = min(0.65, max(0.0, float(nearest_distance) - exact) * 0.22)
+    return -max(0.10, authority - distance_cost)
+
+
+def human_override_teacher_cloud_ranking_score(
+    effective_weight: int,
+    support_count: int,
+    nearest_distance: float,
+) -> float:
+    """Return a lower-is-better score for a supported correction cloud."""
+    exact = human_override_distance_threshold(effective_weight)
+    weight = max(1, int(effective_weight or 0))
+    support = max(2, int(support_count or 0))
+    authority = min(1.9, 0.35 + math.log1p(weight) / 4.5 + math.log1p(support) / 8.0)
+    distance_cost = min(0.65, max(0.0, float(nearest_distance) - exact) * 0.18)
+    return -max(0.15, authority - distance_cost)
 
 
 def no_human_override_match(
@@ -210,12 +311,17 @@ def no_human_override_match(
     """Return the empty match object used when no GUI correction applies."""
     return HumanOverrideRecallMatch(
         matched=False,
+        exact_match=False,
+        generalized_match=False,
+        match_kind="none",
         nearest_distance=float("inf"),
         effective_weight=int(effective_weight),
         example_count=int(example_count),
         confirmation_count=0,
         ranking_score=float("inf"),
         threshold=human_override_distance_threshold(effective_weight),
+        exact_threshold=human_override_distance_threshold(effective_weight),
+        generalized_threshold=human_override_prototype_distance_threshold(effective_weight),
     )
 
 

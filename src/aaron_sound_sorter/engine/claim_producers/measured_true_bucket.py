@@ -12,6 +12,7 @@ class preserves the original branch order from the legacy decision core.
 from __future__ import annotations
 
 from aaron_sound_sorter.domain.models import SharedAudioFacts
+from aaron_sound_sorter.engine.claim_contracts import is_rank_one_concrete_non_sax_instrument_consensus
 from aaron_sound_sorter.engine.claim_producers.measured_early_adjudication import (
     MeasuredEarlyCandidateAdjudicator,
 )
@@ -60,6 +61,8 @@ class MeasuredTrueBucketClaimProducer(
         if raw.final_top == "_TO_REVIEW":
             return None
         raw_path = _norm_path(raw.folder_path)
+        if is_rank_one_concrete_non_sax_instrument_consensus(raw):
+            return None
         measured_role = _measured_role_from_facts(facts)
         shape = _shape_vote_from_facts(facts)
         shape_conf = _shape_confidence_from_facts(facts)

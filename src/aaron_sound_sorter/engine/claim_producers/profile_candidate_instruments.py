@@ -1026,6 +1026,10 @@ class ProfileInstrumentClaimMixin:
         raw_group = self._instrument_branch_group(raw_path)
         if raw_group in {"", "bass", "generic", "mixed"}:
             return None
+        if self._facts_support_tonal_alert_siren_fx(role_name, facts):
+            return None
+        if self._facts_support_short_keys_or_synth_tonal_stab(facts):
+            return None
         if not self._shape_or_role_supports_stable_music(
             role_name,
             shape_name,
@@ -1102,6 +1106,79 @@ class ProfileInstrumentClaimMixin:
             strength=strength,
             is_real_candidate=False,
         )
+
+    def _facts_support_short_keys_or_synth_tonal_stab(self, facts: SharedAudioFacts | None) -> bool:
+        if facts is None:
+            return False
+        duration = _feature_number_from_facts(facts, "duration_sec")
+        if duration <= 0.0 or duration > 1.80:
+            return False
+        if _shape_vote_from_facts(facts) not in {
+            "solo_phrase",
+            "echo_tail_hit",
+            "hit_with_tail",
+            "single_hit",
+            "pitched_phrase",
+        }:
+            return False
+        keys_score = max(
+            self._score_from_facts(facts, "struck_keys_score"),
+            self._score_from_facts(facts, "struck_keys_authority_score"),
+            self._score_from_facts(facts, "keys_tonal_decay_score"),
+            self._score_from_facts(facts, "keys_piano_score"),
+            self._score_from_facts(facts, "keys_electric_piano_score"),
+        )
+        synth_score = max(
+            self._score_from_facts(facts, "synth_tonal_source_score"),
+            self._score_from_facts(facts, "synth_chord_score"),
+        )
+        plucked_score = max(
+            self._score_from_facts(facts, "plucked_string_score"),
+            self._score_from_facts(facts, "guitar_acoustic_score"),
+            self._score_from_facts(facts, "guitar_electric_score"),
+            self._score_from_facts(facts, "guitar_nylon_score"),
+        )
+        drum_score = max(
+            self._score_from_facts(facts, "drum_hit_score"),
+            self._score_from_facts(facts, "drum_snare_source_score"),
+            self._score_from_facts(facts, "drum_clap_source_score"),
+            self._score_from_facts(facts, "drum_tom_conga_source_score"),
+        )
+        return bool(
+            max(keys_score, synth_score) >= 0.54
+            and drum_score <= 0.46
+            and max(keys_score, synth_score) >= plucked_score + 0.02
+        )
+
+    def _facts_support_tonal_alert_siren_fx(self, role_name: str, facts: SharedAudioFacts | None) -> bool:
+        if facts is None:
+            return False
+        tonal_alert = max(
+            self._score_from_facts(facts, "tonal_alert_siren_score"),
+            self._score_from_facts(facts, "fx_siren_score"),
+            self._score_from_facts(facts, "fx_alarm_score"),
+        )
+        if role_name == "fx_tonal_alert_or_siren" and tonal_alert >= 0.62:
+            return True
+        return bool(
+            tonal_alert >= 0.82
+            and max(
+                self._score_from_facts(facts, "fx_siren_score"),
+                self._score_from_facts(facts, "fx_alarm_score"),
+            )
+            >= 0.60
+        )
+
+    def _score_from_facts(self, facts: SharedAudioFacts | None, *names: str) -> float:
+        best = 0.0
+        for name in names:
+            best = max(best, _feature_number_from_facts(facts, name), _shape_metric_from_facts(facts, name))
+            if facts is not None and isinstance(getattr(facts, "evidence", None), dict):
+                panels = facts.evidence.get("physics_subpanels", {})
+                flat = panels.get("flat", {}) if isinstance(panels, dict) else {}
+                if isinstance(flat, dict):
+                    best = max(best, _safe_float(flat.get(name)))
+        return best
 
     def non_voice_instrument_parent_claim(
         self,

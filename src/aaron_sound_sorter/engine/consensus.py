@@ -6,6 +6,7 @@ from typing import Any
 
 from aaron_sound_sorter.domain.models import CategoryGuess, SharedAudioFacts, VoterResult
 from aaron_sound_sorter.domain.policies import ConsensusPolicy
+from aaron_sound_sorter.engine.claim_contracts import is_rank_one_concrete_non_sax_instrument_row
 from aaron_sound_sorter.engine.concrete_fx_gate import ConcreteFxGateProtector
 from aaron_sound_sorter.engine.consensus_candidates import SharedCandidateBuilder
 from aaron_sound_sorter.engine.consensus_support import (
@@ -115,6 +116,60 @@ def _shape_texture_conflict_is_really_short_percussion(
         and compact >= 0.62
         and drum_branch >= 0.58
     )
+
+
+def _shape_score(facts: SharedAudioFacts, shape_name: str) -> float:
+    """Return a ShapeVoter score by name from source-blind shape metadata."""
+    evidence = facts.evidence if isinstance(getattr(facts, "evidence", None), dict) else {}
+    shape_vote = evidence.get("shape_vote", {}) if isinstance(evidence, dict) else {}
+    if not isinstance(shape_vote, dict):
+        return 0.0
+    for row in shape_vote.get("shape_scores", []) or []:
+        try:
+            name, score = row
+        except Exception:
+            continue
+        if str(name) == shape_name:
+            try:
+                return float(score or 0.0)
+            except Exception:
+                return 0.0
+    return 0.0
+
+
+def _designed_tonal_shape_should_yield_to_concrete_instrument(
+    *,
+    facts: SharedAudioFacts,
+    winner: dict[str, Any],
+    primary_shape: str,
+) -> bool:
+    """Return True when a tonal-FX shape lacks proof to veto Instrument consensus.
+
+    A clean Piano/Keys/Guitar/Synth-style loop can look like ``designed_tonal_fx``
+    because it is synthetic or processed.  ShapeVoter should only force review
+    when transition or motion FX evidence is real; otherwise a concrete rank-one
+    Brain/Physics Instrument agreement should remain the winner.
+    """
+    if primary_shape != "designed_tonal_fx":
+        return False
+    if not is_rank_one_concrete_non_sax_instrument_row(winner):
+        return False
+    measured_fx_motion = max(
+        _subpanel_number(facts, "fx_motion_score"),
+        _subpanel_number(facts, "fx_transition_authority_score"),
+        _subpanel_number(facts, "fx_riser_build_score"),
+        _subpanel_number(facts, "fx_drop_downlifter_score"),
+        _subpanel_number(facts, "fx_whoosh_sweep_score"),
+        _subpanel_number(facts, "fx_reverse_score"),
+    )
+    shape_motion = max(
+        _shape_score(facts, "hybrid_fx_motion"),
+        _shape_score(facts, "transition_riser"),
+        _shape_score(facts, "transition_drop"),
+        _shape_score(facts, "whoosh_sweep"),
+        _shape_score(facts, "reverse_swell"),
+    )
+    return bool(measured_fx_motion < 0.46 and shape_motion < 0.70)
 
 
 def _measured_voice_source_strength(facts: SharedAudioFacts) -> float:
@@ -386,6 +441,12 @@ class ConsensusRunner:
             winner=winner,
             primary_shape=primary,
             confidence=confidence,
+        ):
+            return None
+        if _designed_tonal_shape_should_yield_to_concrete_instrument(
+            facts=facts,
+            winner=winner,
+            primary_shape=primary,
         ):
             return None
 

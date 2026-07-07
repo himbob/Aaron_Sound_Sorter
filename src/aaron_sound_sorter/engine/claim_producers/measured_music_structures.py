@@ -18,6 +18,7 @@ arbiter typed evidence earlier so the top layer does not need late rescue passes
 from __future__ import annotations
 
 from aaron_sound_sorter.domain.models import SharedAudioFacts
+from aaron_sound_sorter.engine.claim_contracts import is_rank_one_concrete_non_sax_instrument_consensus
 from aaron_sound_sorter.engine.decision_context import DecisionContext
 from aaron_sound_sorter.engine.decision_helpers import (
     _feature_number_from_facts,
@@ -105,18 +106,19 @@ class MeasuredMusicStructureClaimProducer:
         )
 
     def _tonal_chord_or_voice_stab_claim(self, context: DecisionContext) -> ConsensusClaim | None:
-        """Keep clean tonal/voice stabs out of drum leaves."""
+        """Keep clean tonal/voice stabs out of drum and brittle plucked leaves."""
         raw = context.raw
         facts = context.facts
-        if facts is None or raw.family != "Drums":
+        if facts is None or raw.family not in {"Drums", "Instruments"}:
+            return None
+        raw_path = _norm_path(raw.folder_path or raw.label)
+        if raw.family == "Instruments" and not _path_has_any(raw_path, ("guitar", "plucked", "strings")):
             return None
         duration = self._shape_number(facts, "duration_sec") or _feature_number_from_facts(facts, "duration_sec")
         if duration <= 0.0 or duration > 1.80:
             return None
         shape = _shape_vote_from_facts(facts)
         if shape not in {"solo_phrase", "echo_tail_hit", "hit_with_tail", "single_hit", "pitched_phrase"}:
-            return None
-        if self._parent_role(facts) in {"percussive_one_shot", "protected_percussive_one_shot", "low_kick_like_hit"}:
             return None
         if self._facts_support_voice_before_tonal_stab(facts):
             return self._claim(
@@ -131,9 +133,25 @@ class MeasuredMusicStructureClaimProducer:
             )
         tonal_source = max(
             self._measured_score(facts, "synth_tonal_source_score", "synth_chord_score"),
-            self._measured_score(facts, "struck_keys_score", "struck_keys_authority_score"),
+            self._measured_score(
+                facts,
+                "struck_keys_score",
+                "struck_keys_authority_score",
+                "keys_tonal_decay_score",
+                "keys_piano_score",
+                "keys_electric_piano_score",
+            ),
             self._shape_number(facts, "sustained_tonal_frame_ratio"),
         )
+        keys_source = self._measured_score(
+            facts,
+            "struck_keys_authority_score",
+            "struck_keys_score",
+            "keys_tonal_decay_score",
+            "keys_piano_score",
+            "keys_electric_piano_score",
+        )
+        synth_source = self._measured_score(facts, "synth_tonal_source_score", "synth_chord_score")
         drum_source = max(
             self._measured_score(facts, "drum_hit_score"),
             self._measured_score(facts, "drum_snare_source_score"),
@@ -142,8 +160,18 @@ class MeasuredMusicStructureClaimProducer:
         )
         if tonal_source < 0.54 or drum_source > 0.46:
             return None
+        if self._parent_role(facts) in {"percussive_one_shot", "protected_percussive_one_shot", "low_kick_like_hit"}:
+            plucked_source = self._measured_score(
+                facts,
+                "plucked_string_score",
+                "guitar_acoustic_score",
+                "guitar_electric_score",
+                "guitar_nylon_score",
+            )
+            if max(keys_source, synth_source) < plucked_source + 0.02:
+                return None
         target = "Instruments/Synths/Synth Chord/One Shots"
-        if self._measured_score(facts, "struck_keys_authority_score", "struck_keys_score") >= tonal_source + 0.05:
+        if keys_source >= synth_source + 0.05 or keys_source >= tonal_source - 0.03:
             target = "Instruments/Keys/Rhodes/One Shots"
         return self._claim(
             context,
@@ -173,6 +201,12 @@ class MeasuredMusicStructureClaimProducer:
             return None
         if not self._facts_support_measured_drum_loop_authority(facts):
             return None
+        role_loop = self._measured_score(facts, "role_loop_score")
+        role_phrase = self._measured_score(facts, "role_phrase_score")
+        drum_loop_panel = self._measured_score(facts, "drum_loop_source_score", "rhythmic_break_loop_score")
+        voice_like_panel = self._measured_score(facts, "voice_score", "human_spoken_voice_score", "formant_fx_score")
+        if drum_loop_panel < 0.70 and role_loop < 0.50 and role_phrase >= role_loop + 0.14 and voice_like_panel >= 0.60:
+            return None
         if self._facts_support_designed_motion_fx_over_rhythmic_break(facts):
             return None
         return self._claim(
@@ -191,6 +225,8 @@ class MeasuredMusicStructureClaimProducer:
         raw = context.raw
         facts = context.facts
         if facts is None:
+            return None
+        if is_rank_one_concrete_non_sax_instrument_consensus(raw):
             return None
         path = _norm_path(raw.folder_path or raw.label)
         if raw.family == "Instruments" and "voice" in path:

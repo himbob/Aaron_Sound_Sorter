@@ -34,6 +34,12 @@ def _fingerprint(value: float = 0.25) -> list[float]:
     return vector.astype(float).tolist()
 
 
+def _prefix_fingerprint(value: float, *, width: int = 10) -> list[float]:
+    vector = np.zeros(FP_SIZE, dtype=np.float32)
+    vector[:width] = value
+    return vector.astype(float).tolist()
+
+
 def _base_brain(labels: list[str] | None = None) -> dict:
     labels = labels or []
     return {
@@ -311,6 +317,75 @@ def test_brain_voter_honors_exact_human_override_fingerprint(tmp_path: Path) -> 
     assert ordered[0]["label"] == label
     assert ordered[0]["evidence"]["human_override_exact_audio_match"] is True
     assert ordered[0]["score"] < 0.0
+
+
+def test_brain_voter_generalizes_multiple_human_corrections_to_nearby_audio(tmp_path: Path) -> None:
+    label = "Instruments/Voice/Phrase/One Shots"
+    competitor = "Instruments/Instrument Loops/Loops"
+    query = _prefix_fingerprint(0.52)
+    brain = _base_brain([label, competitor])
+    brain["feature_weights"] = [1.0] * FP_SIZE
+    brain["centroids"][label] = [_prefix_fingerprint(0.0)]
+    brain["centroids"][competitor] = [query]
+    brain["training_examples_detailed_by_label"][label] = [
+        {
+            "incremental_gui_correction": True,
+            "human_override_evidence_weight": 240,
+            "human_override_confirmation_count": 1,
+            "fingerprint": _prefix_fingerprint(0.00),
+        },
+        {
+            "incremental_gui_correction": True,
+            "human_override_evidence_weight": 240,
+            "human_override_confirmation_count": 1,
+            "fingerprint": _prefix_fingerprint(0.04),
+        },
+    ]
+    brain["label_reliability_by_label"][label] = {"human_override_effective_weight": 240}
+
+    rows = BrainVoter().score_labels(
+        _audio_physics_for_vector(tmp_path, query),
+        _facts_for_vector(query),
+        brain,
+        [label, competitor],
+    )
+    ordered = sorted(rows, key=lambda row: float(row["score"]))
+
+    assert ordered[0]["label"] == label
+    assert ordered[0]["evidence"]["human_override_exact_audio_match"] is False
+    assert ordered[0]["evidence"]["human_override_generalized_audio_match"] is True
+    assert ordered[0]["evidence"]["human_override_match_kind"] == "teacher_cloud"
+    assert ordered[0]["score"] < 0.0
+
+
+def test_brain_voter_does_not_generalize_one_human_correction_to_far_audio(tmp_path: Path) -> None:
+    label = "Instruments/Voice/Phrase/One Shots"
+    competitor = "Instruments/Instrument Loops/Loops"
+    query = _prefix_fingerprint(0.85)
+    brain = _base_brain([label, competitor])
+    brain["feature_weights"] = [1.0] * FP_SIZE
+    brain["centroids"][label] = [_prefix_fingerprint(0.0)]
+    brain["centroids"][competitor] = [query]
+    brain["training_examples_detailed_by_label"][label] = [
+        {
+            "incremental_gui_correction": True,
+            "human_override_evidence_weight": 240,
+            "human_override_confirmation_count": 1,
+            "fingerprint": _prefix_fingerprint(0.0),
+        }
+    ]
+    brain["label_reliability_by_label"][label] = {"human_override_effective_weight": 240}
+
+    rows = BrainVoter().score_labels(
+        _audio_physics_for_vector(tmp_path, query),
+        _facts_for_vector(query),
+        brain,
+        [label, competitor],
+    )
+    label_row = next(row for row in rows if row["label"] == label)
+
+    assert label_row["evidence"]["human_override_matched"] is False
+    assert label_row["evidence"]["human_override_match_kind"] == "none"
 
 
 def test_physics_voter_honors_exact_human_override_fingerprint(tmp_path: Path) -> None:

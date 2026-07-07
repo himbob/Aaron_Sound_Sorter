@@ -19,6 +19,7 @@ claims instead of late post-winner rescue calls.
 from __future__ import annotations
 
 from aaron_sound_sorter.domain.models import SharedAudioFacts
+from aaron_sound_sorter.engine.claim_contracts import is_rank_one_concrete_non_sax_instrument_consensus
 from aaron_sound_sorter.engine.decision_context import DecisionContext
 from aaron_sound_sorter.engine.decision_helpers import (
     _candidate_combined_score,
@@ -620,22 +621,7 @@ class MeasuredInstrumentBranchClaimProducer:
             This uses internal candidate metadata only.  It must not inspect
             producer filenames or source folder paths.
         """
-        if raw.family != "Instruments" or not raw.is_real_candidate:
-            return False
-        if raw.source != "strong_consensus":
-            return False
-        if raw.brain_rank != 1 or raw.physics_rank != 1:
-            return False
-        try:
-            if float(raw.raw_candidate_score or 9999.0) > 2.0:
-                return False
-        except Exception:
-            return False
-        path = _norm_path(raw.folder_path or raw.label)
-        if not path or "sax" in path or "saxophone" in path:
-            return False
-        broad_parent_fragments = ("instrument loops", "mixed musical loops", "brass and woodwinds")
-        return not any(fragment in path for fragment in broad_parent_fragments)
+        return is_rank_one_concrete_non_sax_instrument_consensus(raw)
 
     def _facts_support_low_mixed_melodic_loop(self, facts: SharedAudioFacts | None) -> bool:
         if facts is None:
@@ -1131,7 +1117,17 @@ class MeasuredInstrumentBranchClaimProducer:
         if synth_panel >= sax_panel + 0.10 or keys_panel >= sax_panel + 0.08:
             return False
         return bool(
-            clean_loop_shape and self._has_candidate_support(context.raw, SAX_PATH_FRAGMENTS, top_family="Instruments")
+            clean_loop_shape
+            and sax_panel >= 0.60
+            and reed_panel >= 0.54
+            and self._has_candidate_support(
+                context.raw,
+                SAX_PATH_FRAGMENTS,
+                top_family="Instruments",
+                max_score=18.0,
+                max_brain_rank=6,
+                max_physics_rank=10,
+            )
         )
 
     def _facts_have_measured_drum_loop_authority(self, facts: SharedAudioFacts | None) -> bool:
