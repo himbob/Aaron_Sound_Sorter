@@ -16,6 +16,7 @@ from aaron_sound_sorter.domain.models import ConsensusDecision, SharedAudioFacts
 from aaron_sound_sorter.engine.claim_boundary_policy import ClaimBoundaryPolicy
 from aaron_sound_sorter.engine.claim_contracts import (
     contracts_from_claims,
+    is_human_taught_rank_one_consensus,
     is_rank_one_concrete_non_sax_instrument_consensus,
 )
 from aaron_sound_sorter.engine.decision_helpers import (
@@ -4919,6 +4920,10 @@ class FamilyClaimArbiter:
             )
         )
         if not concrete_leaf or "instrument loops" in path:
+            return winning_claim
+        if is_human_taught_rank_one_consensus(winning_claim) or self._rank_one_concrete_non_sax_instrument_claim(
+            winning_claim
+        ):
             return winning_claim
         if winning_claim.source == "final_short_synth_one_shot_invariant":
             return winning_claim
@@ -11028,6 +11033,8 @@ class FamilyClaimArbiter:
         """
         if facts is None or raw_claim.is_review:
             return None
+        if is_human_taught_rank_one_consensus(raw_claim):
+            return None
         drum_loop_from_hat = self._raw_drum_one_shot_is_repeated_high_percussion_loop(raw_claim, facts)
         if drum_loop_from_hat is not None:
             return drum_loop_from_hat
@@ -14222,6 +14229,11 @@ class FamilyClaimArbiter:
         """Return True when a claim is legally allowed to challenge raw."""
         if not claim.can_override:
             return False
+        if is_human_taught_rank_one_consensus(raw_claim) and not self._claim_targets_same_folder(
+            raw_claim,
+            claim,
+        ):
+            return False
         if claim.is_review:
             return True
         if (
@@ -14600,6 +14612,26 @@ class FamilyClaimArbiter:
             ):
                 return False
         return True
+
+    @classmethod
+    def _claim_targets_same_folder(cls, raw_claim: ConsensusClaim, claim: ConsensusClaim) -> bool:
+        """Return True when a competing claim preserves the raw folder.
+
+        Args:
+            raw_claim: The original shared Brain/Physics winner.
+            claim: A later role, shape, review, or profile claim.
+
+        Returns:
+            True only when both claims resolve to the same public folder path.
+
+        Side Effects:
+            None.
+
+        Important Constraints:
+            Uses internal folder metadata only; it must not inspect input audio
+            filenames or source folders.
+        """
+        return bool(cls._norm_claim_path(raw_claim) == cls._norm_claim_path(claim))
 
     def _same_family_loop_broadening_is_safe(
         self,

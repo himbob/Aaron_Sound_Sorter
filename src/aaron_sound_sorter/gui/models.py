@@ -36,6 +36,8 @@ class PreviewRow:
         read_status: Audio read status from feature extraction.
         decision_reason: Sorter decision reason.
         diagnostic_summary: Compact human-readable voter/shape summary.
+        candidate_folders: Diagnostic candidate folders proposed by voters and
+            final arbitration. These are displayed only as human override hints.
         result: Full in-memory sort result used for correction evidence. Tests
             may provide ``None`` when only export behavior is under test.
 
@@ -59,6 +61,7 @@ class PreviewRow:
     read_status: str
     decision_reason: str
     diagnostic_summary: str
+    candidate_folders: list[str] = field(default_factory=list)
     result: SortFileResult | None = field(default=None, repr=False)
 
     @property

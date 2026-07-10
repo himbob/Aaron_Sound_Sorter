@@ -220,6 +220,33 @@ def is_rank_one_concrete_non_sax_instrument_consensus(claim: ConsensusClaim) -> 
     return any(_shared_row_is_rank_one_concrete_non_sax_instrument_consensus(row) for row in claim.shared_candidates)
 
 
+def is_human_taught_rank_one_consensus(claim: ConsensusClaim) -> bool:
+    """Return True when GUI-taught evidence has rank-one voter agreement.
+
+    Args:
+        claim: Raw shared voter claim before synthetic measured claims compete.
+
+    Returns:
+        True when the raw claim or one of its shared rows is a non-review
+        category ranked first by both Brain and Physics and backed by GUI
+        correction recall evidence.
+
+    Side Effects:
+        None.
+
+    Raises:
+        No intentional exceptions.
+
+    Important Constraints:
+        This is source-name blind. It reads only internal voter ranks, folder
+        metadata, and numeric GUI-correction recall diagnostics already stored
+        in candidate evidence.
+    """
+    if _claim_is_human_taught_rank_one_consensus(claim):
+        return True
+    return any(_shared_row_is_human_taught_rank_one_consensus(row) for row in claim.shared_candidates)
+
+
 def is_rank_one_concrete_non_sax_instrument_row(row: object) -> bool:
     """Return whether a shared candidate row is protected concrete Instrument consensus.
 
@@ -242,6 +269,58 @@ def is_rank_one_concrete_non_sax_instrument_row(row: object) -> bool:
         labels.
     """
     return _shared_row_is_rank_one_concrete_non_sax_instrument_consensus(row)
+
+
+def is_human_taught_rank_one_row(row: object) -> bool:
+    """Return True when a shared row is a GUI-taught rank-one consensus."""
+    return _shared_row_is_human_taught_rank_one_consensus(row)
+
+
+def is_human_taught_brain_top_shared_row(row: object, *, max_physics_rank: int = 25) -> bool:
+    """Return True when a GUI-taught row deserves same-family authority.
+
+    Args:
+        row: Shared Brain/Physics candidate metadata.
+        max_physics_rank: Loosest Physics rank still considered corroboration.
+
+    Returns:
+        True when Brain ranked a GUI-taught correction first, Physics still
+        ranked that same internal folder in its shared candidate window, and
+        candidate role metadata does not contradict the measured family.
+
+    Side Effects:
+        None.
+
+    Raises:
+        No intentional exceptions.
+
+    Important Constraints:
+        This is for same-family arbitration only. It reads internal candidate
+        ranks, GUI-correction recall diagnostics, and measured role metadata. It
+        must not inspect producer filenames, source folders, or ZIP member names.
+    """
+    if not isinstance(row, dict):
+        return False
+    folder_path = str(row.get("folder_path") or row.get("label") or "")
+    if not _norm_path(folder_path):
+        return False
+    family = str(row.get("top_family") or folder_path.split("/", 1)[0])
+    if family == "_TO_REVIEW":
+        return False
+    if _safe_int(row.get("brain_rank")) != 1:
+        return False
+    physics_rank = _safe_int(row.get("physics_rank"))
+    if physics_rank is None or physics_rank > max_physics_rank:
+        return False
+    if not _shared_row_has_human_teacher_support(row):
+        return False
+    if _is_broad_teacher_parent_path(folder_path):
+        return False
+    compatibility = row.get("family_compatibility")
+    if isinstance(compatibility, dict) and compatibility.get("is_family_compatible") is False:
+        return False
+    role_distance = _safe_float(row.get("candidate_role_distance"))
+    return bool(role_distance is None or role_distance <= 1.50)
 
 
 def _claim_is_rank_one_concrete_non_sax_instrument_consensus(claim: ConsensusClaim) -> bool:
@@ -276,6 +355,36 @@ def _shared_row_is_rank_one_concrete_non_sax_instrument_consensus(row: object) -
     )
 
 
+def _claim_is_human_taught_rank_one_consensus(claim: ConsensusClaim) -> bool:
+    """Return True when the claim itself is a teacher-backed rank-one winner."""
+    if claim.family == "_TO_REVIEW" or not claim.is_real_candidate:
+        return False
+    if claim.source != "strong_consensus":
+        return False
+    if claim.brain_rank != 1 or claim.physics_rank != 1:
+        return False
+    return any(
+        _shared_row_is_human_taught_rank_one_consensus(row)
+        for row in claim.shared_candidates
+        if _same_public_folder(row, claim.folder_path or claim.label)
+    )
+
+
+def _shared_row_is_human_taught_rank_one_consensus(row: object) -> bool:
+    """Return True when a shared row carries protected GUI-teacher support."""
+    if not isinstance(row, dict):
+        return False
+    folder_path = str(row.get("folder_path") or row.get("label") or "")
+    family = str(row.get("top_family") or folder_path.split("/", 1)[0])
+    if family == "_TO_REVIEW":
+        return False
+    if _safe_int(row.get("brain_rank")) != 1 or _safe_int(row.get("physics_rank")) != 1:
+        return False
+    if not _shared_row_has_human_teacher_support(row):
+        return False
+    return bool(_norm_path(folder_path))
+
+
 def _is_rank_one_concrete_non_sax_path(
     folder_path: str,
     *,
@@ -284,7 +393,13 @@ def _is_rank_one_concrete_non_sax_path(
     raw_candidate_score: float | None,
     allow_teacher_support: bool,
 ) -> bool:
-    """Return True for protected rank-one concrete non-sax Instrument paths."""
+    """Return True for protected rank-one concrete Instrument paths.
+
+    The normal path still excludes sax/woodwind leaves because those have been
+    common overreach candidates. GUI teacher support is stronger evidence: when
+    a user-taught sax/woodwind row also has rank-one Brain and Physics support,
+    the old sax exclusion stands down.
+    """
     if brain_rank != 1 or physics_rank != 1:
         return False
     if raw_candidate_score is None:
@@ -292,7 +407,9 @@ def _is_rank_one_concrete_non_sax_path(
     if raw_candidate_score > 2.0 and not allow_teacher_support:
         return False
     path = _norm_path(folder_path)
-    if not path or "sax" in path or "saxophone" in path:
+    if not path:
+        return False
+    if not allow_teacher_support and ("sax" in path or "saxophone" in path):
         return False
     broad_parent_fragments = (
         "instrument loops",
@@ -300,6 +417,25 @@ def _is_rank_one_concrete_non_sax_path(
         "brass and woodwinds",
     )
     return not any(fragment in path for fragment in broad_parent_fragments)
+
+
+def _same_public_folder(row: object, folder_path: str) -> bool:
+    """Return True when row and claim point to the same public folder."""
+    if not isinstance(row, dict):
+        return False
+    row_path = str(row.get("folder_path") or row.get("label") or "")
+    return bool(_norm_path(row_path) == _norm_path(folder_path))
+
+
+def _is_broad_teacher_parent_path(folder_path: str) -> bool:
+    """Return True for broad parent buckets that should not gain leaf authority."""
+    path = _norm_path(folder_path)
+    broad_fragments = (
+        "instrument loops/loops",
+        "mixed musical loops/",
+        "brass and woodwinds/loops",
+    )
+    return any(fragment in path for fragment in broad_fragments)
 
 
 def _shared_row_has_human_teacher_support(row: dict[str, object]) -> bool:

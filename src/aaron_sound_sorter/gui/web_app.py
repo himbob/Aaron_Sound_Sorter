@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import mimetypes
 import os
@@ -15,7 +16,7 @@ from dataclasses import dataclass, field
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, BinaryIO, Callable
 from urllib.parse import parse_qs, urlparse
 
 from aaron_sound_sorter.gui.incremental_brain_update import (
@@ -271,9 +272,14 @@ class SorterRequestHandler(BaseHTTPRequestHandler):
         if row_index < 0 or row_index >= len(session.rows):
             self.send_error(HTTPStatus.NOT_FOUND, "Audio row not found")
             return
-        audio_path = session.rows[row_index].source_path
-        if not audio_path.exists() or not audio_path.is_file():
+        source_audio_path = session.rows[row_index].source_path
+        if not source_audio_path.exists() or not source_audio_path.is_file():
             self.send_error(HTTPStatus.NOT_FOUND, "Audio file not found")
+            return
+        try:
+            audio_path = browser_preview_audio_path(source_audio_path, session.run_dir)
+        except Exception as exc:
+            self.send_error(HTTPStatus.INTERNAL_SERVER_ERROR, f"Audio preview conversion failed: {exc}")
             return
         self.send_audio_file(audio_path)
 
@@ -302,15 +308,7 @@ class SorterRequestHandler(BaseHTTPRequestHandler):
         if is_partial:
             self.send_header("Content-Range", f"bytes {start_byte}-{end_byte}/{file_size}")
         self.end_headers()
-        with audio_path.open("rb") as handle:
-            handle.seek(start_byte)
-            remaining_bytes = end_byte - start_byte + 1
-            while remaining_bytes > 0:
-                chunk = handle.read(min(262_144, remaining_bytes))
-                if not chunk:
-                    break
-                self.wfile.write(chunk)
-                remaining_bytes -= len(chunk)
+        write_audio_range_to_stream(audio_path, self.wfile, start_byte=start_byte, end_byte=end_byte)
 
     def send_job(self, job_id: str) -> None:
         """Send preview job state."""
@@ -708,6 +706,7 @@ def row_to_payload(index: int, row: PreviewRow) -> dict[str, Any]:
         "read_status": row.read_status,
         "decision_reason": row.decision_reason,
         "diagnostic_summary": row.diagnostic_summary,
+        "candidate_folders": row.candidate_folders,
         "is_corrected": row.is_corrected,
     }
 
@@ -749,6 +748,101 @@ def choose_path_with_osascript(kind: str) -> str:
     if completed.returncode != 0:
         return ""
     return completed.stdout.strip()
+
+
+def browser_preview_audio_path(source_audio_path: Path, run_dir: Path) -> Path:
+    """Return an audio path that the browser can reliably preview.
+
+    Args:
+        source_audio_path: Preview-row source audio file.
+        run_dir: GUI preview run directory used for generated preview cache
+            files.
+
+    Returns:
+        The original source path for browser-native formats, or a cached WAV
+        preview for AIFF/AIF files.
+
+    Side Effects:
+        May create ``audio_preview_cache`` under ``run_dir`` and write a WAV
+        preview file.
+
+    Important Constraints:
+        This helper exists only for browser playback. It does not alter sorting,
+        training evidence, exports, or classifier inputs.
+    """
+    resolved_source = Path(source_audio_path).expanduser().resolve()
+    if resolved_source.suffix.lower() not in {".aif", ".aiff"}:
+        return resolved_source
+    cache_dir = Path(run_dir).expanduser().resolve() / "audio_preview_cache"
+    return cached_wav_preview_path(resolved_source, cache_dir)
+
+
+def cached_wav_preview_path(source_audio_path: Path, cache_dir: Path) -> Path:
+    """Return a cached WAV preview path for one source audio file."""
+    stat = source_audio_path.stat()
+    cache_key = hashlib.sha256(f"{source_audio_path.resolve()}:{stat.st_mtime_ns}:{stat.st_size}".encode()).hexdigest()[
+        :16
+    ]
+    target_path = cache_dir / f"{safe_audio_cache_stem(source_audio_path)}_{cache_key}.wav"
+    if target_path.exists() and target_path.stat().st_size > 0:
+        return target_path
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    write_wav_preview_from_audio(source_audio_path, target_path)
+    return target_path
+
+
+def safe_audio_cache_stem(audio_path: Path) -> str:
+    """Return a compact filesystem-safe stem for a generated preview file."""
+    safe_chars = [char if char.isalnum() or char in {"-", "_"} else "_" for char in audio_path.stem]
+    return ("".join(safe_chars).strip("_") or "audio")[:80]
+
+
+def write_wav_preview_from_audio(source_audio_path: Path, target_path: Path) -> None:
+    """Decode source audio and write a browser-friendly WAV preview."""
+    import soundfile as sf
+
+    audio_data, samplerate = sf.read(source_audio_path, always_2d=False)
+    sf.write(target_path, audio_data, samplerate, format="WAV", subtype="PCM_16")
+
+
+def write_audio_range_to_stream(audio_path: Path, stream: BinaryIO, *, start_byte: int, end_byte: int) -> bool:
+    """Write one byte range to a browser stream.
+
+    Args:
+        audio_path: Local browser-preview audio path.
+        stream: HTTP response stream.
+        start_byte: Inclusive byte offset where streaming starts.
+        end_byte: Inclusive byte offset where streaming stops.
+
+    Returns:
+        True when the whole requested byte range was written. False when the
+        browser disconnected during playback.
+
+    Side Effects:
+        Reads from ``audio_path`` and writes bytes to ``stream``.
+
+    Raises:
+        Propagates file I/O errors other than normal browser disconnects.
+
+    Important Constraints:
+        Browser audio elements often cancel range requests when the user clicks
+        another row, seeks, or the browser reissues a better range. Broken pipe
+        and connection-reset errors are expected client disconnects, not sorter
+        failures.
+    """
+    with audio_path.open("rb") as handle:
+        handle.seek(start_byte)
+        remaining_bytes = end_byte - start_byte + 1
+        while remaining_bytes > 0:
+            chunk = handle.read(min(262_144, remaining_bytes))
+            if not chunk:
+                break
+            try:
+                stream.write(chunk)
+            except (BrokenPipeError, ConnectionResetError):
+                return False
+            remaining_bytes -= len(chunk)
+    return True
 
 
 def audio_content_type(audio_path: Path) -> str:
@@ -942,18 +1036,62 @@ def render_index_html(*, brain_config_path: str, brain_summary: str) -> str:
       background: #fff;
     }}
     audio {{ width: 100%; height: 34px; }}
-    .details {{
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      padding: 12px;
-      background: #fbfbfa;
+      .details {{
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 12px;
+        background: #fbfbfa;
       white-space: pre-wrap;
       overflow: auto;
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 12px;
-      line-height: 1.42;
-    }}
-    .export-grid {{
+        font-size: 12px;
+        line-height: 1.42;
+      }}
+      .category-hints {{
+        margin-top: 8px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 10px;
+        background: #fff;
+        font-size: 12px;
+      }}
+      .category-hints summary {{
+        cursor: pointer;
+        font-weight: 750;
+        color: var(--accent-dark);
+      }}
+      .hint-section {{
+        margin-top: 10px;
+        padding-top: 8px;
+        border-top: 1px solid #ece8df;
+      }}
+      .hint-buttons {{
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 6px;
+      }}
+      .hint-button {{
+        min-height: 28px;
+        padding: 4px 7px;
+        font-size: 11px;
+        font-weight: 650;
+        text-align: left;
+        max-width: 100%;
+        overflow-wrap: anywhere;
+      }}
+      .hint-tree {{
+        margin-top: 8px;
+        max-height: 260px;
+        overflow: auto;
+        border: 1px solid #ece8df;
+        border-radius: 5px;
+        padding: 8px;
+        background: #fbfbfa;
+      }}
+      .hint-tree details {{ margin-left: 8px; }}
+      .hint-tree summary {{ color: var(--text); font-weight: 700; }}
+      .export-grid {{
       display: grid;
       grid-template-columns: minmax(180px, 1fr) auto auto auto auto;
       gap: 8px;
@@ -1156,13 +1294,14 @@ def render_index_html(*, brain_config_path: str, brain_summary: str) -> str:
       </div>
       <aside>
         <strong>Selected File</strong>
-        <div class="audio-box">
-          <label for="audioPlayer">Listen</label>
-          <audio id="audioPlayer" controls preload="none"></audio>
-        </div>
-        <div id="details" class="details" style="margin-top:8px;">No file selected.</div>
-      </aside>
-    </section>
+          <div class="audio-box">
+            <label for="audioPlayer">Listen</label>
+            <audio id="audioPlayer" controls preload="none"></audio>
+          </div>
+          <div id="details" class="details" style="margin-top:8px;">No file selected.</div>
+          <div id="categoryHints" class="category-hints" hidden></div>
+        </aside>
+      </section>
 
     <section class="panel">
       <div class="export-grid">
@@ -1248,6 +1387,7 @@ const state = {{
 const statusEl = document.getElementById("status");
 const rowsEl = document.getElementById("rows");
 const detailsEl = document.getElementById("details");
+const categoryHints = document.getElementById("categoryHints");
 const rowCountEl = document.getElementById("rowCount");
 const audioPlayer = document.getElementById("audioPlayer");
 const progressArea = document.getElementById("progressArea");
@@ -1333,9 +1473,11 @@ async function startPreview() {{
     setStatus("Choose or paste an input path first.", true);
     return;
   }}
-  rowsEl.innerHTML = "";
-  detailsEl.textContent = "Preview running...";
-  audioPlayer.removeAttribute("src");
+    rowsEl.innerHTML = "";
+    detailsEl.textContent = "Preview running...";
+    categoryHints.hidden = true;
+    categoryHints.innerHTML = "";
+    audioPlayer.removeAttribute("src");
   audioPlayer.load();
   rowCountEl.textContent = "0 files";
   state.rows = [];
@@ -1464,6 +1606,23 @@ function correctionRows() {{
   return state.rows.filter(row => rowIsCorrected(row));
 }}
 
+function candidateFolders(row) {{
+  const labels = Array.isArray(row.candidate_folders) ? row.candidate_folders : [];
+  const unique = [];
+  const seen = new Set();
+  [row.approved_folder, row.proposed_folder, ...labels].forEach(label => {{
+    const normalized = normalizeFolder(label);
+    if (!normalized || seen.has(normalized)) return;
+    seen.add(normalized);
+    unique.push(normalized);
+  }});
+  return unique;
+}}
+
+function possibleFxFolders(row) {{
+  return candidateFolders(row).filter(label => label.startsWith("FX/"));
+}}
+
 function updateCorrectionNotice() {{
   const correctedCount = correctionRows().length;
   correctionNotice.hidden = correctedCount === 0;
@@ -1477,7 +1636,7 @@ function selectRow(index) {{
   if (state.sessionId) {{
     audioPlayer.src = `/api/audio/${{state.sessionId}}/${{row.index}}`;
   }}
-  detailsEl.textContent = [
+    detailsEl.textContent = [
     `File: ${{row.display_name}}`,
     "",
     `Approved: ${{row.approved_folder}}`,
@@ -1491,20 +1650,103 @@ function selectRow(index) {{
     "Voter Summary:",
     row.diagnostic_summary || "(none)",
     "",
+    "Possible FX Matches:",
+    possibleFxFolders(row).length ? possibleFxFolders(row).slice(0, 8).map(label => `- ${{label}}`).join("\\n") : "(none from voter candidates)",
+    "",
+    "Detected Alternatives:",
+    candidateFolders(row).filter(label => label !== row.approved_folder && label !== row.proposed_folder).slice(0, 8).map(label => `- ${{label}}`).join("\\n") || "(none)",
+    "",
     "Reason:",
     row.decision_reason || "(none)"
-  ].join("\\n");
-  Array.from(rowsEl.children).forEach((tr, rowIndex) => {{
-    const candidate = state.rows[rowIndex];
-    const classes = [];
-    if (rowIndex === index) classes.push("selected");
-    if (candidate && rowIsCorrected(candidate)) classes.push("corrected");
-    tr.className = classes.join(" ");
-  }});
-}}
+    ].join("\\n");
+    renderCategoryHints(row);
+    Array.from(rowsEl.children).forEach((tr, rowIndex) => {{
+      const candidate = state.rows[rowIndex];
+      const classes = [];
+      if (rowIndex === index) classes.push("selected");
+      if (candidate && rowIsCorrected(candidate)) classes.push("corrected");
+      tr.className = classes.join(" ");
+    }});
+  }}
 
-async function playRow(index) {{
-  selectRow(index);
+  function renderCategoryHints(row) {{
+    const candidates = candidateFolders(row);
+    if (!candidates.length) {{
+      categoryHints.hidden = true;
+      categoryHints.innerHTML = "";
+      return;
+    }}
+    categoryHints.hidden = false;
+    categoryHints.innerHTML = "";
+    const details = document.createElement("details");
+    const summary = document.createElement("summary");
+    summary.textContent = `Detected category options (${{candidates.length}})`;
+    details.appendChild(summary);
+    const note = document.createElement("div");
+    note.className = "small";
+    note.style.marginTop = "6px";
+    note.textContent = "These are voter/proposal hints only. Click a folder to approve it for this file.";
+    details.appendChild(note);
+    const fxCandidates = possibleFxFolders(row);
+    if (fxCandidates.length) {{
+      const fxSection = document.createElement("div");
+      fxSection.className = "hint-section";
+      const title = document.createElement("strong");
+      title.textContent = "Possible FX matches";
+      fxSection.appendChild(title);
+      const buttonWrap = document.createElement("div");
+      buttonWrap.className = "hint-buttons";
+      fxCandidates.slice(0, 12).forEach(label => buttonWrap.appendChild(categoryHintButton(row.index, label)));
+      fxSection.appendChild(buttonWrap);
+      details.appendChild(fxSection);
+    }}
+    const treeSection = document.createElement("div");
+    treeSection.className = "hint-section";
+    const treeTitle = document.createElement("strong");
+    treeTitle.textContent = "All detected options";
+    treeSection.appendChild(treeTitle);
+    const tree = document.createElement("div");
+    tree.className = "hint-tree";
+    appendHintNodes(tree, buildLabelTree(candidates).children, "", row.index);
+    treeSection.appendChild(tree);
+    details.appendChild(treeSection);
+    categoryHints.appendChild(details);
+  }}
+
+  function categoryHintButton(index, label) {{
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "hint-button";
+    button.textContent = label;
+    button.addEventListener("click", event => {{
+      event.preventDefault();
+      event.stopPropagation();
+      stageApprovedFolder(index, label);
+    }});
+    return button;
+  }}
+
+  function appendHintNodes(parent, children, prefix, index) {{
+    Object.keys(children).sort((left, right) => left.localeCompare(right)).forEach(part => {{
+      const node = children[part];
+      const childKeys = Object.keys(node.children);
+      const currentPath = prefix ? `${{prefix}}/${{part}}` : part;
+      if (childKeys.length) {{
+        const details = document.createElement("details");
+        const summary = document.createElement("summary");
+        summary.textContent = part;
+        details.appendChild(summary);
+        if (node.label) details.appendChild(categoryHintButton(index, node.label));
+        appendHintNodes(details, node.children, currentPath, index);
+        parent.appendChild(details);
+        return;
+      }}
+      parent.appendChild(categoryHintButton(index, node.label || currentPath));
+    }});
+  }}
+
+  async function playRow(index) {{
+    selectRow(index);
   try {{
     await audioPlayer.play();
     setStatus(`Playing ${{state.rows[index].display_name}}`);
@@ -1532,20 +1774,21 @@ function closeCategoryChooser() {{
   state.selectedCategory = "";
 }}
 
-function renderCategoryTree() {{
-  categoryTree.innerHTML = "";
-  const query = categorySearch.value.trim().toLowerCase();
-  const labels = state.labels.filter(label => !query || label.toLowerCase().includes(query));
+  function renderCategoryTree() {{
+    categoryTree.innerHTML = "";
+    const query = categorySearch.value.trim().toLowerCase();
+    const labels = state.labels.filter(label => !query || label.toLowerCase().includes(query));
   if (!labels.length) {{
     const empty = document.createElement("div");
     empty.className = "small";
     empty.textContent = "No matching trained folders. Type a new category below if this sound needs one.";
     categoryTree.appendChild(empty);
     return;
+    }}
+    const tree = buildLabelTree(labels);
+    appendCategoryNodes(categoryTree, tree.children, "", Boolean(query));
+    scrollSelectedCategoryIntoView();
   }}
-  const tree = buildLabelTree(labels);
-  appendCategoryNodes(categoryTree, tree.children, "");
-}}
 
 function buildLabelTree(labels) {{
   const root = {{ children: {{}}, label: "" }};
@@ -1561,55 +1804,77 @@ function buildLabelTree(labels) {{
   return root;
 }}
 
-function appendCategoryNodes(parent, children, prefix) {{
-  Object.keys(children).sort((left, right) => left.localeCompare(right)).forEach(part => {{
-    const node = children[part];
-    const childKeys = Object.keys(node.children);
-    if (childKeys.length) {{
-      const details = document.createElement("details");
-      details.open = prefix.split("/").length < 2;
-      const summary = document.createElement("summary");
-      summary.textContent = part;
-      details.appendChild(summary);
-      if (node.label) details.appendChild(categoryLeafButton(node.label));
-      appendCategoryNodes(details, node.children, prefix ? `${{prefix}}/${{part}}` : part);
-      parent.appendChild(details);
-      return;
-    }}
-    parent.appendChild(categoryLeafButton(node.label || (prefix ? `${{prefix}}/${{part}}` : part)));
-  }});
-}}
+  function appendCategoryNodes(parent, children, prefix, expandMatches) {{
+    Object.keys(children).sort((left, right) => left.localeCompare(right)).forEach(part => {{
+      const node = children[part];
+      const childKeys = Object.keys(node.children);
+      const currentPath = prefix ? `${{prefix}}/${{part}}` : part;
+      if (childKeys.length) {{
+        const details = document.createElement("details");
+        details.open = expandMatches || selectedCategoryContainsPath(currentPath);
+        const summary = document.createElement("summary");
+        summary.textContent = part;
+        details.appendChild(summary);
+        if (node.label) details.appendChild(categoryLeafButton(node.label));
+        appendCategoryNodes(details, node.children, currentPath, expandMatches);
+        parent.appendChild(details);
+        return;
+      }}
+      parent.appendChild(categoryLeafButton(node.label || currentPath));
+    }});
+  }}
 
-function categoryLeafButton(label) {{
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = normalizeFolder(label) === normalizeFolder(state.selectedCategory) ? "category-leaf selected" : "category-leaf";
-  button.textContent = label;
+  function selectedCategoryContainsPath(path) {{
+    const selected = normalizeFolder(state.selectedCategory);
+    const current = normalizeFolder(path);
+    return Boolean(selected && current && (selected === current || selected.startsWith(`${{current}}/`)));
+  }}
+
+  function scrollSelectedCategoryIntoView() {{
+    const selectedButton = categoryTree.querySelector(".category-leaf.selected");
+    if (selectedButton) selectedButton.scrollIntoView({{ block: "center" }});
+  }}
+
+  function categoryLeafButton(label) {{
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = normalizeFolder(label) === normalizeFolder(state.selectedCategory) ? "category-leaf selected" : "category-leaf";
+    button.textContent = label;
   button.addEventListener("click", () => {{
     state.selectedCategory = label;
     customCategory.value = label;
     selectedCategoryText.textContent = `Selected: ${{label}}`;
     renderCategoryTree();
   }});
-  return button;
-}}
-
-function applyApprovedCategory() {{
-  if (state.categoryEditIndex < 0 || state.categoryEditIndex >= state.rows.length) return;
-  const approved = normalizeFolder(customCategory.value || state.selectedCategory);
-  if (!approved) {{
-    setStatus("Choose or type an approved folder first.", true);
-    return;
+    return button;
   }}
-  state.rows[state.categoryEditIndex].approved_folder = approved;
-  state.lastTrainingReportPath = "";
-  openTrainingReportButton.disabled = true;
-  const editedIndex = state.categoryEditIndex;
-  closeCategoryChooser();
-  renderRows();
-  selectRow(editedIndex);
-  setStatus("Approved folder staged. Export will use it; training can teach the brains from it.");
-}}
+
+  function stageApprovedFolder(index, approvedFolder) {{
+    if (index < 0 || index >= state.rows.length) return;
+    const approved = normalizeFolder(approvedFolder);
+    if (!approved) {{
+      setStatus("Choose or type an approved folder first.", true);
+      return;
+    }}
+    state.rows[index].approved_folder = approved;
+    state.lastTrainingReportPath = "";
+    openTrainingReportButton.disabled = true;
+    renderRows();
+    selectRow(index);
+    setStatus("Approved folder staged. Export will use it; training can teach the brains from it.");
+  }}
+
+  function applyApprovedCategory() {{
+    if (state.categoryEditIndex < 0 || state.categoryEditIndex >= state.rows.length) return;
+    const approved = normalizeFolder(customCategory.value || state.selectedCategory);
+    if (!approved) {{
+      setStatus("Choose or type an approved folder first.", true);
+      return;
+    }}
+    const editedIndex = state.categoryEditIndex;
+    closeCategoryChooser();
+    stageApprovedFolder(editedIndex, approved);
+  }}
 
 function resetApprovedCategory() {{
   if (state.categoryEditIndex < 0 || state.categoryEditIndex >= state.rows.length) return;

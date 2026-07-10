@@ -884,6 +884,7 @@ def preview_row_from_result(index: int, result: SortFileResult) -> PreviewRow:
         read_status=str(result.physics.read_status),
         decision_reason=str(decision.reason or ""),
         diagnostic_summary=diagnostic_summary(result),
+        candidate_folders=detected_candidate_folders(result),
         result=result,
     )
 
@@ -905,6 +906,108 @@ def diagnostic_summary(result: SortFileResult) -> str:
     brain_top = result.brain_votes.guesses[0].folder_path if result.brain_votes.guesses else ""
     physics_top = result.physics_votes.guesses[0].folder_path if result.physics_votes.guesses else ""
     return f"shape={primary_shape} ({shape_conf}); brain={brain_top or 'none'}; physics={physics_top or 'none'}"
+
+
+def detected_candidate_folders(result: SortFileResult, *, limit: int = 40) -> list[str]:
+    """Return voter-detected folder options for GUI correction hints.
+
+    Args:
+        result: Completed sorter result for one audio file.
+        limit: Maximum number of unique folders returned.
+
+    Returns:
+        Unique taxonomy folders proposed by final arbitration, brain lanes,
+        physics, and shared candidates.
+
+    Side Effects:
+        None.
+
+    Important Constraints:
+        This is display-only diagnostic data. It must not feed classification
+        decisions or inspect source filenames/folders as audio evidence.
+    """
+    candidates: list[str] = []
+    seen: set[str] = set()
+
+    def add_candidate(raw_value: object) -> None:
+        if len(candidates) >= limit:
+            return
+        label = normalize_taxonomy_label(raw_value)
+        if not is_valid_taxonomy_label(label) or label in seen:
+            return
+        seen.add(label)
+        candidates.append(label)
+
+    add_candidate(result.decision.folder_path or result.decision.final_label)
+    add_guess_folders(candidates, seen, result.brain_votes.guesses, limit=limit)
+    add_guess_folders(candidates, seen, result.physics_votes.guesses, limit=limit)
+    for candidate in result.decision.shared_candidates[:limit]:
+        if isinstance(candidate, dict):
+            add_candidate(candidate.get("folder_path") or candidate.get("label"))
+    evidence = result.facts.evidence if isinstance(result.facts.evidence, dict) else {}
+    for digest_key in diagnostic_vote_digest_keys():
+        digest = evidence.get(digest_key, {})
+        if isinstance(digest, dict):
+            add_digest_folders(candidates, seen, digest, limit=limit)
+    authority_trace = result.decision.authority_trace if isinstance(result.decision.authority_trace, dict) else {}
+    for trace_key in ("raw_claim", "winner_after_pick"):
+        trace_value = authority_trace.get(trace_key, {})
+        if isinstance(trace_value, dict):
+            add_candidate(trace_value.get("path") or trace_value.get("folder_path") or trace_value.get("label"))
+    return candidates
+
+
+def add_guess_folders(
+    candidates: list[str],
+    seen: set[str],
+    guesses: list[Any],
+    *,
+    limit: int,
+) -> None:
+    """Append normalized folder paths from category guesses."""
+    for guess in guesses[:limit]:
+        if len(candidates) >= limit:
+            return
+        label = normalize_taxonomy_label(getattr(guess, "folder_path", "") or getattr(guess, "label", ""))
+        if not is_valid_taxonomy_label(label) or label in seen:
+            continue
+        seen.add(label)
+        candidates.append(label)
+
+
+def add_digest_folders(candidates: list[str], seen: set[str], digest: dict[str, Any], *, limit: int) -> None:
+    """Append normalized folder paths from a compact voter digest."""
+    guesses = digest.get("top_guesses", [])
+    if not isinstance(guesses, list):
+        return
+    for guess in guesses[:limit]:
+        if len(candidates) >= limit:
+            return
+        if not isinstance(guess, dict):
+            continue
+        label = normalize_taxonomy_label(guess.get("folder_path") or guess.get("label"))
+        if not is_valid_taxonomy_label(label) or label in seen:
+            continue
+        seen.add(label)
+        candidates.append(label)
+
+
+def diagnostic_vote_digest_keys() -> tuple[str, ...]:
+    """Return evidence keys that may contain compact voter top candidates."""
+    return (
+        "brain_ensemble_vote_result",
+        "full_brain_vote_result",
+        "baby_brain_vote_result",
+        "core_baby_vote_result",
+        "spread_baby_vote_result",
+        "outlier_baby_vote_result",
+        "harmonic_core_baby_vote_result",
+        "harmonic_spread_baby_vote_result",
+        "harmonic_outlier_baby_vote_result",
+        "dry_core_brain_ensemble_vote_result",
+        "dry_core_full_brain_vote_result",
+        "dry_core_physics_vote_result",
+    )
 
 
 def load_available_labels(
@@ -1169,6 +1272,7 @@ def preview_manifest_fields() -> list[str]:
         "read_status",
         "decision_reason",
         "diagnostic_summary",
+        "candidate_folders_json",
     ]
 
 
@@ -1188,6 +1292,7 @@ def preview_row_to_csv(row: PreviewRow) -> dict[str, str]:
         "read_status": row.read_status,
         "decision_reason": row.decision_reason,
         "diagnostic_summary": row.diagnostic_summary,
+        "candidate_folders_json": json.dumps(row.candidate_folders, sort_keys=True),
     }
 
 

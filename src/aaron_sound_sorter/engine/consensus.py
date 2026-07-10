@@ -6,7 +6,11 @@ from typing import Any
 
 from aaron_sound_sorter.domain.models import CategoryGuess, SharedAudioFacts, VoterResult
 from aaron_sound_sorter.domain.policies import ConsensusPolicy
-from aaron_sound_sorter.engine.claim_contracts import is_rank_one_concrete_non_sax_instrument_row
+from aaron_sound_sorter.engine.claim_contracts import (
+    is_human_taught_brain_top_shared_row,
+    is_human_taught_rank_one_row,
+    is_rank_one_concrete_non_sax_instrument_row,
+)
 from aaron_sound_sorter.engine.concrete_fx_gate import ConcreteFxGateProtector
 from aaron_sound_sorter.engine.consensus_candidates import SharedCandidateBuilder
 from aaron_sound_sorter.engine.consensus_support import (
@@ -152,7 +156,7 @@ def _designed_tonal_shape_should_yield_to_concrete_instrument(
     """
     if primary_shape != "designed_tonal_fx":
         return False
-    if not is_rank_one_concrete_non_sax_instrument_row(winner):
+    if not (is_rank_one_concrete_non_sax_instrument_row(winner) or is_human_taught_rank_one_row(winner)):
         return False
     measured_fx_motion = max(
         _subpanel_number(facts, "fx_motion_score"),
@@ -237,6 +241,7 @@ class ConsensusRunner:
         )
         claims: list[ConsensusClaim] = []
         primary_claims = [
+            self.human_taught_specific_decision(shared, winner, facts),
             self.top_family_sanity_decision(shared, winner, facts),
             self.role_sanity_decision(shared, winner, facts, brain_result, physics_result),
             self.shape_sanity_decision(shared, winner, facts),
@@ -265,6 +270,80 @@ class ConsensusRunner:
                 )
             )
         return raw_claim, claims
+
+    def human_taught_specific_decision(
+        self,
+        shared: list[dict[str, Any]],
+        winner: dict[str, Any],
+        facts: SharedAudioFacts,
+    ) -> ConsensusClaim | None:
+        """Emit a concrete same-family claim from GUI-correction recall.
+
+        The incremental GUI trainer intentionally updates the Brain lanes more
+        quickly than the physics profiles. This claim lets a user-taught folder
+        beat a broad parent bucket when Physics still has the same folder in its
+        candidate window. It does not cross top families and it does not inspect
+        source filenames.
+        """
+        del facts
+        if not shared or not winner:
+            return None
+        winner_top = str(winner.get("top_family") or "")
+        winner_path = str(winner.get("folder_path") or winner.get("label") or "")
+        candidates = [
+            row
+            for row in shared
+            if str(row.get("top_family") or "") == winner_top
+            and str(row.get("folder_path") or row.get("label") or "") != winner_path
+            and is_human_taught_brain_top_shared_row(row)
+        ]
+        if not candidates:
+            return None
+        candidates.sort(
+            key=lambda row: (
+                int(row.get("physics_rank", 9999)),
+                float(row.get("combined_rank_score", 9999.0)),
+                -float(row.get("brain_confidence", 0.0) or 0.0),
+                str(row.get("label", "")),
+            )
+        )
+        taught_row = candidates[0]
+        return claim_from_candidate_row(
+            row=taught_row,
+            source="human_taught_specific_shared_candidate",
+            reason=(
+                "GUI correction recall ranked this folder first in Brain, and "
+                "Physics still corroborated it in the shared candidate window; "
+                "allowed the concrete taught folder to compete with broader "
+                "same-family role buckets"
+            ),
+            shared=shared,
+            can_override=True,
+            strength=self._human_taught_specific_strength(taught_row),
+        )
+
+    @staticmethod
+    def _human_taught_specific_strength(row: dict[str, Any]) -> float:
+        """Return dynamic authority for a GUI-taught shared candidate."""
+        try:
+            physics_rank = int(float(row.get("physics_rank", 9999)))
+        except Exception:
+            physics_rank = 9999
+        try:
+            combined = float(row.get("combined_rank_score", 9999.0))
+        except Exception:
+            combined = 9999.0
+        evidence = row.get("brain_evidence")
+        teacher_weight = 0.0
+        if isinstance(evidence, dict):
+            try:
+                teacher_weight = float(evidence.get("human_override_effective_weight", 0.0) or 0.0)
+            except Exception:
+                teacher_weight = 0.0
+        physics_bonus = max(0.0, min(0.06, (26 - physics_rank) * 0.003))
+        combined_bonus = max(0.0, min(0.03, (28.0 - combined) * 0.002))
+        teacher_bonus = 0.02 if teacher_weight >= 1000.0 else 0.0
+        return min(0.98, 0.90 + physics_bonus + combined_bonus + teacher_bonus)
 
     def top_family_sanity_decision(
         self,
@@ -598,6 +677,8 @@ class ConsensusRunner:
             )
 
         if compatible_shared:
+            if is_human_taught_rank_one_row(winner):
+                return None
             if primary == "pitched_repetition_phrase" and _measured_voice_source_strength(facts) >= 0.66:
                 voice_shared = [row for row in compatible_shared if _is_human_voice_candidate_row(row)]
                 if voice_shared:
@@ -794,6 +875,8 @@ class ConsensusRunner:
             "clean_sustained_tonal_instrument_loop",
             "mixed_music_loop",
         }
+        if generic_pitched_loop_role and is_human_taught_rank_one_row(winner):
+            return None
         if generic_pitched_loop_role and str(winner.get("top_family", "")) == "FX":
             winner_path_low = str(winner.get("folder_path") or winner.get("label") or "").lower()
             concrete_fx_fragments = ("siren", "alarm", "beep", "glitch", "stutter", "machine", "motor", "engine")
