@@ -15,6 +15,7 @@ __pycache__/
 outputs/
 reports/
 _reports/
+_real_sort_tests/
 _pytest_outputs/
 _pytest_regression_outputs/
 dist/

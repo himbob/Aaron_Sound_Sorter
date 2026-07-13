@@ -63,7 +63,11 @@ def test_uploaded_belize_loop_is_not_voice() -> None:
     assert label.startswith("Instruments/") or label.startswith("FX/"), label
 
 
-def test_uploaded_av5_hit_escapes_measured_role_conflict_review() -> None:
+def test_uploaded_av5_hit_escapes_review_and_allows_trained_brass_hit() -> None:
     label = _run_one("AV5_5_94bpm_Hit 2.wav")
     assert not label.startswith("_TO_REVIEW/Measured Role Conflict"), label
-    assert label.startswith("FX/") or label.startswith("Instruments/Instrument Loops"), label
+    assert (
+        label.startswith("Instruments/Brass/Brass Section")
+        or label.startswith("FX/")
+        or label.startswith("Instruments/Instrument Loops")
+    ), label
