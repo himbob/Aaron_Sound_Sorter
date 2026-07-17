@@ -10,6 +10,7 @@ import zipfile
 from pathlib import Path
 from typing import Any
 
+from aaron_audio_intelligence.sidecar_writer import AUDIO_INTELLIGENCE_SIDECAR_NAME, write_audio_intelligence_sidecars
 from aaron_sound_sorter.domain.models import SortFileResult, SortSummary
 from aaron_sound_sorter.domain.physics_category_panels import ALL_CATEGORY_SPECS
 from aaron_sound_sorter.infrastructure.brain_lane_validation import write_brain_lane_validation_reports
@@ -176,6 +177,7 @@ class SortReportWriter:
         summary_path = self.output_dir / f"{SORTED_ROOT_NAME}_summary.txt"
         write_manifest(manifest_path, file_results)
         write_debug_packets(self.output_dir / DEBUG_PACKET_SIDECAR_NAME, file_results)
+        write_audio_intelligence_sidecars(self.output_dir / AUDIO_INTELLIGENCE_SIDECAR_NAME, file_results)
         write_summary(summary_path, file_results)
         write_brain_ensemble_audit(self.output_dir / "Aaron_Brain_Ensemble_Audit.csv", file_results)
         write_brain_lane_validation_reports(self.output_dir, file_results)
