@@ -7,8 +7,15 @@ import subprocess
 import tempfile
 from dataclasses import dataclass
 
+from aaron_audio_intelligence.shape_memory_brain import SHAPE_STARTER_MEMORY_BRAIN_NAME
+
 from .brain_family_training import AnchorSelectionConfig, build_brain_family_training_trees
 from .core import *
+from .shape_memory_training import (
+    DEFAULT_STARTER_SHAPE_MEMORY_EXAMPLES_PER_LABEL,
+    DEFAULT_STARTER_SHAPE_MEMORY_WEIGHT,
+    train_shape_memory_starter_from_tree,
+)
 
 # Visible product/developer policy values. Keep defaults here instead of hiding
 # mystery numbers inside command methods. Command methods should read like a
@@ -23,6 +30,80 @@ TRAIN_BRAIN_WEAK_SIMILARITY_FLOOR = 0.20
 TRAIN_BRAIN_STRONG_MARGIN = 1.50
 TRAIN_BRAIN_RISKY_MIN_SIMILARITY = 0.80
 TRAIN_BRAIN_BROAD_CONFLICT_OVERRIDE_GAP = 0.80
+
+
+def shape_memory_starter_output_path(base_brain_path: Path, requested_path: str | None = None) -> Path:
+    """Return the starter ShapeVoter memory path for a training command.
+
+    Args:
+        base_brain_path: Full brain path whose sibling is used by default.
+        requested_path: Optional explicit output path from CLI arguments.
+
+    Returns:
+        Absolute starter memory brain path.
+
+    Side Effects:
+        None.
+    """
+    raw = str(requested_path or "").strip()
+    if raw:
+        return Path(raw).expanduser().resolve()
+    return Path(base_brain_path).expanduser().resolve().with_name(SHAPE_STARTER_MEMORY_BRAIN_NAME)
+
+
+def maybe_train_shape_memory_starter_for_cli(
+    *,
+    args: argparse.Namespace,
+    training_root: Path,
+    base_brain_path: Path,
+    report_dir: Path,
+) -> int:
+    """Train the optional low-trust starter ShapeVoter memory brain.
+
+    Args:
+        args: Parsed training command arguments.
+        training_root: Trusted training tree used by the folder brain.
+        base_brain_path: Full brain JSON providing feature scaler metadata.
+        report_dir: Report folder for starter-memory audit files.
+
+    Returns:
+        Zero on success or when disabled; nonzero when requested training fails.
+
+    Side Effects:
+        May write ``stage4_shape_memory_starter_brain.json`` and reports.
+    """
+    if not bool(getattr(args, "train_shape_memory", True)):
+        print("ShapeVoter starter memory training disabled.", flush=True)
+        return 0
+    base_brain_path = Path(base_brain_path).expanduser().resolve()
+    if not base_brain_path.exists():
+        print(f"WARNING: shape-memory starter skipped; base brain missing: {base_brain_path}", flush=True)
+        return 0
+    output_path = shape_memory_starter_output_path(
+        base_brain_path,
+        str(getattr(args, "save_shape_memory_brain", "") or ""),
+    )
+    print(f"Training low-trust ShapeVoter starter memory: {output_path}", flush=True)
+    try:
+        summary = train_shape_memory_starter_from_tree(
+            training_root=training_root,
+            base_brain_path=base_brain_path,
+            output_brain_path=output_path,
+            report_dir=report_dir,
+            allowed_top=str(getattr(args, "allowed_top", "Drums,Instruments,FX,Textures")),
+            max_examples_per_label=int(
+                getattr(args, "shape_memory_train_per_label", DEFAULT_STARTER_SHAPE_MEMORY_EXAMPLES_PER_LABEL)
+            ),
+            evidence_weight=int(getattr(args, "shape_memory_evidence_weight", DEFAULT_STARTER_SHAPE_MEMORY_WEIGHT)),
+            random_seed=int(getattr(args, "random_seed", 20260503)),
+            apply=True,
+        )
+    except Exception as exc:
+        print(f"ShapeVoter starter memory training failed: {exc}", flush=True)
+        return 1
+    print(f"Saved low-trust ShapeVoter starter memory: {summary.output_brain_path}", flush=True)
+    print(f"ShapeVoter starter report: {summary.report_dir}", flush=True)
+    return 0
 
 
 @dataclass(frozen=True)
@@ -383,6 +464,14 @@ def run_train_brain_command(args: argparse.Namespace) -> int:
     print(f"Saved folder-supervised brain: {save_brain}", flush=True)
     print(f"Latest brain pointer: {latest}", flush=True)
     print(f"Training reports: {run_dir / 'reports'}", flush=True)
+    starter_code = maybe_train_shape_memory_starter_for_cli(
+        args=args,
+        training_root=training_root,
+        base_brain_path=save_brain,
+        report_dir=run_dir / "reports" / "shape_memory_starter",
+    )
+    if starter_code != 0:
+        return starter_code
     return 0
 
 
@@ -563,6 +652,11 @@ def run_train_brain_family_command(args: argparse.Namespace) -> int:
         return code
 
     latest = project_dir / "PHASE4_LATEST_BRAIN_FAMILY_PATHS.txt"
+    shape_starter_pointer = (
+        str(shape_memory_starter_output_path(save_full, str(getattr(args, "save_shape_memory_brain", "") or "")))
+        if bool(getattr(args, "train_shape_memory", True))
+        else "disabled"
+    )
     latest.write_text(
         "\n".join(
             [
@@ -570,6 +664,7 @@ def run_train_brain_family_command(args: argparse.Namespace) -> int:
                 f"core_baby={save_core}",
                 f"spread_baby={save_spread}",
                 f"outlier_baby={save_outlier}",
+                f"shape_starter_memory={shape_starter_pointer}",
                 f"run_root={run_root}",
                 f"anchor_manifest={trees.manifest_path}",
             ]
@@ -577,11 +672,20 @@ def run_train_brain_family_command(args: argparse.Namespace) -> int:
         + "\n",
         encoding="utf-8",
     )
+    starter_code = maybe_train_shape_memory_starter_for_cli(
+        args=args,
+        training_root=training_root,
+        base_brain_path=save_full,
+        report_dir=run_root / "shape_memory_starter",
+    )
+    if starter_code != 0:
+        return starter_code
     print("\nDONE training brain family.", flush=True)
     print(f"Full brain: {save_full}", flush=True)
     print(f"Core baby brain: {save_core}", flush=True)
     print(f"Spread baby brain: {save_spread}", flush=True)
     print(f"Outlier baby brain: {save_outlier}", flush=True)
+    print(f"ShapeVoter starter memory: {shape_starter_pointer}", flush=True)
     print(f"Reports: {run_root}", flush=True)
     print(f"Latest brain family pointer: {latest}", flush=True)
     return 0
@@ -711,6 +815,43 @@ def normalize_cli_args(argv: Optional[List[str]] = None) -> List[str]:
     return cli_args
 
 
+def add_shape_memory_training_args(parser: argparse.ArgumentParser) -> None:
+    """Add shared ShapeVoter starter-memory training flags.
+
+    Args:
+        parser: Training subparser to extend.
+
+    Returns:
+        None.
+
+    Side Effects:
+        Mutates ``parser`` by registering CLI arguments.
+    """
+    parser.add_argument(
+        "--train-shape-memory",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=("Also train the low-trust ShapeVoter starter memory brain from the trusted training tree. Default: on."),
+    )
+    parser.add_argument(
+        "--save-shape-memory-brain",
+        default="",
+        help=f"Starter ShapeVoter memory JSON to write. Default: sibling {SHAPE_STARTER_MEMORY_BRAIN_NAME}.",
+    )
+    parser.add_argument(
+        "--shape-memory-train-per-label",
+        type=int,
+        default=DEFAULT_STARTER_SHAPE_MEMORY_EXAMPLES_PER_LABEL,
+        help="Low-trust starter ShapeVoter examples per label. Default: 3.",
+    )
+    parser.add_argument(
+        "--shape-memory-evidence-weight",
+        type=int,
+        default=DEFAULT_STARTER_SHAPE_MEMORY_WEIGHT,
+        help="Low-trust support weight per starter shape example. GUI corrections remain stronger.",
+    )
+
+
 def build_argument_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(description="Aaron Sound Sorter Stage 4")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -780,6 +921,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
         default=45.0,
         help="Per-file timeout for experimental dry-core training augmentation.",
     )
+    add_shape_memory_training_args(trainp)
     trainp.set_defaults(func=run_train_brain_command)
 
     familyp = sub.add_parser(
@@ -834,6 +976,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
     familyp.add_argument("--training-preview-per-label", type=int, default=3)
     familyp.add_argument("--min-active-train-per-label", type=int, default=1)
     familyp.add_argument("--random-seed", type=int, default=20260513)
+    add_shape_memory_training_args(familyp)
     familyp.set_defaults(func=run_train_brain_family_command)
 
     run = sub.add_parser("build-eval", help="Build a pure scratch brain and evaluate it.")

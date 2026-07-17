@@ -23,9 +23,13 @@ build/
 
 # Large generated brain files
 stage4_folder_brain*.json
+stage4_shape_memory_brain*.json
+stage4_shape_memory_starter_brain*.json
 
 # Local training/audio data
 training/
+!commands/training/
+!commands/training/*.command
 *.wav
 *.aif
 *.aiff

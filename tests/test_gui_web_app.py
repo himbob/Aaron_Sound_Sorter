@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from aaron_audio_intelligence.shape_memory_brain import SHAPE_MEMORY_BRAIN_NAME, SHAPE_STARTER_MEMORY_BRAIN_NAME
 from aaron_audio_intelligence.user_memory_brain import USER_MEMORY_BRAIN_NAME
 from aaron_sound_sorter.gui.models import PreviewRow, SortPreviewSession
 from aaron_sound_sorter.gui.web_app import (
@@ -158,15 +159,21 @@ def test_backup_active_brain_family_copies_existing_gui_brains(tmp_path: Path) -
     full_brain = tmp_path / "stage4_folder_brain.json"
     core_brain = tmp_path / "stage4_folder_brain_core_baby.json"
     memory_brain = tmp_path / USER_MEMORY_BRAIN_NAME
+    shape_memory_brain = tmp_path / SHAPE_MEMORY_BRAIN_NAME
+    shape_starter_memory_brain = tmp_path / SHAPE_STARTER_MEMORY_BRAIN_NAME
     full_brain.write_text('{"labels": ["full"]}', encoding="utf-8")
     core_brain.write_text('{"labels": ["core"]}', encoding="utf-8")
     memory_brain.write_text('{"labels": ["memory"]}', encoding="utf-8")
+    shape_memory_brain.write_text('{"labels": ["shape"]}', encoding="utf-8")
+    shape_starter_memory_brain.write_text('{"labels": ["starter"]}', encoding="utf-8")
 
     backup_dir = backup_active_brain_family(tmp_path, tmp_path / "_reports" / "run" / "brain_backups")
 
     assert (backup_dir / "stage4_folder_brain.json").read_text(encoding="utf-8") == '{"labels": ["full"]}'
     assert (backup_dir / "stage4_folder_brain_core_baby.json").read_text(encoding="utf-8") == '{"labels": ["core"]}'
     assert (backup_dir / USER_MEMORY_BRAIN_NAME).read_text(encoding="utf-8") == '{"labels": ["memory"]}'
+    assert (backup_dir / SHAPE_STARTER_MEMORY_BRAIN_NAME).read_text(encoding="utf-8") == '{"labels": ["starter"]}'
+    assert (backup_dir / SHAPE_MEMORY_BRAIN_NAME).read_text(encoding="utf-8") == '{"labels": ["shape"]}'
     assert not (backup_dir / "stage4_folder_brain_spread_baby.json").exists()
 
 

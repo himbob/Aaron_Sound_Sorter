@@ -14,6 +14,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
+from aaron_audio_intelligence.shape_memory_brain import SHAPE_MEMORY_BRAIN_NAME, SHAPE_STARTER_MEMORY_BRAIN_NAME
 from aaron_audio_intelligence.user_memory_brain import USER_MEMORY_BRAIN_NAME
 from aaron_sound_sorter.domain.models import SortFileResult, SortRequest
 from aaron_sound_sorter.domain.policies import BrainVoterPolicy, ConsensusPolicy, PhysicsVoterPolicy, ShapeVoterPolicy
@@ -77,6 +78,10 @@ class BrainFamilyConfig:
             configured.
         user_memory_brain_path: GUI correction memory brain path, when
             configured.
+        shape_starter_memory_brain_path: Low-trust batch starter ShapeVoter
+            memory brain path, when configured.
+        shape_memory_brain_path: ShapeVoter correction memory brain path, when
+            configured.
         harmonic_core_baby_brain_path: Harmonic-core baby brain path, when
             configured.
         harmonic_spread_baby_brain_path: Harmonic-spread baby brain path, when
@@ -101,6 +106,8 @@ class BrainFamilyConfig:
     spread_baby_brain_path: Path | None
     outlier_baby_brain_path: Path | None
     user_memory_brain_path: Path | None
+    shape_starter_memory_brain_path: Path | None
+    shape_memory_brain_path: Path | None
     harmonic_core_baby_brain_path: Path | None
     harmonic_spread_baby_brain_path: Path | None
     harmonic_outlier_baby_brain_path: Path | None
@@ -115,6 +122,8 @@ class BrainFamilyConfig:
             self.spread_baby_brain_path,
             self.outlier_baby_brain_path,
             self.user_memory_brain_path,
+            self.shape_starter_memory_brain_path,
+            self.shape_memory_brain_path,
         ]
         harmonic_lanes = [
             self.harmonic_core_baby_brain_path,
@@ -195,6 +204,8 @@ class SortPreviewService:
             spread_baby_brain_path=brain_config.spread_baby_brain_path,
             outlier_baby_brain_path=brain_config.outlier_baby_brain_path,
             user_memory_brain_path=brain_config.user_memory_brain_path,
+            shape_starter_memory_brain_path=brain_config.shape_starter_memory_brain_path,
+            shape_memory_brain_path=brain_config.shape_memory_brain_path,
             harmonic_core_baby_brain_path=brain_config.harmonic_core_baby_brain_path,
             harmonic_spread_baby_brain_path=brain_config.harmonic_spread_baby_brain_path,
             harmonic_outlier_baby_brain_path=brain_config.harmonic_outlier_baby_brain_path,
@@ -209,7 +220,7 @@ class SortPreviewService:
             brain = sorter.brain_repository.load(request.brain_path)
             baby_brains = sorter.load_baby_brains_if_available(request)
             harmonic_baby_brains = sorter.load_harmonic_baby_brains_if_available(request)
-            sorter.attach_user_memory_brain(brain, baby_brains)
+            sorter.attach_memory_brains(brain, baby_brains)
             prepared_input = sorter.audio_repository.prepare(request.input_path, request.output_dir)
             total_files = len(prepared_input.audio_files)
             if progress_callback is not None:
@@ -288,6 +299,12 @@ class SortPreviewService:
             outlier_baby_brain_path=self.resolve_optional_project_path(baby.get("outlier")),
             user_memory_brain_path=self.resolve_optional_project_path(
                 brains.get("user_memory") or USER_MEMORY_BRAIN_NAME
+            ),
+            shape_starter_memory_brain_path=self.resolve_optional_project_path(
+                brains.get("shape_starter_memory") or SHAPE_STARTER_MEMORY_BRAIN_NAME
+            ),
+            shape_memory_brain_path=self.resolve_optional_project_path(
+                brains.get("shape_memory") or SHAPE_MEMORY_BRAIN_NAME
             ),
             harmonic_core_baby_brain_path=self.resolve_optional_project_path(harmonic_baby.get("core")),
             harmonic_spread_baby_brain_path=self.resolve_optional_project_path(harmonic_baby.get("spread")),

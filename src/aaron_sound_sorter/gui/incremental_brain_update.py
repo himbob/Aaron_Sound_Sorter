@@ -18,6 +18,12 @@ from typing import Any
 
 import numpy as np
 
+from aaron_audio_intelligence.shape_memory_brain import (
+    SHAPE_MEMORY_BRAIN_NAME,
+    build_empty_shape_memory_brain,
+    is_shape_memory_brain,
+    update_shape_memory_with_row,
+)
 from aaron_audio_intelligence.user_memory_brain import USER_MEMORY_BRAIN_NAME, build_empty_user_memory_brain
 from aaron_sound_sorter.brain import (
     compute_category_fact_profiles,
@@ -45,6 +51,7 @@ DEFAULT_INCREMENTAL_BRAIN_NAMES = (
     "stage4_folder_brain_spread_baby.json",
     "stage4_folder_brain_outlier_baby.json",
     USER_MEMORY_BRAIN_NAME,
+    SHAPE_MEMORY_BRAIN_NAME,
 )
 MAX_INCREMENTAL_EXAMPLES_PER_LABEL = 120
 DEFAULT_MAX_CENTROIDS = 6
@@ -207,7 +214,7 @@ class IncrementalBrainUpdater:
         backup_dir.mkdir(parents=True, exist_ok=True)
         rows, errors = self._read_correction_rows(corrections)
         if rows:
-            self._ensure_user_memory_brain_exists()
+            self._ensure_memory_brains_exist()
         updated_brains: list[BrainDeltaResult] = []
         for brain_path in self._existing_brain_paths():
             try:
@@ -230,18 +237,30 @@ class IncrementalBrainUpdater:
     def _existing_brain_paths(self) -> list[Path]:
         return [self.project_root / name for name in self.brain_names if (self.project_root / name).is_file()]
 
-    def _ensure_user_memory_brain_exists(self) -> None:
-        """Create the dedicated GUI correction memory brain when configured."""
-        if USER_MEMORY_BRAIN_NAME not in self.brain_names:
-            return
-        memory_path = self.project_root / USER_MEMORY_BRAIN_NAME
-        if memory_path.exists():
-            return
+    def _ensure_memory_brains_exist(self) -> None:
+        """Create dedicated GUI correction memory brains when configured."""
         full_brain_path = self.project_root / "stage4_folder_brain.json"
         if not full_brain_path.exists():
             return
         base_brain = self.repository.load(full_brain_path)
-        self.repository.save(memory_path, build_empty_user_memory_brain(base_brain))
+        self._ensure_user_memory_brain_exists(base_brain)
+        self._ensure_shape_memory_brain_exists(base_brain)
+
+    def _ensure_user_memory_brain_exists(self, base_brain: dict[str, Any]) -> None:
+        """Create the dedicated GUI correction memory brain when configured."""
+        if USER_MEMORY_BRAIN_NAME not in self.brain_names:
+            return
+        memory_path = self.project_root / USER_MEMORY_BRAIN_NAME
+        if not memory_path.exists():
+            self.repository.save(memory_path, build_empty_user_memory_brain(base_brain))
+
+    def _ensure_shape_memory_brain_exists(self, base_brain: dict[str, Any]) -> None:
+        """Create the dedicated ShapeVoter memory brain when configured."""
+        if SHAPE_MEMORY_BRAIN_NAME not in self.brain_names:
+            return
+        memory_path = self.project_root / SHAPE_MEMORY_BRAIN_NAME
+        if not memory_path.exists():
+            self.repository.save(memory_path, build_empty_shape_memory_brain(base_brain))
 
     def _read_correction_rows(
         self,
@@ -299,6 +318,7 @@ class IncrementalBrainUpdater:
         labels_touched: list[str] = []
         warnings: list[str] = []
         weighted_rows: list[MeasuredCorrectionEvidence] = []
+        shape_memory_brain = is_shape_memory_brain(brain)
         for evidence in correction_rows:
             row = evidence.row
             dynamic_weight = dynamic_human_override_weight(
@@ -308,14 +328,21 @@ class IncrementalBrainUpdater:
             )
             weighted_evidence = MeasuredCorrectionEvidence(row=row, evidence_weight=dynamic_weight)
             try:
-                update_brain_label_with_row(brain, row, evidence_weight=dynamic_weight)
-                labels_touched.append(row.label)
+                if shape_memory_brain:
+                    shape = update_shape_memory_with_row(brain, row, evidence_weight=dynamic_weight)
+                    if shape:
+                        labels_touched.append(shape)
+                else:
+                    update_brain_label_with_row(brain, row, evidence_weight=dynamic_weight)
+                    update_shape_memory_with_row(brain, row, evidence_weight=dynamic_weight)
+                    labels_touched.append(row.label)
                 weighted_rows.append(weighted_evidence)
             except Exception as exc:
                 warnings.append(f"{row.label}: {exc}")
         if weighted_rows:
             annotate_incremental_update(brain, weighted_rows, brain_path.name)
-            recompute_rival_contrast_facts(brain)
+            if not shape_memory_brain:
+                recompute_rival_contrast_facts(brain)
             self.repository.save(brain_path, brain)
         label_count_after = len(brain.get("labels", []) if isinstance(brain.get("labels", []), list) else [])
         return BrainDeltaResult(

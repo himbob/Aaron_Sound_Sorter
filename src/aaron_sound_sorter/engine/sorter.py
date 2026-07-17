@@ -12,6 +12,11 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
+from aaron_audio_intelligence.shape_memory_brain import (
+    SHAPE_MEMORY_BRAIN_NAME,
+    SHAPE_STARTER_MEMORY_BRAIN_NAME,
+    merge_shape_memory_into_brain,
+)
 from aaron_audio_intelligence.user_memory_brain import USER_MEMORY_BRAIN_NAME, merge_user_memory_into_brain
 from aaron_sound_sorter.domain.facts import build_shared_audio_facts
 from aaron_sound_sorter.domain.models import (
@@ -94,7 +99,7 @@ class SortSamplesUseCase:
             brain = self.brain_repository.load(request.brain_path)
             baby_brains = self.load_baby_brains_if_available(request)
             harmonic_baby_brains = self.load_harmonic_baby_brains_if_available(request)
-            self.attach_user_memory_brain(brain, baby_brains)
+            self.attach_memory_brains(brain, baby_brains)
         if any(baby_brains.values()):
             brain["_multi_baby_brains_loaded"] = True
         if any(harmonic_baby_brains.values()):
@@ -129,6 +134,8 @@ class SortSamplesUseCase:
         default_spread = full_path.with_name("stage4_folder_brain_spread_baby.json")
         default_outlier = full_path.with_name("stage4_folder_brain_outlier_baby.json")
         default_user_memory = full_path.with_name(USER_MEMORY_BRAIN_NAME)
+        default_shape_starter_memory = full_path.with_name(SHAPE_STARTER_MEMORY_BRAIN_NAME)
+        default_shape_memory = full_path.with_name(SHAPE_MEMORY_BRAIN_NAME)
         legacy = request.baby_brain_path or full_path.with_name("stage4_folder_brain_baby.json")
         paths = {
             "core_baby": request.core_baby_brain_path or default_core,
@@ -136,6 +143,8 @@ class SortSamplesUseCase:
             or (legacy if Path(legacy).expanduser().exists() else default_spread),
             "outlier_baby": request.outlier_baby_brain_path or default_outlier,
             "user_memory": request.user_memory_brain_path or default_user_memory,
+            "shape_starter_memory": request.shape_starter_memory_brain_path or default_shape_starter_memory,
+            "shape_memory": request.shape_memory_brain_path or default_shape_memory,
         }
         loaded: dict[str, dict[str, Any] | None] = {}
         for lane, candidate in paths.items():
@@ -151,6 +160,16 @@ class SortSamplesUseCase:
         """Attach GUI correction memory to the current in-memory brain view."""
         memory_brain = baby_brains.get("user_memory")
         merge_user_memory_into_brain(brain, memory_brain)
+
+    @staticmethod
+    def attach_memory_brains(
+        brain: dict[str, Any],
+        baby_brains: dict[str, dict[str, Any] | None],
+    ) -> None:
+        """Attach all GUI correction memory lanes to the current brain view."""
+        SortSamplesUseCase.attach_user_memory_brain(brain, baby_brains)
+        merge_shape_memory_into_brain(brain, baby_brains.get("shape_starter_memory"))
+        merge_shape_memory_into_brain(brain, baby_brains.get("shape_memory"))
 
     def load_harmonic_baby_brains_if_available(self, request: SortRequest) -> dict[str, dict[str, Any] | None]:
         """Load optional harmonic-trained baby brains.

@@ -6,6 +6,15 @@ from pathlib import Path
 
 import numpy as np
 
+from aaron_audio_intelligence.shape_memory_brain import (
+    SHAPE_MEMORY_BRAIN_NAME,
+    SHAPE_STARTER_MEMORY_BRAIN_NAME,
+    build_empty_shape_memory_brain,
+    merge_shape_memory_into_brain,
+    shape_memory_match_for_facts,
+    shape_target_for_label,
+    update_shape_memory_with_row,
+)
 from aaron_audio_intelligence.user_memory_brain import (
     USER_MEMORY_BRAIN_NAME,
     build_empty_user_memory_brain,
@@ -28,6 +37,7 @@ from aaron_sound_sorter.gui.incremental_brain_update import (
 from aaron_sound_sorter.voters.brain_voter import BrainVoter
 from aaron_sound_sorter.voters.physics_voter import PhysicsVoter
 from aaron_sound_sorter.voters.scoring_tools import PROFILE_FEATURES
+from aaron_sound_sorter.voters.shape_voter import ShapeVoter
 
 
 def _fingerprint(value: float = 0.25) -> list[float]:
@@ -81,12 +91,13 @@ def _base_brain(labels: list[str] | None = None) -> dict:
 
 
 def _row(label: str, source: Path, value: float = 0.25) -> FeatureRow:
+    structure = "loop" if label.endswith("/Loops") else "one_shot"
     return FeatureRow(
         path=str(source),
         group_key=label,
         label=label,
         top=label.split("/", 1)[0],
-        structure="one_shot",
+        structure=structure,
         duration_sec=1.0,
         fingerprint=_fingerprint(value),
         read_status="ok",
@@ -288,6 +299,96 @@ def test_incremental_updater_creates_dedicated_user_memory_brain(
     assert memory["brain_type"] == "user_correction_memory_brain"
     assert "Instruments/Plucked Strings/Koto/One Shots" in memory["labels"]
     assert USER_MEMORY_BRAIN_NAME in updated_names
+
+
+def test_incremental_updater_creates_dedicated_shape_memory_brain(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    brain_path = tmp_path / "stage4_folder_brain.json"
+    brain_path.write_text(json.dumps(_base_brain()), encoding="utf-8")
+    audio_path = tmp_path / "loop.wav"
+    audio_path.write_bytes(b"not real audio")
+    monkeypatch.setattr(
+        updater_module,
+        "make_fingerprint_safe",
+        lambda path: (np.asarray(_fingerprint(0.55), dtype=np.float32), 1.0, "ok"),
+    )
+    correction = IncrementalCorrection(
+        label="Instruments/Mixed Musical Loops/Multi Instrument/Loops",
+        audio_path=audio_path,
+        source_path=audio_path,
+        row_id="00001",
+        status="staged",
+    )
+
+    summary = IncrementalBrainUpdater(tmp_path, ("stage4_folder_brain.json", SHAPE_MEMORY_BRAIN_NAME)).apply(
+        [correction],
+        report_dir=tmp_path / "_reports" / "gui_training_imports" / "run",
+        backup_dir=tmp_path / "_reports" / "gui_training_imports" / "run" / "brain_backups",
+    )
+
+    memory_path = tmp_path / SHAPE_MEMORY_BRAIN_NAME
+    memory = json.loads(memory_path.read_text(encoding="utf-8"))
+    updated_names = {result.brain_path.name for result in summary.updated_brains}
+    payload = memory["shape_memory"]
+    assert memory["brain_type"] == "shape_memory_brain"
+    assert "mixed_instrument_loop" in memory["labels"]
+    assert payload["shape_counts_by_shape"]["mixed_instrument_loop"] == 1
+    assert SHAPE_MEMORY_BRAIN_NAME in updated_names
+
+
+def test_default_incremental_updater_does_not_mutate_shape_starter_memory() -> None:
+    assert SHAPE_MEMORY_BRAIN_NAME in updater_module.DEFAULT_INCREMENTAL_BRAIN_NAMES
+    assert SHAPE_STARTER_MEMORY_BRAIN_NAME not in updater_module.DEFAULT_INCREMENTAL_BRAIN_NAMES
+
+
+def test_shape_memory_target_uses_broad_taxonomy_structure() -> None:
+    assert shape_target_for_label("Drums/Drum Loops/Loops", "loop") == "beat_loop"
+    assert (
+        shape_target_for_label("Instruments/Mixed Musical Loops/Multi Instrument/Loops", "loop")
+        == "mixed_instrument_loop"
+    )
+    assert shape_target_for_label("Instruments/Plucked Strings/Koto/One Shots", "one_shot") == "solo_phrase"
+    assert (
+        shape_target_for_label(
+            "FX/Structural and Transitional FX/Risers and Builds/Generic Riser/Long FX",
+            "long_fx",
+        )
+        == "transition_riser"
+    )
+    assert shape_target_for_label("FX/Designed Noise FX/Siren/Long FX", "long_fx") == "hybrid_fx_motion"
+    assert shape_target_for_label("FX/Textures/Noise and Static/Hiss/Long FX", "long_fx") == "texture_bed"
+
+
+def test_shape_memory_teaches_shape_voter_with_exact_correction(tmp_path: Path) -> None:
+    label = "Instruments/Mixed Musical Loops/Multi Instrument/Loops"
+    query = _fingerprint(0.55)
+    brain = _base_brain()
+    memory = build_empty_shape_memory_brain(brain)
+    update_shape_memory_with_row(memory, _row(label, tmp_path / "loop.wav", value=0.55), evidence_weight=240)
+    merge_shape_memory_into_brain(brain, memory)
+    physics = _audio_physics_for_vector(tmp_path, query)
+    facts = _facts_for_vector(query)
+
+    result = ShapeVoter().vote(physics, facts, brain)
+    shape_vote = result.diagnostics["shape_vote"]
+
+    assert shape_vote["primary_shape"] == "mixed_instrument_loop"
+    assert shape_vote["learned_shape_memory_matched"] is True
+    assert shape_vote["learned_shape_memory_match_kind"] == "fingerprint"
+
+
+def test_shape_memory_does_not_fire_for_far_audio(tmp_path: Path) -> None:
+    label = "Instruments/Mixed Musical Loops/Multi Instrument/Loops"
+    brain = _base_brain()
+    memory = build_empty_shape_memory_brain(brain)
+    update_shape_memory_with_row(memory, _row(label, tmp_path / "loop.wav", value=0.0), evidence_weight=32)
+    merge_shape_memory_into_brain(brain, memory)
+    match = shape_memory_match_for_facts(brain, _prefix_fingerprint(0.95, width=FP_SIZE))
+
+    assert match.example_count == 1
+    assert match.matched is False
 
 
 def test_incremental_updater_uses_dynamic_competitor_aware_weight(

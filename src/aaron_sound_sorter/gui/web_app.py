@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any, BinaryIO, Callable
 from urllib.parse import parse_qs, urlparse
 
+from aaron_audio_intelligence.shape_memory_brain import SHAPE_MEMORY_BRAIN_NAME, SHAPE_STARTER_MEMORY_BRAIN_NAME
 from aaron_audio_intelligence.user_memory_brain import USER_MEMORY_BRAIN_NAME
 from aaron_sound_sorter.gui.incremental_brain_update import (
     IncrementalBrainUpdater,
@@ -786,6 +787,8 @@ def active_gui_brain_file_names() -> list[str]:
         "stage4_folder_brain_spread_baby.json",
         "stage4_folder_brain_outlier_baby.json",
         USER_MEMORY_BRAIN_NAME,
+        SHAPE_STARTER_MEMORY_BRAIN_NAME,
+        SHAPE_MEMORY_BRAIN_NAME,
         "stage4_folder_brain_harmonic_core_baby.json",
         "stage4_folder_brain_harmonic_spread_baby.json",
         "stage4_folder_brain_harmonic_outlier_baby.json",

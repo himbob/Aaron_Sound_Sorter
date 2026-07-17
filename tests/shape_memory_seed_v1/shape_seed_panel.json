@@ -1,0 +1,75 @@
+{
+  "panel_name": "shape_memory_seed_v1",
+  "description": "Explicit broad-shape teacher panel for ShapeVoter memory. These examples are training seeds, not acceptance assertions.",
+  "rules": {
+    "explicit_labels_only": true,
+    "do_not_use_for_acceptance_gate": true,
+    "runtime_matching_uses_audio_fingerprints_only": true
+  },
+  "cases": [
+    {
+      "id": "seed_drum_loop_full",
+      "source_path": "tests/regression_audio/2.Drum Loop_1_100bpm.wav",
+      "approved_label": "Drums/Drum Loops/Loops",
+      "structure": "loop",
+      "expected_shape": "beat_loop",
+      "evidence_weight": 96
+    },
+    {
+      "id": "seed_drum_hit_kick",
+      "source_path": "tests/regression_audio/kick.wav",
+      "approved_label": "Drums/Kick Drums/Generic Kick/One Shots",
+      "structure": "one_shot",
+      "expected_shape": "single_hit",
+      "evidence_weight": 96
+    },
+    {
+      "id": "seed_instrument_bass_loop",
+      "source_path": "tests/regression_audio/03_bass_Emn_178bpm.wav",
+      "approved_label": "Instruments/Bass/Electric Bass/Loops",
+      "structure": "loop",
+      "expected_shape": "bass_phrase",
+      "evidence_weight": 96
+    },
+    {
+      "id": "seed_instrument_piano_phrase",
+      "source_path": "tests/regression_audio/Piano_G.wav",
+      "approved_label": "Instruments/Keys/Piano/One Shots",
+      "structure": "one_shot",
+      "expected_shape": "solo_phrase",
+      "evidence_weight": 96
+    },
+    {
+      "id": "seed_instrument_mixed_loop",
+      "source_path": "tests/regression_audio/Brass_Saxophone_RnB_Multi_Instrument_F_Minor_80BPM.wav",
+      "approved_label": "Instruments/Mixed Musical Loops/Loops",
+      "structure": "loop",
+      "expected_shape": "mixed_instrument_loop",
+      "evidence_weight": 96
+    },
+    {
+      "id": "seed_voice_phrase",
+      "source_path": "tests/regression_audio/Money_vocals_female_rap_110bpm.wav",
+      "approved_label": "Instruments/Voice/Phrase/One Shots",
+      "structure": "one_shot",
+      "expected_shape": "pitched_phrase_shape",
+      "evidence_weight": 120
+    },
+    {
+      "id": "seed_fx_riser",
+      "source_path": "tests/regression_audio/Riser Short Effect.wav",
+      "approved_label": "FX/Structural and Transitional FX/Risers and Builds/Generic Riser/Long FX",
+      "structure": "long_fx",
+      "expected_shape": "transition_riser",
+      "evidence_weight": 96
+    },
+    {
+      "id": "seed_fx_siren_motion",
+      "source_path": "tests/regression_audio/MS_O_01_Outlaw_Fx Police_D#minor_91bpm_Wet.wav",
+      "approved_label": "FX/Designed Noise FX/Siren/Long FX",
+      "structure": "long_fx",
+      "expected_shape": "hybrid_fx_motion",
+      "evidence_weight": 96
+    }
+  ]
+}

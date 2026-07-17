@@ -20,9 +20,10 @@ features and the identity voters, not by ShapeVoter.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from typing import Any
 
+from aaron_audio_intelligence.shape_memory_brain import ShapeMemoryMatch, shape_memory_match_for_facts
 from aaron_sound_sorter.domain.models import AudioPhysics, CategoryGuess, SharedAudioFacts, VoterResult
 from aaron_sound_sorter.domain.policies import ShapeVoterPolicy
 from aaron_sound_sorter.voters.base import Voter, clamp01
@@ -70,6 +71,16 @@ class ShapeEvidence:
     echo_tail_score: float
     true_repetition_score: float
     reason: str
+    learned_shape_memory_enabled: bool = False
+    learned_shape_memory_matched: bool = False
+    learned_shape_memory_shape: str = ""
+    learned_shape_memory_confidence: float = 0.0
+    learned_shape_memory_nearest_distance: float = 0.0
+    learned_shape_memory_threshold: float = 0.0
+    learned_shape_memory_example_count: int = 0
+    learned_shape_memory_effective_weight: int = 0
+    learned_shape_memory_match_kind: str = "none"
+    learned_shape_memory_policy: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
@@ -81,6 +92,9 @@ class ShapeEvidence:
             "instrument_plus_fx_loop_score",
             "echo_tail_score",
             "true_repetition_score",
+            "learned_shape_memory_confidence",
+            "learned_shape_memory_nearest_distance",
+            "learned_shape_memory_threshold",
         ):
             data[key] = round(float(data[key]), 6)
         return data
@@ -100,6 +114,7 @@ class ShapeVoter(Voter):
             evidence = self.broken_shape_evidence(physics, facts)
         else:
             evidence = classify_shape(facts.feature_values_by_name, facts=facts)
+            evidence = apply_shape_memory(evidence, facts=facts, brain=brain)
         label = f"shape/{evidence.primary_shape}"
         guess = CategoryGuess(
             label=label,
@@ -169,6 +184,7 @@ def classify_shape(values: Mapping[str, float], *, facts: SharedAudioFacts) -> S
         + v(values, "tail_pitch_confidence") * 0.25
         + v(values, "loop_sustained_tonal_frame_ratio") * 0.30
     )
+
     low_event = v(values, "loop_mean_event_low_ratio")
     high_event = v(values, "loop_mean_event_high_ratio")
     mid_event = clamp01(1.0 - low_event - high_event)
@@ -1049,6 +1065,66 @@ def classify_shape(values: Mapping[str, float], *, facts: SharedAudioFacts) -> S
         true_repetition_score=round(true_repetition, 6),
         reason=reason,
     )
+
+
+def apply_shape_memory(
+    evidence: ShapeEvidence,
+    *,
+    facts: SharedAudioFacts,
+    brain: dict[str, Any],
+) -> ShapeEvidence:
+    """Return shape evidence adjusted by learned GUI correction memory."""
+    if evidence.primary_shape == "broken_or_tiny":
+        return evidence
+    match = shape_memory_match_for_facts(brain, facts.feature_vector)
+    if match.example_count <= 0:
+        return evidence
+    memory_fields = shape_memory_fields(match)
+    if not match.matched or not match.shape:
+        return replace(evidence, **memory_fields)
+
+    scores = {str(name): float(score) for name, score in evidence.shape_scores}
+    current = float(scores.get(match.shape, 0.0))
+    teacher_score = float(match.confidence)
+    if match.match_kind == "fingerprint":
+        teacher_score = max(teacher_score, min(0.98, float(evidence.confidence) + 0.035))
+    scores[match.shape] = max(current, teacher_score)
+    sorted_scores = sorted(scores.items(), key=lambda item: item[1], reverse=True)
+    primary, primary_score = sorted_scores[0]
+    secondary = sorted_scores[1][0] if len(sorted_scores) > 1 else evidence.secondary_shape
+    if primary_score < 0.42:
+        primary = "ambiguous_shape"
+        secondary = sorted_scores[0][0]
+    reason = (
+        f"{evidence.reason}; learned_shape_memory={match.shape} "
+        f"kind={match.match_kind} confidence={match.confidence:.2f} "
+        f"distance={match.nearest_distance:.2f}"
+    )
+    return replace(
+        evidence,
+        primary_shape=primary,
+        secondary_shape=secondary,
+        confidence=round(clamp01(primary_score), 6),
+        shape_scores=[(name, round(clamp01(score), 6)) for name, score in sorted_scores],
+        reason=reason,
+        **memory_fields,
+    )
+
+
+def shape_memory_fields(match: ShapeMemoryMatch) -> dict[str, Any]:
+    """Return ``ShapeEvidence`` keyword fields for learned shape diagnostics."""
+    return {
+        "learned_shape_memory_enabled": match.example_count > 0,
+        "learned_shape_memory_matched": bool(match.matched),
+        "learned_shape_memory_shape": str(match.shape),
+        "learned_shape_memory_confidence": float(match.confidence),
+        "learned_shape_memory_nearest_distance": float(match.nearest_distance),
+        "learned_shape_memory_threshold": float(match.threshold),
+        "learned_shape_memory_example_count": int(match.example_count),
+        "learned_shape_memory_effective_weight": int(match.effective_weight),
+        "learned_shape_memory_match_kind": str(match.match_kind),
+        "learned_shape_memory_policy": "shape_voter_teacher_fingerprint_memory",
+    }
 
 
 def v(values: Mapping[str, float], name: str, default: float = 0.0) -> float:

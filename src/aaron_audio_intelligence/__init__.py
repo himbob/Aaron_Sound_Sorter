@@ -10,6 +10,10 @@ from aaron_audio_intelligence.owner_brains import (
     PrototypeOwnerBrain,
     TrainableBrainExample,
 )
+from aaron_audio_intelligence.shape_memory_brain import (
+    SHAPE_MEMORY_BRAIN_NAME,
+    SHAPE_STARTER_MEMORY_BRAIN_NAME,
+)
 from aaron_audio_intelligence.sidecar_schema import (
     AAI_SIDECAR_SCHEMA_VERSION,
     AudioIntelligenceSidecar,
@@ -22,6 +26,8 @@ __all__ = [
     "AudioIntelligenceSidecar",
     "OwnerBrainResult",
     "PrototypeOwnerBrain",
+    "SHAPE_MEMORY_BRAIN_NAME",
+    "SHAPE_STARTER_MEMORY_BRAIN_NAME",
     "TrainableBrainExample",
     "USER_MEMORY_BRAIN_NAME",
     "build_sidecar_from_sort_result",
