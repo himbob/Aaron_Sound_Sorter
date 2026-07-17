@@ -136,7 +136,7 @@ Open work:
 
 ### Phase 1: Sidecar Schema And Evidence Export
 
-Status: started.
+Status: implemented as a read-only foundation.
 
 Goal:
 
@@ -162,6 +162,34 @@ Exit criteria:
 - manifest remains readable
 - sidecar is JSON and versioned
 - tests cover schema serialization
+
+### Phase 1.5: GUI Correction Memory Brain
+
+Status: first product increment implemented.
+
+Goal:
+
+Make GUI corrections immediately useful without forcing a full retrain. When a
+user clicks "Train Brains From Corrections", the updater now keeps the existing
+full/core/spread/outlier incremental updates and also writes a dedicated
+`stage4_folder_brain_user_memory.json` brain lane.
+
+Behavior:
+
+- correction memory is source-name blind and stores measured fingerprints
+- the sorter loads the memory lane automatically when present
+- the memory lane participates in brain ensemble voting as `user_memory`
+- the memory examples are merged into the in-memory full brain view so
+  BrainVoter and PhysicsVoter can both use human-override recall
+- normal measured eligibility and arbitration still apply; this is not a final
+  folder rescue
+
+Why this matters:
+
+Human corrections now become an explicit trainable teacher brain instead of
+being diluted inside the large historical brain. This is the first step toward
+making more of the system trainable: owner brains, shape brains, role brains,
+and physics-like measured specialist brains.
 
 ### Phase 2: Read-Only Music Properties
 

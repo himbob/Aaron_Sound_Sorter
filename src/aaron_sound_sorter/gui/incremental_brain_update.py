@@ -18,6 +18,7 @@ from typing import Any
 
 import numpy as np
 
+from aaron_audio_intelligence.user_memory_brain import USER_MEMORY_BRAIN_NAME, build_empty_user_memory_brain
 from aaron_sound_sorter.brain import (
     compute_category_fact_profiles,
     compute_category_rival_contrast_facts,
@@ -43,6 +44,7 @@ DEFAULT_INCREMENTAL_BRAIN_NAMES = (
     "stage4_folder_brain_core_baby.json",
     "stage4_folder_brain_spread_baby.json",
     "stage4_folder_brain_outlier_baby.json",
+    USER_MEMORY_BRAIN_NAME,
 )
 MAX_INCREMENTAL_EXAMPLES_PER_LABEL = 120
 DEFAULT_MAX_CENTROIDS = 6
@@ -204,6 +206,8 @@ class IncrementalBrainUpdater:
         report_dir.mkdir(parents=True, exist_ok=True)
         backup_dir.mkdir(parents=True, exist_ok=True)
         rows, errors = self._read_correction_rows(corrections)
+        if rows:
+            self._ensure_user_memory_brain_exists()
         updated_brains: list[BrainDeltaResult] = []
         for brain_path in self._existing_brain_paths():
             try:
@@ -225,6 +229,19 @@ class IncrementalBrainUpdater:
 
     def _existing_brain_paths(self) -> list[Path]:
         return [self.project_root / name for name in self.brain_names if (self.project_root / name).is_file()]
+
+    def _ensure_user_memory_brain_exists(self) -> None:
+        """Create the dedicated GUI correction memory brain when configured."""
+        if USER_MEMORY_BRAIN_NAME not in self.brain_names:
+            return
+        memory_path = self.project_root / USER_MEMORY_BRAIN_NAME
+        if memory_path.exists():
+            return
+        full_brain_path = self.project_root / "stage4_folder_brain.json"
+        if not full_brain_path.exists():
+            return
+        base_brain = self.repository.load(full_brain_path)
+        self.repository.save(memory_path, build_empty_user_memory_brain(base_brain))
 
     def _read_correction_rows(
         self,

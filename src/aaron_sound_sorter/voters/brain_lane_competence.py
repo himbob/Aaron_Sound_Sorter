@@ -94,13 +94,14 @@ def brain_lane_candidate_diagnostics(
     parent_count = count_lanes_matching_parent(label, parent, lane_guesses, present_lanes)
     top_count = count_lanes_matching_top(label, top, lane_guesses, present_lanes)
     outlier_only = present_lanes in (["outlier_baby"], ["harmonic_outlier_baby"])
+    user_memory_only = present_lanes == ["user_memory"]
     lane_confidence = max(calibrated_values) if calibrated_values else 0.0
     return BrainLaneCandidateDiagnostics(
         label=label,
         candidate_parent_path=parent,
         candidate_top_family=top,
         lane_calibrated_confidence=lane_confidence,
-        lane_authority_reason=authority_reason(present_lanes, parent_count, top_count, outlier_only),
+        lane_authority_reason=authority_reason(present_lanes, parent_count, top_count, outlier_only, user_memory_only),
         lane_exact_agreement_count=exact_count,
         lane_parent_agreement_count=parent_count,
         lane_top_family_agreement_count=top_count,
@@ -197,9 +198,17 @@ def count_lanes_matching_top(
     )
 
 
-def authority_reason(present_lanes: list[str], parent_count: int, top_count: int, outlier_only: bool) -> str:
+def authority_reason(
+    present_lanes: list[str],
+    parent_count: int,
+    top_count: int,
+    outlier_only: bool,
+    user_memory_only: bool = False,
+) -> str:
     if outlier_only:
         return "outlier-only support is recall visibility, not terminal authority"
+    if user_memory_only:
+        return "human correction memory support; normal measured eligibility still applies"
     if len(present_lanes) >= 2:
         return "exact label agreement across multiple brain lanes"
     if parent_count >= 2:

@@ -14,6 +14,7 @@ def choose_representative_brain_guess(
 ) -> CategoryGuess | None:
     """Choose the lane guess whose metadata represents the ensemble label."""
     preferred_order = [
+        "user_memory",
         "core_baby",
         "spread_baby",
         "full",
@@ -44,6 +45,7 @@ def brain_lane_vote_weight(lane: str, *, weight_profile: str = "generic", label:
             "harmonic_core_baby": 0.18,
             "harmonic_spread_baby": 0.16,
             "harmonic_outlier_baby": 0.06,
+            "user_memory": 2.35,
         },
         "bass_loop_baby_priority": {
             "full": 0.86,
@@ -54,6 +56,7 @@ def brain_lane_vote_weight(lane: str, *, weight_profile: str = "generic", label:
             "harmonic_core_baby": 0.38,
             "harmonic_spread_baby": 0.34,
             "harmonic_outlier_baby": 0.16,
+            "user_memory": 2.55,
         },
         "vocal_core_spread_priority": {
             "full": 0.78,
@@ -64,6 +67,7 @@ def brain_lane_vote_weight(lane: str, *, weight_profile: str = "generic", label:
             "harmonic_core_baby": 0.40,
             "harmonic_spread_baby": 0.36,
             "harmonic_outlier_baby": 0.12,
+            "user_memory": 2.75,
         },
         "generic_pitched_full_guarded": {
             "full": 1.10,
@@ -74,6 +78,7 @@ def brain_lane_vote_weight(lane: str, *, weight_profile: str = "generic", label:
             "harmonic_core_baby": 0.32,
             "harmonic_spread_baby": 0.28,
             "harmonic_outlier_baby": 0.10,
+            "user_memory": 2.60,
         },
         "generic": {
             "core_baby": 1.00,
@@ -84,6 +89,7 @@ def brain_lane_vote_weight(lane: str, *, weight_profile: str = "generic", label:
             "harmonic_core_baby": 0.42,
             "harmonic_spread_baby": 0.36,
             "harmonic_outlier_baby": 0.14,
+            "user_memory": 2.45,
         },
     }
     weights = profile_weights.get(weight_profile, profile_weights["generic"])

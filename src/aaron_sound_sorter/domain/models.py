@@ -113,6 +113,7 @@ class SortRequest:
     core_baby_brain_path: Path | None = None
     spread_baby_brain_path: Path | None = None
     outlier_baby_brain_path: Path | None = None
+    user_memory_brain_path: Path | None = None
     harmonic_core_baby_brain_path: Path | None = None
     harmonic_spread_baby_brain_path: Path | None = None
     harmonic_outlier_baby_brain_path: Path | None = None

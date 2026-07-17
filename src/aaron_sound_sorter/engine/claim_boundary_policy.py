@@ -68,6 +68,8 @@ class ClaimBoundaryPolicy:
             return ClaimBoundaryDecision(False, kind, "broad_wind_loop_lacks_source_margin")
         if self._transition_fx_over_stable_music_loop(raw_claim, claim, facts):
             return ClaimBoundaryDecision(False, kind, "transition_fx_lacks_motion_authority")
+        if self._human_voice_fx_over_true_voice_instrument(claim, facts):
+            return ClaimBoundaryDecision(False, kind, "human_voice_fx_conflicts_with_true_voice_instrument")
         if self._human_voice_fx_over_clean_instrument_loop(claim, facts):
             return ClaimBoundaryDecision(False, kind, "human_voice_fx_conflicts_with_clean_instrument_loop")
         return ClaimBoundaryDecision(True, kind)
@@ -100,7 +102,7 @@ class ClaimBoundaryPolicy:
         if claim.family != "Drums" or claim.sub_family != "Drum Loops":
             return False
         shape = self._shape(facts)
-        return bool(
+        older_clean_bass_guard = bool(
             shape in {"bass_phrase", "beat_loop", "pitched_repetition_phrase"}
             and self._shape_confidence(facts) >= 0.86
             and self._metric(facts, "low_event_ratio") >= 0.86
@@ -111,6 +113,31 @@ class ClaimBoundaryPolicy:
             and self._score(facts, "bass_synth_score", "bass_sub_score", "low_end_source_score") >= 0.62
             and self._score(facts, "drum_loop_source_score", "rhythmic_break_loop_score") <= 0.46
         )
+        clean_bass_phrase_guard = bool(
+            shape == "bass_phrase"
+            and self._shape_confidence(facts) >= 0.86
+            and self._metric(facts, "low_event_ratio") >= 0.86
+            and self._metric(facts, "pitched_event_ratio") >= 0.88
+            and self._metric(facts, "pitch_confidence") >= 0.70
+            and self._metric(facts, "non_event_tonal_ratio") >= 0.50
+            and self._metric(facts, "percussive_event_ratio") <= 0.08
+            and self._metric(facts, "drumlike_frame_ratio") <= 0.08
+            and self._score(facts, "bass_synth_score", "bass_sub_score", "low_end_source_score") >= 0.62
+            and self._score(
+                facts,
+                "drum_hit_score",
+                "drum_kick_source_score",
+                "drum_snare_source_score",
+                "drum_tom_conga_source_score",
+                "drum_closed_hat_source_score",
+                "drum_cymbal_source_score",
+                "drum_rim_stick_source_score",
+                "drum_shaker_tambourine_source_score",
+                "drum_metallic_percussion_source_score",
+            )
+            <= 0.52
+        )
+        return older_clean_bass_guard or clean_bass_phrase_guard
 
     def _drum_loop_over_clean_synth_loop(
         self,
@@ -276,6 +303,39 @@ class ClaimBoundaryPolicy:
             and self._score(facts, "voice_score", "human_spoken_voice_score") < 0.88
         )
 
+    def _human_voice_fx_over_true_voice_instrument(
+        self,
+        claim: ConsensusClaim,
+        facts: SharedAudioFacts | None,
+    ) -> bool:
+        path = self._claim_path(claim)
+        if claim.family != "FX" or "human and voice" not in path:
+            return False
+        voice_role_strength = max(
+            self._measured_role_strength(facts, "vocal_music_phrase"),
+            self._measured_role_strength(facts, "vocal_phrase"),
+            self._measured_role_strength(facts, "vocal_one_shot"),
+            self._measured_role_strength(facts, "voiced_one_shot"),
+        )
+        transition_strength = self._score(
+            facts,
+            "fx_transition_authority_score",
+            "fx_motion_score",
+            "fx_riser_build_score",
+            "fx_drop_downlifter_score",
+            "fx_whoosh_sweep_score",
+        )
+        return bool(
+            voice_role_strength >= 0.68
+            and self._score(facts, "voice_score", "human_spoken_voice_score") >= 0.78
+            and self._metric(facts, "pitched_event_ratio") >= 0.82
+            and self._metric(facts, "f0_voiced_ratio") >= 0.68
+            and self._metric(facts, "sustained_tonal_frame_ratio") >= 0.68
+            and self._metric(facts, "percussive_event_ratio") <= 0.16
+            and self._metric(facts, "drumlike_frame_ratio") <= 0.16
+            and transition_strength <= 0.42
+        )
+
     @staticmethod
     def _claim_path(claim: ConsensusClaim) -> str:
         return str(claim.folder_path or claim.label or "").strip("/").lower()
@@ -332,6 +392,17 @@ class ClaimBoundaryPolicy:
             if isinstance(feature_values, dict):
                 best = max(best, ClaimBoundaryPolicy._float(feature_values.get(name)))
         return best
+
+    @staticmethod
+    def _measured_role_strength(facts: SharedAudioFacts | None, name: str) -> float:
+        evidence = getattr(facts, "evidence", {}) if facts is not None else {}
+        roles = evidence.get("measured_roles") if isinstance(evidence, dict) else {}
+        if not isinstance(roles, dict):
+            return 0.0
+        value = roles.get(name)
+        if isinstance(value, dict):
+            value = value.get("strength", value.get("score"))
+        return ClaimBoundaryPolicy._float(value)
 
     @staticmethod
     def _float(value: object) -> float:

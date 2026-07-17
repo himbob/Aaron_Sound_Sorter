@@ -8,12 +8,18 @@ from aaron_sound_sorter.engine.family_claim_arbiter import FamilyClaimArbiter
 from aaron_sound_sorter.engine.family_claims import claim_from_folder_path
 
 
-def _claim(path: str, *, source: str = "final_measured_branch_loop_broad_bucket", strength: float = 0.94):
+def _claim(
+    path: str,
+    *,
+    source: str = "final_measured_branch_loop_broad_bucket",
+    strength: float = 0.94,
+    shared: list[dict] | None = None,
+):
     return claim_from_folder_path(
         folder_path=path,
         source=source,
         reason="test claim",
-        shared=[],
+        shared=shared or [],
         raw_candidate_score=5.0,
         brain_rank=2,
         physics_rank=3,
@@ -24,17 +30,26 @@ def _claim(path: str, *, source: str = "final_measured_branch_loop_broad_bucket"
     )
 
 
-def _facts(shape: str, confidence: float, shape_values: dict[str, float], panel_values: dict[str, float]):
+def _facts(
+    shape: str,
+    confidence: float,
+    shape_values: dict[str, float],
+    panel_values: dict[str, float],
+    measured_roles: dict[str, float] | None = None,
+):
+    evidence = {
+        "shape_vote": {"primary_shape": shape, "confidence": confidence, **shape_values},
+        "physics_subpanels": {"flat": panel_values},
+    }
+    if measured_roles is not None:
+        evidence["measured_roles"] = measured_roles
     return SharedAudioFacts(
         is_broken_or_tiny=False,
         is_loop_like=True,
         is_single_event_like=False,
         is_short_hit_like=False,
         is_long=True,
-        evidence={
-            "shape_vote": {"primary_shape": shape, "confidence": confidence, **shape_values},
-            "physics_subpanels": {"flat": panel_values},
-        },
+        evidence=evidence,
     )
 
 
@@ -57,6 +72,40 @@ def test_drum_loop_claim_stands_down_for_clean_bass_loop() -> None:
             "low_end_source_score": 0.70,
             "drum_loop_source_score": 0.18,
             "rhythmic_break_loop_score": 0.22,
+        },
+    )
+
+    decision = ClaimBoundaryPolicy().evaluate(raw_claim=raw, claim=claim, facts=facts)
+
+    assert not decision.allowed
+    assert decision.reason == "drum_loop_claim_conflicts_with_clean_bass_loop"
+
+
+def test_drum_loop_claim_stands_down_for_clean_rhythmic_bass_phrase() -> None:
+    raw = _claim("Instruments/Bass/808 Bass/Loops", source="strong_consensus")
+    claim = _claim("Drums/Drum Loops/Loops", source="placement_depth_broad_bucket")
+    facts = _facts(
+        "bass_phrase",
+        0.98,
+        {
+            "low_event_ratio": 0.99,
+            "pitched_event_ratio": 1.0,
+            "pitch_confidence": 0.92,
+            "non_event_tonal_ratio": 0.63,
+            "sustained_tonal_frame_ratio": 0.67,
+            "percussive_event_ratio": 0.0,
+            "drumlike_frame_ratio": 0.0,
+        },
+        {
+            "bass_synth_score": 0.78,
+            "bass_sub_score": 0.67,
+            "low_end_source_score": 0.64,
+            "drum_loop_source_score": 0.72,
+            "rhythmic_break_loop_score": 0.38,
+            "drum_hit_score": 0.19,
+            "drum_kick_source_score": 0.42,
+            "drum_tom_conga_source_score": 0.32,
+            "drum_snare_source_score": 0.18,
         },
     )
 
@@ -280,6 +329,36 @@ def test_human_voice_fx_claim_stands_down_for_clean_instrument_loop() -> None:
     assert decision.reason == "human_voice_fx_conflicts_with_clean_instrument_loop"
 
 
+def test_human_voice_fx_claim_stands_down_for_true_vocal_music_phrase() -> None:
+    raw = _claim("FX/Human and Voice FX/Spoken Voice/Long FX", source="strong_consensus")
+    claim = _claim("FX/Human and Voice FX/Spoken Voice/Long FX", source="strong_consensus")
+    facts = _facts(
+        "designed_low_fx",
+        0.88,
+        {
+            "pitched_event_ratio": 0.94,
+            "f0_voiced_ratio": 0.86,
+            "sustained_tonal_frame_ratio": 0.90,
+            "percussive_event_ratio": 0.06,
+            "drumlike_frame_ratio": 0.06,
+        },
+        {
+            "voice_score": 0.80,
+            "human_spoken_voice_score": 0.90,
+            "fx_formant_score": 0.80,
+            "fx_motion_score": 0.20,
+            "fx_transition_authority_score": 0.22,
+            "fx_riser_build_score": 0.18,
+        },
+        {"vocal_music_phrase": 0.93},
+    )
+
+    decision = ClaimBoundaryPolicy().evaluate(raw_claim=raw, claim=claim, facts=facts)
+
+    assert not decision.allowed
+    assert decision.reason == "human_voice_fx_conflicts_with_true_voice_instrument"
+
+
 def test_broad_instrument_loop_claim_is_not_treated_as_source_identity() -> None:
     raw = _claim("FX/Textures/Noise and Static/Hiss/Long FX", source="strong_consensus")
     claim = _claim("Instruments/Instrument Loops/Loops", source="parent_eligibility_broad_bucket")
@@ -435,6 +514,93 @@ def test_raw_transition_fx_winner_stands_down_for_stable_music_loop_without_moti
 
     assert winner.folder_path == "Instruments/Synths/Synth Loops"
     assert winner.source == "raw_contract_stable_music_loop_over_transition_fx"
+
+
+def test_measured_voice_claim_can_beat_fx_human_voice_when_role_is_true_vocal() -> None:
+    raw = _claim("FX/Human and Voice FX/Spoken Voice/Long FX", source="strong_consensus", strength=0.88)
+    claim = _claim(
+        "Instruments/Voice/Vocal Loops/Loops",
+        source="final_measured_voice_invariant",
+        strength=0.98,
+    )
+    facts = _facts(
+        "designed_low_fx",
+        0.88,
+        {
+            "pitched_event_ratio": 0.94,
+            "f0_voiced_ratio": 0.86,
+            "sustained_tonal_frame_ratio": 0.90,
+            "percussive_event_ratio": 0.06,
+            "drumlike_frame_ratio": 0.06,
+        },
+        {
+            "voice_score": 0.80,
+            "human_spoken_voice_score": 0.90,
+            "fx_transition_authority_score": 0.26,
+            "fx_motion_score": 0.20,
+        },
+        {"vocal_music_phrase": 0.92},
+    )
+
+    winner = FamilyClaimArbiter().pick_winner(raw_claim=raw, claims=[claim], facts=facts)
+
+    assert winner.folder_path == "Instruments/Voice/Vocal Loops/Loops"
+    assert winner.source == "final_measured_voice_invariant"
+
+
+def test_measured_sax_claim_beats_broad_brass_woodwinds_parent() -> None:
+    shared_sax = [
+        {
+            "folder_path": "Instruments/Woodwinds/Saxophone/Loops",
+            "combined_rank_score": 19.0,
+            "brain_rank": 7,
+            "physics_rank": 12,
+        },
+    ]
+    raw = _claim("Instruments/Mallets and Bells/Vibraphone/Loops", source="strong_consensus", strength=0.88)
+    broad = _claim(
+        "Instruments/Brass and Woodwinds/Loops",
+        source="final_measured_branch_loop_broad_bucket",
+        strength=0.97,
+        shared=shared_sax,
+    )
+    sax = _claim(
+        "Instruments/Woodwinds/Saxophone/Loops",
+        source="final_measured_sax_loop_invariant",
+        strength=0.94,
+        shared=shared_sax,
+    )
+    facts = _facts(
+        "pitched_phrase",
+        1.0,
+        {
+            "pitched_event_ratio": 1.0,
+            "f0_voiced_ratio": 1.0,
+            "sustained_tonal_frame_ratio": 1.0,
+            "non_event_tonal_ratio": 1.0,
+            "mid_event_ratio": 0.71,
+            "high_event_ratio": 0.13,
+            "low_event_ratio": 0.16,
+            "spectral_flatness_mean": 0.25,
+            "spectral_entropy_mean": 0.40,
+            "onset_count": 9.0,
+            "percussive_event_ratio": 0.0,
+            "drumlike_frame_ratio": 0.0,
+        },
+        {
+            "woodwind_sax_score": 0.71,
+            "reed_wind_score": 0.62,
+            "reed_wind_authority_score": 0.47,
+            "voice_score": 0.61,
+            "synth_tonal_source_score": 0.61,
+            "plucked_string_score": 0.50,
+        },
+    )
+
+    winner = FamilyClaimArbiter().pick_winner(raw_claim=raw, claims=[broad, sax], facts=facts)
+
+    assert winner.folder_path == "Instruments/Woodwinds/Saxophone/Loops"
+    assert winner.source == "final_measured_sax_loop_invariant"
 
 
 def test_profile_synth_one_shot_claim_deepens_to_loop_when_shape_is_loop() -> None:

@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import sys
 import threading
+import time
 import uuid
 import webbrowser
 from dataclasses import dataclass, field
@@ -19,6 +20,7 @@ from pathlib import Path
 from typing import Any, BinaryIO, Callable
 from urllib.parse import parse_qs, urlparse
 
+from aaron_audio_intelligence.user_memory_brain import USER_MEMORY_BRAIN_NAME
 from aaron_sound_sorter.gui.incremental_brain_update import (
     IncrementalBrainUpdater,
     corrections_from_import_manifest,
@@ -47,6 +49,27 @@ class PreviewJob:
     completed_files: int = 0
     total_files: int = 0
     latest_file: str = ""
+    partial_rows: list[dict[str, Any]] = field(default_factory=list)
+    started_at: float = field(default_factory=time.time)
+    updated_at: float = field(default_factory=time.time)
+
+
+@dataclass
+class ExportJob:
+    """Background export job state for long copy, move, or symlink runs."""
+
+    job_id: str
+    status: str = "queued"
+    message: str = "Queued"
+    error: str = ""
+    exported_count: int = 0
+    corrected_count: int = 0
+    sorted_root: str = ""
+    approved_plan_path: str = ""
+    corrections_path: str = ""
+    errors: list[str] = field(default_factory=list)
+    started_at: float = field(default_factory=time.time)
+    updated_at: float = field(default_factory=time.time)
 
 
 @dataclass
@@ -69,6 +92,8 @@ class BrainTrainingJob:
     log_path: str = ""
     update_manifest_path: str = ""
     errors: list[str] = field(default_factory=list)
+    started_at: float = field(default_factory=time.time)
+    updated_at: float = field(default_factory=time.time)
 
 
 @dataclass
@@ -81,6 +106,7 @@ class WebGuiState:
     training_importer: TrainingCorrectionImporter = field(default_factory=TrainingCorrectionImporter)
     sessions: dict[str, SortPreviewSession] = field(default_factory=dict)
     jobs: dict[str, PreviewJob] = field(default_factory=dict)
+    export_jobs: dict[str, ExportJob] = field(default_factory=dict)
     training_jobs: dict[str, BrainTrainingJob] = field(default_factory=dict)
 
 
@@ -189,8 +215,14 @@ class SorterRequestHandler(BaseHTTPRequestHandler):
         if parsed.path.startswith("/api/audio/"):
             self.send_audio_from_path(parsed.path)
             return
+        if parsed.path.startswith("/api/job-audio/"):
+            self.send_job_audio_from_path(parsed.path)
+            return
         if parsed.path.startswith("/api/job/"):
             self.send_job(parsed.path.rsplit("/", 1)[-1])
+            return
+        if parsed.path.startswith("/api/export-job/"):
+            self.send_export_job(parsed.path.rsplit("/", 1)[-1])
             return
         if parsed.path.startswith("/api/session/"):
             self.send_session(parsed.path.rsplit("/", 1)[-1])
@@ -283,6 +315,38 @@ class SorterRequestHandler(BaseHTTPRequestHandler):
             return
         self.send_audio_file(audio_path)
 
+    def send_job_audio_from_path(self, request_path: str) -> None:
+        """Stream audio for a row that has completed inside a live preview job."""
+        parts = request_path.removeprefix("/api/job-audio/").split("/")
+        if len(parts) != 2:
+            self.send_error(HTTPStatus.BAD_REQUEST, "Live audio URL must include job and row index")
+            return
+        job_id, row_index_text = parts
+        job = self.gui_state.jobs.get(job_id)
+        if job is None:
+            self.send_error(HTTPStatus.NOT_FOUND, "Unknown preview job")
+            return
+        try:
+            row_index = int(row_index_text)
+        except ValueError:
+            self.send_error(HTTPStatus.BAD_REQUEST, "Live audio row index must be an integer")
+            return
+        row_payload = next((row for row in job.partial_rows if int(row.get("index", -1)) == row_index), None)
+        if row_payload is None:
+            self.send_error(HTTPStatus.NOT_FOUND, "Live audio row not ready")
+            return
+        source_audio_path = Path(str(row_payload.get("source_path", "")))
+        if not source_audio_path.exists() or not source_audio_path.is_file():
+            self.send_error(HTTPStatus.NOT_FOUND, "Audio file not found")
+            return
+        live_cache_dir = self.gui_state.project_root / "_reports" / "gui_preview" / "_live_audio_cache" / job.job_id
+        try:
+            audio_path = browser_preview_audio_path(source_audio_path, live_cache_dir)
+        except Exception as exc:
+            self.send_error(HTTPStatus.INTERNAL_SERVER_ERROR, f"Audio preview conversion failed: {exc}")
+            return
+        self.send_audio_file(audio_path)
+
     def send_audio_file(self, audio_path: Path) -> None:
         """Send one local audio file with basic HTTP range support."""
         file_size = audio_path.stat().st_size
@@ -316,7 +380,15 @@ class SorterRequestHandler(BaseHTTPRequestHandler):
         if job is None:
             self.send_json({"error": "Unknown job"}, HTTPStatus.NOT_FOUND)
             return
-        self.send_json(job.__dict__)
+        self.send_json(preview_job_to_payload(job))
+
+    def send_export_job(self, job_id: str) -> None:
+        """Send export job state."""
+        job = self.gui_state.export_jobs.get(job_id)
+        if job is None:
+            self.send_json({"error": "Unknown export job"}, HTTPStatus.NOT_FOUND)
+            return
+        self.send_json(export_job_to_payload(job))
 
     def send_session(self, session_id: str) -> None:
         """Send a completed preview session."""
@@ -349,6 +421,8 @@ class SorterRequestHandler(BaseHTTPRequestHandler):
     def run_preview_job(self, job: PreviewJob, input_path: Path) -> None:
         """Background preview worker."""
         try:
+            job.status = "running"
+            job.updated_at = time.time()
             session = self.gui_state.preview_service.classify_input(
                 input_path,
                 sort_workers=gui_worker_count(),
@@ -358,6 +432,7 @@ class SorterRequestHandler(BaseHTTPRequestHandler):
                     total,
                     latest,
                 ),
+                row_callback=lambda row: add_preview_job_row(job, row),
             )
             session_id = uuid.uuid4().hex
             self.gui_state.sessions[session_id] = session
@@ -366,13 +441,15 @@ class SorterRequestHandler(BaseHTTPRequestHandler):
             job.total_files = len(session.rows)
             job.message = f"Preview ready: {len(session.rows)} files"
             job.session_id = session_id
+            job.updated_at = time.time()
         except Exception as exc:
             job.status = "error"
             job.error = str(exc)
             job.message = "Preview failed"
+            job.updated_at = time.time()
 
     def export_session(self, payload: dict[str, Any]) -> None:
-        """Apply approved folders and export the session."""
+        """Start an approved-folder export in a background thread."""
         session_id = str(payload.get("session_id", ""))
         session = self.gui_state.sessions.get(session_id)
         if session is None:
@@ -384,20 +461,43 @@ class SorterRequestHandler(BaseHTTPRequestHandler):
             return
         apply_overrides(session, payload.get("rows", []))
         mode = str(payload.get("mode", "copy"))
+        job = create_export_job()
+        self.gui_state.export_jobs[job.job_id] = job
+        thread = threading.Thread(
+            target=self.run_export_job,
+            args=(job, session, destination, mode),
+            daemon=True,
+        )
+        thread.start()
+        self.send_json(export_job_to_payload(job))
+
+    def run_export_job(
+        self,
+        job: ExportJob,
+        session: SortPreviewSession,
+        destination: Path,
+        mode: str,
+    ) -> None:
+        """Background export worker for slow copy, move, or symlink runs."""
         try:
+            job.status = "running"
+            job.message = "Export is running..."
+            job.updated_at = time.time()
             summary = self.gui_state.exporter.export(session, destination, mode=mode)  # type: ignore[arg-type]
-            self.send_json(
-                {
-                    "exported_count": summary.exported_count,
-                    "corrected_count": summary.corrected_count,
-                    "sorted_root": str(summary.sorted_root),
-                    "approved_plan_path": str(summary.approved_plan_path),
-                    "corrections_path": str(summary.corrections_path),
-                    "errors": summary.errors,
-                }
-            )
+            job.exported_count = summary.exported_count
+            job.corrected_count = summary.corrected_count
+            job.sorted_root = str(summary.sorted_root)
+            job.approved_plan_path = str(summary.approved_plan_path)
+            job.corrections_path = str(summary.corrections_path)
+            job.errors = list(summary.errors)
+            job.status = "done"
+            job.message = f"Exported {summary.exported_count} files."
+            job.updated_at = time.time()
         except Exception as exc:
-            self.send_json({"error": str(exc)}, HTTPStatus.INTERNAL_SERVER_ERROR)
+            job.status = "error"
+            job.error = str(exc)
+            job.message = "Export failed"
+            job.updated_at = time.time()
 
     def train_from_corrections(self, payload: dict[str, Any]) -> None:
         """Stage corrected rows and start incremental brain updates."""
@@ -466,6 +566,7 @@ def update_preview_job_progress(job: PreviewJob, completed_files: int, total_fil
     job.completed_files = int(completed_files)
     job.total_files = int(total_files)
     job.latest_file = str(latest_file)
+    job.updated_at = time.time()
     if total_files <= 0:
         job.message = "Preparing audio files..."
         return
@@ -473,6 +574,15 @@ def update_preview_job_progress(job: PreviewJob, completed_files: int, total_fil
         job.message = f"Prepared {total_files} files. Starting classification..."
         return
     job.message = f"Classified {completed_files} of {total_files}: {latest_file}"
+
+
+def create_export_job() -> ExportJob:
+    """Create a background export job for browser polling."""
+    return ExportJob(
+        job_id=uuid.uuid4().hex,
+        status="queued",
+        message="Export queued...",
+    )
 
 
 def create_brain_training_job(import_summary: TrainingImportSummary) -> BrainTrainingJob:
@@ -501,6 +611,8 @@ def run_brain_training_job(job: BrainTrainingJob, project_root: Path) -> None:
     log_path = Path(job.log_path)
     log_path.parent.mkdir(parents=True, exist_ok=True)
     try:
+        job.status = "running"
+        job.updated_at = time.time()
         with log_path.open("w", encoding="utf-8") as log_handle:
             log_handle.write("Aaron GUI incremental brain update\n")
             log_handle.write(f"Project root: {project_root}\n")
@@ -511,6 +623,7 @@ def run_brain_training_job(job: BrainTrainingJob, project_root: Path) -> None:
                 job.returncode = 1
                 job.status = "error"
                 job.message = "No trainable corrections were available for incremental brain update."
+                job.updated_at = time.time()
                 log_handle.write(job.message + "\n")
                 return
             backup_dir = backup_active_brain_family(project_root, Path(job.backup_dir))
@@ -542,10 +655,12 @@ def run_brain_training_job(job: BrainTrainingJob, project_root: Path) -> None:
             f"Incrementally updated {len(summary.updated_brains)} active brain file(s) "
             f"from {summary.applied_correction_count} correction(s)."
         )
+        job.updated_at = time.time()
     except Exception as exc:
         job.status = "error"
         job.returncode = 1
         job.message = f"Incremental brain update failed before completion: {exc}"
+        job.updated_at = time.time()
 
 
 def build_brain_family_training_command(project_root: Path, training_root: Path) -> list[str]:
@@ -617,6 +732,26 @@ def training_job_to_payload(job: BrainTrainingJob) -> dict[str, Any]:
         "log_path": job.log_path,
         "update_manifest_path": job.update_manifest_path,
         "errors": job.errors,
+        "started_at": job.started_at,
+        "updated_at": job.updated_at,
+    }
+
+
+def export_job_to_payload(job: ExportJob) -> dict[str, Any]:
+    """Convert one export job to a JSON-safe payload."""
+    return {
+        "job_id": job.job_id,
+        "status": job.status,
+        "message": job.message,
+        "error": job.error,
+        "exported_count": job.exported_count,
+        "corrected_count": job.corrected_count,
+        "sorted_root": job.sorted_root,
+        "approved_plan_path": job.approved_plan_path,
+        "corrections_path": job.corrections_path,
+        "errors": job.errors,
+        "started_at": job.started_at,
+        "updated_at": job.updated_at,
     }
 
 
@@ -650,6 +785,7 @@ def active_gui_brain_file_names() -> list[str]:
         "stage4_folder_brain_core_baby.json",
         "stage4_folder_brain_spread_baby.json",
         "stage4_folder_brain_outlier_baby.json",
+        USER_MEMORY_BRAIN_NAME,
         "stage4_folder_brain_harmonic_core_baby.json",
         "stage4_folder_brain_harmonic_spread_baby.json",
         "stage4_folder_brain_harmonic_outlier_baby.json",
@@ -687,6 +823,41 @@ def session_to_payload(session: SortPreviewSession) -> dict[str, Any]:
         "input_path": str(session.input_path),
         "available_labels": session.available_labels,
         "rows": [row_to_payload(index, row) for index, row in enumerate(session.rows)],
+    }
+
+
+def add_preview_job_row(job: PreviewJob, row: PreviewRow) -> None:
+    """Add or replace one completed row in a live preview job."""
+    row_index = preview_row_payload_index(row)
+    payload = row_to_payload(row_index, row)
+    job.partial_rows = [existing for existing in job.partial_rows if int(existing.get("index", -1)) != row_index]
+    job.partial_rows.append(payload)
+    job.partial_rows.sort(key=lambda existing: int(existing.get("index", 0)))
+    job.updated_at = time.time()
+
+
+def preview_row_payload_index(row: PreviewRow) -> int:
+    """Return the zero-based final row index encoded in a preview row id."""
+    try:
+        return max(0, int(row.row_id) - 1)
+    except ValueError:
+        return 0
+
+
+def preview_job_to_payload(job: PreviewJob) -> dict[str, Any]:
+    """Convert one live preview job to a JSON-safe browser payload."""
+    return {
+        "job_id": job.job_id,
+        "status": job.status,
+        "message": job.message,
+        "session_id": job.session_id,
+        "error": job.error,
+        "completed_files": job.completed_files,
+        "total_files": job.total_files,
+        "latest_file": job.latest_file,
+        "partial_rows": sorted(job.partial_rows, key=lambda row: int(row.get("index", 0))),
+        "started_at": job.started_at,
+        "updated_at": job.updated_at,
     }
 
 
@@ -931,25 +1102,188 @@ def render_index_html(*, brain_config_path: str, brain_summary: str) -> str:
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }}
     body.busy, body.busy button, body.busy input {{ cursor: progress; }}
-    header {{
-      padding: 18px 22px 10px;
-      border-bottom: 1px solid var(--line);
-      background: #fbfaf7;
-    }}
-    h1 {{ margin: 0; font-size: 24px; }}
-    header p {{ margin: 4px 0 0; color: var(--muted); }}
-    main {{ padding: 16px 22px 22px; }}
-    .panel {{
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 14px;
-      margin-bottom: 14px;
-    }}
-    .row {{
-      display: grid;
-      grid-template-columns: minmax(160px, 1fr) auto auto auto;
-      gap: 8px;
+      header {{
+        padding: 18px 22px 10px;
+        border-bottom: 1px solid var(--line);
+        background: #fbfaf7;
+      }}
+      h1 {{ margin: 0; font-size: 24px; }}
+      header p {{ margin: 4px 0 0; color: var(--muted); }}
+      main {{
+        width: min(1920px, 100%);
+        margin: 0 auto;
+        padding: 16px 22px 22px;
+      }}
+      .app-toolbar {{
+        position: sticky;
+        top: 0;
+        z-index: 12;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 10px;
+        align-items: center;
+        border-bottom: 1px solid var(--line);
+        background: rgba(251, 250, 247, 0.96);
+        padding: 10px 22px;
+        backdrop-filter: blur(10px);
+      }}
+      .toolbar-label {{
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 750;
+        white-space: nowrap;
+      }}
+      .queue-scroll-slider {{
+        width: 100%;
+        min-width: 140px;
+        accent-color: var(--accent);
+      }}
+      .queue-scroll-control {{
+        display: grid;
+        grid-template-columns: auto minmax(180px, 1fr) auto;
+        gap: 10px;
+        align-items: center;
+        margin: 0 0 10px;
+        padding: 8px 10px;
+        border: 1px solid #e7e1d7;
+        border-radius: 8px;
+        background: #fbfaf7;
+      }}
+      .toolbar-actions {{
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+        align-items: center;
+      }}
+      .panel {{
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 14px;
+        margin-bottom: 14px;
+      }}
+      .panel-header {{
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 10px;
+        border-radius: 8px;
+        transition:
+          background 140ms ease,
+          border-color 140ms ease;
+      }}
+      .panel-header[data-collapsible-header] {{
+        cursor: pointer;
+      }}
+      .panel-header[data-collapsible-header]:hover {{
+        background: #f8f7f2;
+      }}
+      .panel-title {{
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        min-width: 0;
+        font-weight: 800;
+      }}
+      .panel-title strong {{ font-size: 15px; }}
+      .panel-title .small {{ overflow-wrap: anywhere; }}
+      .sr-only {{
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }}
+      .panel-toggle,
+      .toolbar-icon-button {{
+        display: inline-grid;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        min-height: 34px;
+        padding: 0;
+        border-radius: 999px;
+        border: 1px solid transparent;
+        background: color-mix(in srgb, var(--accent) 9%, white);
+        color: #214b8e;
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.85),
+          0 1px 2px rgba(15, 23, 42, 0.05);
+        transition:
+          background 140ms ease,
+          border-color 140ms ease,
+          box-shadow 140ms ease,
+          transform 140ms ease;
+      }}
+      .panel-toggle:hover,
+      .toolbar-icon-button:hover {{
+        background: color-mix(in srgb, var(--accent) 15%, white);
+        border-color: color-mix(in srgb, var(--accent) 30%, white);
+        box-shadow: 0 6px 18px rgba(43, 95, 178, 0.13);
+        transform: translateY(-1px);
+      }}
+      .panel-toggle:focus-visible,
+      .toolbar-icon-button:focus-visible {{
+        outline: 3px solid rgba(43, 95, 178, 0.24);
+        outline-offset: 2px;
+      }}
+      .collapse-icon {{
+        width: 9px;
+        height: 9px;
+        border-right: 2px solid currentColor;
+        border-bottom: 2px solid currentColor;
+        transform: translateY(-2px) rotate(45deg);
+        transition: transform 160ms ease;
+      }}
+      .collapsed > .panel-header .collapse-icon {{
+        transform: translateX(-1px) rotate(-45deg);
+      }}
+      .panel-toggle:hover .collapse-icon {{
+        color: var(--accent-dark);
+      }}
+      .stack-icon {{
+        position: relative;
+        width: 16px;
+        height: 14px;
+      }}
+      .stack-icon::before,
+      .stack-icon::after {{
+        content: "";
+        position: absolute;
+        left: 2px;
+        width: 12px;
+        height: 5px;
+        border: 1.8px solid currentColor;
+        border-radius: 3px;
+        transition: transform 140ms ease;
+      }}
+      .stack-icon::before {{ top: 1px; }}
+      .stack-icon::after {{ bottom: 1px; }}
+      .collapse-all-icon::before {{ transform: translateY(3px); }}
+      .collapse-all-icon::after {{ transform: translateY(-3px); }}
+      .expand-all-icon::before {{ transform: translateY(-1px); }}
+      .expand-all-icon::after {{ transform: translateY(1px); }}
+      .toolbar-actions {{
+        padding: 2px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.7);
+      }}
+      .collapsible-panel.collapsed > .panel-body {{
+        display: none;
+      }}
+      .collapsible-panel.collapsed > .panel-header {{
+        margin-bottom: 0;
+      }}
+      .row {{
+        display: grid;
+        grid-template-columns: minmax(160px, 1fr) auto auto auto;
+        gap: 8px;
       align-items: end;
       margin-bottom: 10px;
     }}
@@ -980,20 +1314,74 @@ def render_index_html(*, brain_config_path: str, brain_summary: str) -> str:
       color: white;
     }}
     button.primary:hover {{ background: var(--accent-dark); }}
-    button:disabled {{
-      cursor: not-allowed;
-      opacity: 0.55;
-    }}
-    .workspace {{
-      display: grid;
-      grid-template-columns: minmax(420px, 1fr) 390px;
-      gap: 14px;
-      min-height: 390px;
-    }}
-    .table-wrap {{ overflow: auto; border: 1px solid var(--line); border-radius: 6px; }}
-    table {{ width: 100%; border-collapse: collapse; font-size: 13px; }}
-    th, td {{ padding: 8px; border-bottom: 1px solid #ece8df; text-align: left; vertical-align: top; }}
-    th {{ position: sticky; top: 0; background: #fbfaf7; z-index: 1; }}
+      button:disabled {{
+        cursor: not-allowed;
+        opacity: 0.55;
+      }}
+      .workspace-panel {{
+        padding: 0;
+        overflow: hidden;
+      }}
+      .workspace-panel > .panel-header {{
+        padding: 12px 14px;
+        margin-bottom: 0;
+        border-bottom: 1px solid #ece8df;
+        border-radius: 8px 8px 0 0;
+      }}
+      .workspace-panel.collapsed > .panel-header {{
+        border-bottom-color: transparent;
+        border-radius: 8px;
+      }}
+      .workspace-panel.collapsed > .workspace-body {{
+        display: none;
+      }}
+      .workspace-body {{
+        display: grid;
+        grid-template-columns: minmax(520px, 1fr) minmax(320px, 430px);
+        gap: 14px;
+        min-height: 390px;
+        padding: 14px;
+        align-items: start;
+      }}
+      .workspace-body.details-collapsed {{
+        grid-template-columns: minmax(520px, 1fr);
+      }}
+      .workspace-body.queue-collapsed {{
+        grid-template-columns: minmax(320px, 1fr);
+      }}
+      .subpanel {{
+        min-width: 0;
+      }}
+      .subpanel-frame {{
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+        padding: 12px;
+        min-width: 0;
+      }}
+      .subpanel-frame > .panel-header[data-collapsible-header] {{
+        margin: -4px -4px 10px;
+        padding: 4px;
+      }}
+      .subpanel-frame.collapsed > .panel-header[data-collapsible-header] {{
+        margin-bottom: -4px;
+      }}
+      .subpanel-frame.collapsed > .panel-body {{
+        display: none;
+      }}
+      .table-wrap {{
+        overflow: auto;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        max-height: min(68vh, 780px);
+      }}
+      table {{
+        width: max(100%, 1120px);
+        border-collapse: collapse;
+        font-size: 13px;
+      }}
+      th, td {{ padding: 8px; border-bottom: 1px solid #ece8df; text-align: left; vertical-align: top; }}
+      th {{ position: sticky; top: 0; background: #fbfaf7; z-index: 1; }}
     tr.selected {{ background: var(--soft); }}
     tr.corrected {{ background: #fffaf0; }}
     tr.selected.corrected {{ background: #fff1ce; }}
@@ -1205,10 +1593,10 @@ def render_index_html(*, brain_config_path: str, brain_summary: str) -> str:
       background: #fbfbfa;
     }}
     .category-tree details {{ margin-left: 10px; }}
-    .category-tree summary {{
-      cursor: pointer;
-      font-weight: 700;
-      padding: 3px 0;
+      .category-tree summary {{
+        cursor: pointer;
+        font-weight: 700;
+        padding: 3px 0;
     }}
     .category-leaf {{
       display: block;
@@ -1226,121 +1614,212 @@ def render_index_html(*, brain_config_path: str, brain_summary: str) -> str:
       background: var(--soft);
       color: var(--accent-dark);
     }}
-    .warn {{ color: var(--warn); }}
-    .ok {{ color: var(--ok); }}
-    .small {{ color: var(--muted); font-size: 12px; }}
-    @media (max-width: 980px) {{
-      .workspace {{ grid-template-columns: 1fr; }}
-      .row, .export-grid, .teach-grid {{ grid-template-columns: 1fr; }}
-      button {{ width: 100%; }}
-    }}
-  </style>
-</head>
-<body>
-  <header>
-    <h1>Aaron Sound Sorter</h1>
-    <p>Preview, listen, fix folders, export the approved sort, and teach the brains from your corrections.</p>
-  </header>
-  <main>
-    <section class="panel">
-      <div class="row">
-        <div>
-          <label for="inputPath">Input folder, ZIP, or audio file</label>
-          <input id="inputPath" type="text" placeholder="/path/to/samples.zip" />
+      .warn {{ color: var(--warn); }}
+      .ok {{ color: var(--ok); }}
+      .small {{ color: var(--muted); font-size: 12px; }}
+      @media (max-width: 1100px) {{
+        .workspace-body,
+        .workspace-body.details-collapsed,
+        .workspace-body.queue-collapsed {{
+          grid-template-columns: 1fr;
+        }}
+        .row, .export-grid, .teach-grid {{ grid-template-columns: 1fr; }}
+        .row button, .export-grid button, .teach-grid button {{ width: 100%; }}
+        .panel-toggle, .toolbar-icon-button {{
+          width: 34px;
+          flex: 0 0 auto;
+        }}
+      }}
+      @media (max-width: 760px) {{
+        header {{ padding: 14px 14px 10px; }}
+        main {{ padding: 12px 12px 18px; }}
+        .app-toolbar {{
+          grid-template-columns: 1fr auto;
+          padding: 10px 12px;
+        }}
+        .queue-scroll-control {{ grid-template-columns: 1fr; }}
+        table {{ width: max(100%, 980px); }}
+      }}
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Aaron Sound Sorter</h1>
+      <p>Preview, listen, fix folders, export the approved sort, and teach the brains from your corrections.</p>
+    </header>
+    <div class="app-toolbar" aria-label="Workspace controls">
+      <span class="toolbar-label">Workspace controls</span>
+      <div class="toolbar-actions">
+        <button id="collapseAllPanels" class="toolbar-icon-button" type="button" aria-label="Collapse all panels" title="Collapse all panels">
+          <span class="stack-icon collapse-all-icon" aria-hidden="true"></span>
+        </button>
+        <button id="expandAllPanels" class="toolbar-icon-button" type="button" aria-label="Expand all panels" title="Expand all panels">
+          <span class="stack-icon expand-all-icon" aria-hidden="true"></span>
+        </button>
+      </div>
+    </div>
+    <main>
+      <section class="panel collapsible-panel" data-panel-id="input">
+        <div class="panel-header" data-collapsible-header>
+          <div class="panel-title">
+            <strong>Input</strong>
+            <span class="small">Choose a folder, ZIP, or single audio file.</span>
+          </div>
+          <button class="panel-toggle" type="button" data-collapse-target="input" aria-expanded="true" aria-controls="inputPanelBody" aria-label="Collapse Input" title="Collapse Input">
+            <span class="collapse-icon" aria-hidden="true"></span>
+          </button>
         </div>
-        <button id="chooseFolder">Folder</button>
-        <button id="chooseFile">ZIP/File</button>
-        <button class="primary" id="previewButton">Preview Sort</button>
-      </div>
-      <div class="config-line">
-        <strong>Brains</strong>
-        <span>{escape_html(brain_summary)} from {escape_html(brain_config_path)}</span>
-      </div>
-      <div class="small">Browser security does not expose folder paths directly. Use the buttons for native macOS choosers, or paste paths.</div>
-      <div id="progressArea" class="progress-area" hidden>
-        <div class="progress-header">
-          <span id="progressText">Preparing...</span>
-          <span id="progressCount">0 / 0</span>
+        <div id="inputPanelBody" class="panel-body">
+          <div class="row">
+            <div>
+              <label for="inputPath">Input folder, ZIP, or audio file</label>
+              <input id="inputPath" type="text" placeholder="/path/to/samples.zip" />
+            </div>
+            <button id="chooseFolder">Folder</button>
+            <button id="chooseFile">ZIP/File</button>
+            <button class="primary" id="previewButton">Preview Sort</button>
+          </div>
+          <div class="config-line">
+            <strong>Brains</strong>
+            <span>{escape_html(brain_summary)} from {escape_html(brain_config_path)}</span>
+          </div>
+          <div class="small">Browser security does not expose folder paths directly. Use the buttons for native macOS choosers, or paste paths.</div>
+          <div id="progressArea" class="progress-area" hidden>
+            <div class="progress-header">
+              <span id="progressText">Preparing...</span>
+              <span id="progressCount">0 / 0</span>
+            </div>
+            <div class="progress-track" aria-hidden="true"><div id="progressBar" class="progress-bar"></div></div>
+          </div>
         </div>
-        <div class="progress-track" aria-hidden="true"><div id="progressBar" class="progress-bar"></div></div>
-      </div>
-    </section>
+      </section>
 
     <div id="correctionNotice" class="correction-notice" hidden>
       <strong id="correctionCount">0 corrections staged.</strong>
       Changed folders are already accepted for export. To teach the sorter, click Train Brains From Corrections.
     </div>
 
-    <section class="panel workspace">
-      <div>
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-          <strong>Preview Queue</strong>
-          <span id="rowCount" class="small">0 files</span>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Play</th>
-                <th>File</th>
-                <th>Approved Folder</th>
-                <th>Sorter Proposed</th>
-                <th>Decision</th>
-              </tr>
-            </thead>
-            <tbody id="rows"></tbody>
-          </table>
-        </div>
-      </div>
-      <aside>
-        <strong>Selected File</strong>
-          <div class="audio-box">
-            <label for="audioPlayer">Listen</label>
-            <audio id="audioPlayer" controls preload="none"></audio>
+      <section class="panel workspace-panel collapsible-panel" data-panel-id="workspace">
+        <div class="panel-header" data-collapsible-header>
+          <div class="panel-title">
+            <strong>Review Workspace</strong>
+            <span id="rowCount" class="small">0 files</span>
           </div>
-          <div id="details" class="details" style="margin-top:8px;">No file selected.</div>
-          <div id="categoryHints" class="category-hints" hidden></div>
-        </aside>
+          <button class="panel-toggle" type="button" data-collapse-target="workspace" aria-expanded="true" aria-controls="workspaceBody" aria-label="Collapse Review Workspace" title="Collapse Review Workspace">
+            <span class="collapse-icon" aria-hidden="true"></span>
+          </button>
+        </div>
+        <div id="workspaceBody" class="workspace-body">
+          <div id="queuePanel" class="subpanel subpanel-frame" data-panel-id="queue">
+            <div class="panel-header" data-collapsible-header>
+              <div class="panel-title">
+                <strong>Preview Queue</strong>
+                <span class="small">Use the local slider to move across wide columns.</span>
+              </div>
+              <button class="panel-toggle" type="button" data-collapse-target="queue" aria-expanded="true" aria-controls="queuePanelBody" aria-label="Collapse Preview Queue" title="Collapse Preview Queue">
+                <span class="collapse-icon" aria-hidden="true"></span>
+              </button>
+            </div>
+            <div id="queuePanelBody" class="panel-body">
+              <div class="queue-scroll-control" aria-label="Preview queue horizontal scroll">
+                <span class="toolbar-label">Scroll queue</span>
+                <input id="queueScrollSlider" class="queue-scroll-slider" type="range" min="0" max="1000" value="0" disabled aria-label="Scroll preview queue left and right" />
+                <span id="queueScrollText" class="small">No queue yet</span>
+              </div>
+              <div id="tableWrap" class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Play</th>
+                      <th>File</th>
+                      <th>Approved Folder</th>
+                      <th>Sorter Proposed</th>
+                      <th>Decision</th>
+                    </tr>
+                  </thead>
+                  <tbody id="rows"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <aside id="detailsPanel" class="subpanel subpanel-frame" data-panel-id="details">
+            <div class="panel-header" data-collapsible-header>
+              <div class="panel-title"><strong>Selected File</strong></div>
+              <button class="panel-toggle" type="button" data-collapse-target="details" aria-expanded="true" aria-controls="detailsPanelBody" aria-label="Collapse Selected File" title="Collapse Selected File">
+                <span class="collapse-icon" aria-hidden="true"></span>
+              </button>
+            </div>
+            <div id="detailsPanelBody" class="panel-body">
+              <div class="audio-box">
+                <label for="audioPlayer">Listen</label>
+                <audio id="audioPlayer" controls preload="none"></audio>
+              </div>
+              <div id="details" class="details" style="margin-top:8px;">No file selected.</div>
+              <div id="categoryHints" class="category-hints" hidden></div>
+            </div>
+          </aside>
+        </div>
+        </section>
+
+      <section class="panel collapsible-panel" data-panel-id="export">
+        <div class="panel-header" data-collapsible-header>
+          <div class="panel-title">
+            <strong>Export</strong>
+            <span class="small">Write the approved plan after review.</span>
+          </div>
+          <button class="panel-toggle" type="button" data-collapse-target="export" aria-expanded="true" aria-controls="exportPanelBody" aria-label="Collapse Export" title="Collapse Export">
+            <span class="collapse-icon" aria-hidden="true"></span>
+          </button>
+        </div>
+        <div id="exportPanelBody" class="panel-body">
+          <div class="export-grid">
+            <div>
+              <label for="destinationPath">Destination folder</label>
+              <input id="destinationPath" type="text" placeholder="/path/to/output" />
+            </div>
+            <button id="chooseDestination">Destination</button>
+            <div>
+              <label>Mode</label>
+              <div class="radio-group">
+                <label><input type="radio" name="mode" value="copy" checked /> Copy</label>
+                <label><input type="radio" name="mode" value="move" /> Move</label>
+                <label><input type="radio" name="mode" value="symlink" /> Symlink</label>
+              </div>
+            </div>
+            <button class="primary" id="exportButton">Export Approved Sort</button>
+            <button id="openSortedButton" disabled>Open Sorted Folder</button>
+            <button id="openReportButton" disabled>Open Report Folder</button>
+          </div>
+        </div>
       </section>
 
-    <section class="panel">
-      <div class="export-grid">
-        <div>
-          <label for="destinationPath">Destination folder</label>
-          <input id="destinationPath" type="text" placeholder="/path/to/output" />
+      <section class="panel collapsible-panel" data-panel-id="training">
+        <div class="panel-header" data-collapsible-header>
+          <div class="panel-title">
+            <strong>Teach The Sorter</strong>
+            <span class="small">Use staged corrections as measured training evidence.</span>
+          </div>
+          <button class="panel-toggle" type="button" data-collapse-target="training" aria-expanded="true" aria-controls="trainingPanelBody" aria-label="Collapse Teach The Sorter" title="Collapse Teach The Sorter">
+            <span class="collapse-icon" aria-hidden="true"></span>
+          </button>
         </div>
-        <button id="chooseDestination">Destination</button>
-        <div>
-          <label>Mode</label>
-          <div class="radio-group">
-            <label><input type="radio" name="mode" value="copy" checked /> Copy</label>
-            <label><input type="radio" name="mode" value="move" /> Move</label>
-            <label><input type="radio" name="mode" value="symlink" /> Symlink</label>
+        <div id="trainingPanelBody" class="panel-body">
+          <div class="teach-grid">
+            <div>
+              <div class="small">Copies changed rows into <code>training/locked_curated_v1</code>, backs up active brains, then applies a fast measured-evidence update.</div>
+            </div>
+            <button class="primary" id="trainCorrectionsButton" disabled>Train Brains From Corrections</button>
+            <button id="openTrainingReportButton" disabled>Open Training Report</button>
+          </div>
+          <div id="trainingStatus" class="progress-area" hidden>
+            <div class="progress-header">
+              <span id="trainingText">Training not started.</span>
+              <span id="trainingCount">0 corrections</span>
+            </div>
+            <div class="progress-track" aria-hidden="true"><div id="trainingBar" class="progress-bar"></div></div>
           </div>
         </div>
-        <button class="primary" id="exportButton">Export Approved Sort</button>
-        <button id="openSortedButton" disabled>Open Sorted Folder</button>
-        <button id="openReportButton" disabled>Open Report Folder</button>
-      </div>
-    </section>
-
-    <section class="panel">
-      <div class="teach-grid">
-        <div>
-          <strong>Teach The Sorter</strong>
-          <div class="small">Copies changed rows into <code>training/locked_curated_v1</code>, backs up active brains, then applies a fast measured-evidence update.</div>
-        </div>
-        <button class="primary" id="trainCorrectionsButton" disabled>Train Brains From Corrections</button>
-        <button id="openTrainingReportButton" disabled>Open Training Report</button>
-      </div>
-      <div id="trainingStatus" class="progress-area" hidden>
-        <div class="progress-header">
-          <span id="trainingText">Training not started.</span>
-          <span id="trainingCount">0 corrections</span>
-        </div>
-        <div class="progress-track" aria-hidden="true"><div id="trainingBar" class="progress-bar"></div></div>
-      </div>
-    </section>
+      </section>
     <div id="status" class="status">Ready.</div>
   </main>
 
@@ -1382,8 +1861,15 @@ const state = {{
   lastReportPath: "",
   lastSortedPath: "",
   lastTrainingReportPath: "",
-  trainingJobId: ""
+  trainingJobId: "",
+  exportJobId: "",
+  livePreviewJobId: ""
 }};
+const MAX_JOB_POLL_FAILURES = 40;
+const PREVIEW_POLL_MS = 900;
+const EXPORT_POLL_MS = 1500;
+const TRAINING_POLL_MS = 2500;
+const POLL_RETRY_MS = 2500;
 const statusEl = document.getElementById("status");
 const rowsEl = document.getElementById("rows");
 const detailsEl = document.getElementById("details");
@@ -1406,20 +1892,90 @@ const openReportButton = document.getElementById("openReportButton");
 const openTrainingReportButton = document.getElementById("openTrainingReportButton");
 const trainCorrectionsButton = document.getElementById("trainCorrectionsButton");
 const trainingStatus = document.getElementById("trainingStatus");
-const trainingText = document.getElementById("trainingText");
-const trainingCount = document.getElementById("trainingCount");
-const trainingBar = document.getElementById("trainingBar");
+  const trainingText = document.getElementById("trainingText");
+  const trainingCount = document.getElementById("trainingCount");
+  const trainingBar = document.getElementById("trainingBar");
+  const tableWrap = document.getElementById("tableWrap");
+  const queueScrollSlider = document.getElementById("queueScrollSlider");
+  const queueScrollText = document.getElementById("queueScrollText");
+  const workspaceBody = document.getElementById("workspaceBody");
 
-function setStatus(text, isWarn=false) {{
-  statusEl.textContent = text;
-  statusEl.className = isWarn ? "status warn" : "status";
-}}
+  function setStatus(text, isWarn=false) {{
+    statusEl.textContent = text;
+    statusEl.className = isWarn ? "status warn" : "status";
+  }}
+
+  function panelElement(panelId) {{
+    return document.querySelector(`[data-panel-id="${{panelId}}"]`);
+  }}
+
+  function panelDisplayName(panel) {{
+    const title = panel?.querySelector(".panel-title strong");
+    return title?.textContent?.trim() || "panel";
+  }}
+
+  function setPanelCollapsed(panelId, collapsed) {{
+    const panel = panelElement(panelId);
+    if (!panel) return;
+    panel.classList.toggle("collapsed", collapsed);
+    const panelName = panelDisplayName(panel);
+    document.querySelectorAll(`[data-collapse-target="${{panelId}}"]`).forEach(button => {{
+      const action = collapsed ? "Expand" : "Collapse";
+      const label = `${{action}} ${{panelName}}`;
+      button.setAttribute("aria-expanded", collapsed ? "false" : "true");
+      button.setAttribute("aria-label", label);
+      button.setAttribute("title", label);
+    }});
+    updateWorkspacePanelState();
+    updateQueueScrollSlider();
+  }}
+
+  function togglePanel(panelId) {{
+    const panel = panelElement(panelId);
+    if (!panel) return;
+    setPanelCollapsed(panelId, !panel.classList.contains("collapsed"));
+  }}
+
+  function updateWorkspacePanelState() {{
+    if (!workspaceBody) return;
+    workspaceBody.classList.toggle("queue-collapsed", Boolean(panelElement("queue")?.classList.contains("collapsed")));
+    workspaceBody.classList.toggle("details-collapsed", Boolean(panelElement("details")?.classList.contains("collapsed")));
+  }}
+
+  function setAllPanelsCollapsed(collapsed) {{
+    ["input", "workspace", "queue", "details", "export", "training"].forEach(panelId => setPanelCollapsed(panelId, collapsed));
+  }}
+
+  function shouldIgnoreHeaderClick(event) {{
+    return Boolean(event.target.closest("button, a, input, select, textarea, label"));
+  }}
+
+  function updateQueueScrollSlider() {{
+    if (!tableWrap || !queueScrollSlider || !queueScrollText) return;
+    const maxScroll = Math.max(0, tableWrap.scrollWidth - tableWrap.clientWidth);
+    queueScrollSlider.disabled = maxScroll <= 0 || Boolean(panelElement("queue")?.classList.contains("collapsed"));
+    if (queueScrollSlider.disabled) {{
+      queueScrollSlider.value = "0";
+      queueScrollText.textContent = state.rows.length ? "Queue fits on screen" : "No queue yet";
+      return;
+    }}
+    const percent = Math.round((tableWrap.scrollLeft / maxScroll) * 100);
+    queueScrollSlider.value = String(Math.round((tableWrap.scrollLeft / maxScroll) * 1000));
+    queueScrollText.textContent = `${{percent}}% across queue`;
+  }}
+
+  function scrollQueueFromSlider() {{
+    if (!tableWrap || !queueScrollSlider) return;
+    const maxScroll = Math.max(0, tableWrap.scrollWidth - tableWrap.clientWidth);
+    tableWrap.scrollLeft = maxScroll * (Number(queueScrollSlider.value || 0) / 1000);
+    updateQueueScrollSlider();
+  }}
 
 function setBusy(isBusy) {{
   document.body.classList.toggle("busy", isBusy);
   document.getElementById("previewButton").disabled = isBusy;
   document.getElementById("exportButton").disabled = isBusy;
-  trainCorrectionsButton.disabled = isBusy || correctionRows().length === 0 || !state.sessionId || Boolean(state.trainingJobId);
+  trainCorrectionsButton.disabled = isBusy || correctionRows().length === 0 || !state.sessionId || Boolean(state.trainingJobId) || Boolean(state.exportJobId);
 }}
 
 async function jsonFetch(url, options={{}}) {{
@@ -1430,6 +1986,25 @@ async function jsonFetch(url, options={{}}) {{
   const payload = await response.json();
   if (!response.ok) throw new Error(payload.error || response.statusText);
   return payload;
+}}
+
+function jobAgeSeconds(job) {{
+  const updatedAt = Number(job.updated_at || 0);
+  if (!updatedAt) return 0;
+  return Math.max(0, Math.round((Date.now() / 1000) - updatedAt));
+}}
+
+function retryLongJobPoll(kind, retryCount, retryCallback) {{
+  if (retryCount >= MAX_JOB_POLL_FAILURES) {{
+    setStatus(`${{kind}} status could not be reached. The local GUI server may have stopped.`, true);
+    setBusy(false);
+    state.trainingJobId = "";
+    state.exportJobId = "";
+    trainCorrectionsButton.disabled = correctionRows().length === 0 || !state.sessionId;
+    return;
+  }}
+  setStatus(`${{kind}} is still running; retrying status check (${{retryCount + 1}}/${{MAX_JOB_POLL_FAILURES}})...`, true);
+  window.setTimeout(() => retryCallback(retryCount + 1), POLL_RETRY_MS);
 }}
 
 async function choosePath(kind, targetId) {{
@@ -1467,6 +2042,42 @@ function showPreviewFailure(message) {{
   setBusy(false);
 }}
 
+function rowStableKey(row) {{
+  return String(row?.row_id || row?.source_path || row?.display_name || row?.index || "");
+}}
+
+function correctedFolderMap(rows) {{
+  const edits = new Map();
+  rows.forEach(row => {{
+    if (row && rowIsCorrected(row)) edits.set(rowStableKey(row), row.approved_folder);
+  }});
+  return edits;
+}}
+
+function rowsWithPreservedCorrections(incomingRows) {{
+  const edits = correctedFolderMap(state.rows);
+  return [...(incomingRows || [])]
+    .sort((left, right) => Number(left.index || 0) - Number(right.index || 0))
+    .map(row => {{
+      const copy = {{ ...row }};
+      const approved = edits.get(rowStableKey(copy));
+      if (approved) copy.approved_folder = approved;
+      return copy;
+    }});
+}}
+
+function mergeLivePreviewRows(partialRows) {{
+  if (!Array.isArray(partialRows) || !partialRows.length) return;
+  const selectedKey = state.selectedIndex >= 0 ? rowStableKey(state.rows[state.selectedIndex]) : "";
+  state.rows = rowsWithPreservedCorrections(partialRows);
+  if (selectedKey) {{
+    const selectedIndex = state.rows.findIndex(row => rowStableKey(row) === selectedKey);
+    state.selectedIndex = selectedIndex >= 0 ? selectedIndex : Math.min(state.selectedIndex, state.rows.length - 1);
+  }}
+  renderRows();
+  if (state.selectedIndex >= 0 && state.rows[state.selectedIndex]) selectRow(state.selectedIndex);
+}}
+
 async function startPreview() {{
   const inputPath = document.getElementById("inputPath").value.trim();
   if (!inputPath) {{
@@ -1486,13 +2097,16 @@ async function startPreview() {{
   state.selectedIndex = -1;
   state.lastReportPath = "";
   state.lastSortedPath = "";
-  state.lastTrainingReportPath = "";
-  state.trainingJobId = "";
-  openReportButton.disabled = true;
-  openSortedButton.disabled = true;
-  openTrainingReportButton.disabled = true;
-  trainingStatus.hidden = true;
-  trainingBar.style.width = "0%";
+    state.lastTrainingReportPath = "";
+    state.trainingJobId = "";
+    state.exportJobId = "";
+    state.livePreviewJobId = "";
+    openReportButton.disabled = true;
+    openSortedButton.disabled = true;
+    openTrainingReportButton.disabled = true;
+    updateQueueScrollSlider();
+    trainingStatus.hidden = true;
+    trainingBar.style.width = "0%";
   updateCorrectionNotice();
   resetProgress();
   setBusy(true);
@@ -1502,24 +2116,28 @@ async function startPreview() {{
       method: "POST",
       body: JSON.stringify({{ input_path: inputPath }})
     }});
+    state.livePreviewJobId = payload.job_id || "";
     pollJob(payload.job_id);
   }} catch (error) {{
     showPreviewFailure(error.message || "Could not start preview.");
   }}
 }}
 
-async function pollJob(jobId) {{
+async function pollJob(jobId, retryCount=0) {{
   let job;
   try {{
     job = await jsonFetch(`/api/job/${{jobId}}`);
   }} catch (error) {{
-    showPreviewFailure(error.message || "Could not read preview status.");
+    retryLongJobPoll("Preview", retryCount, nextRetry => pollJob(jobId, nextRetry));
     return;
   }}
   updateProgress(job);
-  setStatus(job.message || job.status);
+  mergeLivePreviewRows(job.partial_rows || []);
+  const heartbeat = jobAgeSeconds(job);
+  setStatus(`${{job.message || job.status}}${{heartbeat > 20 ? ` · last update ${{heartbeat}}s ago` : ""}}`);
   if (job.status === "done") {{
     await loadSession(job.session_id);
+    state.livePreviewJobId = "";
     setBusy(false);
     return;
   }}
@@ -1527,17 +2145,23 @@ async function pollJob(jobId) {{
     showPreviewFailure(job.error || job.message || "Preview failed.");
     return;
   }}
-  window.setTimeout(() => pollJob(jobId), 900);
+  window.setTimeout(() => pollJob(jobId, 0), PREVIEW_POLL_MS);
 }}
 
 async function loadSession(sessionId) {{
   const session = await jsonFetch(`/api/session/${{sessionId}}`);
+  const selectedKey = state.selectedIndex >= 0 ? rowStableKey(state.rows[state.selectedIndex]) : "";
   state.sessionId = sessionId;
-  state.rows = session.rows;
+  state.rows = rowsWithPreservedCorrections(session.rows);
   state.labels = session.available_labels || [];
   state.lastReportPath = session.run_dir || "";
   state.lastTrainingReportPath = "";
   state.trainingJobId = "";
+  state.livePreviewJobId = "";
+  if (selectedKey) {{
+    const selectedIndex = state.rows.findIndex(row => rowStableKey(row) === selectedKey);
+    state.selectedIndex = selectedIndex >= 0 ? selectedIndex : state.selectedIndex;
+  }}
   openReportButton.disabled = !state.lastReportPath;
   openTrainingReportButton.disabled = true;
   trainingStatus.hidden = true;
@@ -1548,10 +2172,11 @@ async function loadSession(sessionId) {{
     option.value = label;
     labels.appendChild(option);
   }});
-  renderRows();
-  updateCorrectionNotice();
-  setStatus(`Preview ready: ${{state.rows.length}} files. Run folder: ${{session.run_dir}}`);
-}}
+    renderRows();
+    updateCorrectionNotice();
+    window.requestAnimationFrame(updateQueueScrollSlider);
+    setStatus(`Preview ready: ${{state.rows.length}} files. Run folder: ${{session.run_dir}}`);
+  }}
 
 function renderRows() {{
   rowsEl.innerHTML = "";
@@ -1589,10 +2214,11 @@ function renderRows() {{
       event.stopPropagation();
       playRow(Number(event.target.dataset.playIndex));
     }});
-  }});
-  updateCorrectionNotice();
-  if (state.rows.length && state.selectedIndex < 0) selectRow(0);
-}}
+    }});
+    updateCorrectionNotice();
+    if (state.rows.length && state.selectedIndex < 0) selectRow(0);
+    window.requestAnimationFrame(updateQueueScrollSlider);
+  }}
 
 function normalizeFolder(value) {{
   return String(value || "").replace(/\\\\/g, "/").split("/").map(part => part.trim()).filter(Boolean).join("/");
@@ -1635,7 +2261,12 @@ function selectRow(index) {{
   const row = state.rows[index];
   if (state.sessionId) {{
     audioPlayer.src = `/api/audio/${{state.sessionId}}/${{row.index}}`;
+  }} else if (state.livePreviewJobId) {{
+    audioPlayer.src = `/api/job-audio/${{state.livePreviewJobId}}/${{row.index}}`;
+  }} else {{
+    audioPlayer.removeAttribute("src");
   }}
+  audioPlayer.load();
     detailsEl.textContent = [
     `File: ${{row.display_name}}`,
     "",
@@ -1659,7 +2290,7 @@ function selectRow(index) {{
     "Reason:",
     row.decision_reason || "(none)"
     ].join("\\n");
-    renderCategoryHints(row);
+    renderCategoryHints(row, index);
     Array.from(rowsEl.children).forEach((tr, rowIndex) => {{
       const candidate = state.rows[rowIndex];
       const classes = [];
@@ -1669,7 +2300,7 @@ function selectRow(index) {{
     }});
   }}
 
-  function renderCategoryHints(row) {{
+  function renderCategoryHints(row, displayIndex) {{
     const candidates = candidateFolders(row);
     if (!candidates.length) {{
       categoryHints.hidden = true;
@@ -1696,7 +2327,7 @@ function selectRow(index) {{
       fxSection.appendChild(title);
       const buttonWrap = document.createElement("div");
       buttonWrap.className = "hint-buttons";
-      fxCandidates.slice(0, 12).forEach(label => buttonWrap.appendChild(categoryHintButton(row.index, label)));
+      fxCandidates.slice(0, 12).forEach(label => buttonWrap.appendChild(categoryHintButton(displayIndex, label)));
       fxSection.appendChild(buttonWrap);
       details.appendChild(fxSection);
     }}
@@ -1707,7 +2338,7 @@ function selectRow(index) {{
     treeSection.appendChild(treeTitle);
     const tree = document.createElement("div");
     tree.className = "hint-tree";
-    appendHintNodes(tree, buildLabelTree(candidates).children, "", row.index);
+    appendHintNodes(tree, buildLabelTree(candidates).children, "", displayIndex);
     treeSection.appendChild(tree);
     details.appendChild(treeSection);
     categoryHints.appendChild(details);
@@ -1935,7 +2566,7 @@ async function exportApproved() {{
   }}
   const mode = document.querySelector("input[name='mode']:checked").value;
   setBusy(true);
-  setStatus("Exporting approved sort plan...");
+  setStatus("Starting export job...");
   try {{
     const payload = await jsonFetch("/api/export", {{
       method: "POST",
@@ -1946,13 +2577,43 @@ async function exportApproved() {{
         rows: state.rows.map(row => ({{ index: row.index, approved_folder: row.approved_folder }}))
       }})
     }});
-    state.lastSortedPath = payload.sorted_root || "";
-    openSortedButton.disabled = !state.lastSortedPath;
-    const errors = payload.errors && payload.errors.length ? ` Errors: ${{payload.errors.join("; ")}}` : "";
-    setStatus(`Exported ${{payload.exported_count}} files to ${{payload.sorted_root}}.${{errors}}`, Boolean(errors));
-  }} finally {{
+    state.exportJobId = payload.job_id || "";
+    if (!state.exportJobId) throw new Error("Export did not return a job id.");
+    setStatus(payload.message || "Export is running...");
+    pollExportJob(state.exportJobId);
+  }} catch (error) {{
+    state.exportJobId = "";
     setBusy(false);
+    setStatus(error.message || "Could not start export.", true);
   }}
+}}
+
+async function pollExportJob(jobId, retryCount=0) {{
+  let job;
+  try {{
+    job = await jsonFetch(`/api/export-job/${{jobId}}`);
+  }} catch (error) {{
+    retryLongJobPoll("Export", retryCount, nextRetry => pollExportJob(jobId, nextRetry));
+    return;
+  }}
+  const heartbeat = jobAgeSeconds(job);
+  if (job.status === "done") {{
+    state.exportJobId = "";
+    state.lastSortedPath = job.sorted_root || "";
+    openSortedButton.disabled = !state.lastSortedPath;
+    const errors = job.errors && job.errors.length ? ` Errors: ${{job.errors.join("; ")}}` : "";
+    setStatus(`Exported ${{job.exported_count}} files to ${{job.sorted_root}}.${{errors}}`, Boolean(errors));
+    setBusy(false);
+    return;
+  }}
+  if (job.status === "error") {{
+    state.exportJobId = "";
+    setStatus(job.error || job.message || "Export failed.", true);
+    setBusy(false);
+    return;
+  }}
+  setStatus(`${{job.message || "Export is running..."}}${{heartbeat > 20 ? ` · last update ${{heartbeat}}s ago` : ""}}`);
+  window.setTimeout(() => pollExportJob(jobId, 0), EXPORT_POLL_MS);
 }}
 
 function updateTrainingStatus(job) {{
@@ -1974,18 +2635,25 @@ function updateTrainingStatus(job) {{
     return;
   }}
   trainingBar.style.width = "55%";
-  setStatus(job.message || "Brain update is running...");
+  const heartbeat = jobAgeSeconds(job);
+  setStatus(`${{job.message || "Brain update is running..."}}${{heartbeat > 20 ? ` · last update ${{heartbeat}}s ago` : ""}}`);
 }}
 
-async function pollTrainingJob(jobId) {{
-  const job = await jsonFetch(`/api/training-job/${{jobId}}`);
+async function pollTrainingJob(jobId, retryCount=0) {{
+  let job;
+  try {{
+    job = await jsonFetch(`/api/training-job/${{jobId}}`);
+  }} catch (error) {{
+    retryLongJobPoll("Training", retryCount, nextRetry => pollTrainingJob(jobId, nextRetry));
+    return;
+  }}
   if (job.report_dir) {{
     state.lastTrainingReportPath = job.report_dir;
     openTrainingReportButton.disabled = false;
   }}
   updateTrainingStatus(job);
   if (job.status === "running" || job.status === "queued") {{
-    window.setTimeout(() => pollTrainingJob(jobId), 2500);
+    window.setTimeout(() => pollTrainingJob(jobId, 0), TRAINING_POLL_MS);
   }}
 }}
 
@@ -2023,8 +2691,23 @@ openReportButton.addEventListener("click", () => revealPath(state.lastReportPath
 openTrainingReportButton.addEventListener("click", () => revealPath(state.lastTrainingReportPath).catch(error => setStatus(error.message, true)));
 document.getElementById("closeCategoryModal").addEventListener("click", () => closeCategoryChooser());
 document.getElementById("applyCategoryButton").addEventListener("click", () => applyApprovedCategory());
-document.getElementById("resetApprovedButton").addEventListener("click", () => resetApprovedCategory());
-categorySearch.addEventListener("input", () => renderCategoryTree());
+  document.getElementById("resetApprovedButton").addEventListener("click", () => resetApprovedCategory());
+  document.querySelectorAll("[data-collapse-target]").forEach(button => {{
+    button.addEventListener("click", () => togglePanel(button.dataset.collapseTarget));
+  }});
+  document.querySelectorAll("[data-collapsible-header]").forEach(header => {{
+    header.addEventListener("click", event => {{
+      if (shouldIgnoreHeaderClick(event)) return;
+      const panel = header.closest("[data-panel-id]");
+      if (panel?.dataset?.panelId) togglePanel(panel.dataset.panelId);
+    }});
+  }});
+  document.getElementById("collapseAllPanels").addEventListener("click", () => setAllPanelsCollapsed(true));
+  document.getElementById("expandAllPanels").addEventListener("click", () => setAllPanelsCollapsed(false));
+  queueScrollSlider.addEventListener("input", () => scrollQueueFromSlider());
+  tableWrap.addEventListener("scroll", () => updateQueueScrollSlider());
+  window.addEventListener("resize", () => updateQueueScrollSlider());
+  categorySearch.addEventListener("input", () => renderCategoryTree());
 customCategory.addEventListener("input", () => {{
   state.selectedCategory = customCategory.value;
   selectedCategoryText.textContent = customCategory.value.trim()

@@ -2,15 +2,21 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from aaron_audio_intelligence.user_memory_brain import USER_MEMORY_BRAIN_NAME
 from aaron_sound_sorter.gui.models import PreviewRow, SortPreviewSession
 from aaron_sound_sorter.gui.web_app import (
+    ExportJob,
     PreviewJob,
+    add_preview_job_row,
     apply_overrides,
     audio_content_type,
     backup_active_brain_family,
     browser_preview_audio_path,
     build_brain_family_training_command,
+    create_export_job,
+    export_job_to_payload,
     parse_range_header,
+    preview_job_to_payload,
     render_index_html,
     session_to_payload,
     update_preview_job_progress,
@@ -43,6 +49,19 @@ def test_web_gui_shell_contains_core_controls() -> None:
     assert "Choose Approved Folder" in html
     assert "Apply Approved Folder" in html
     assert "progressBar" in html
+    assert "queueScrollSlider" in html
+    assert "queue-scroll-control" in html
+    assert "Scroll queue" in html
+    assert "Use the local slider" in html
+    assert "/api/job-audio/" in html
+    assert "/api/export-job/" in html
+    assert "MAX_JOB_POLL_FAILURES" in html
+    assert 'aria-label="Collapse all panels"' in html
+    assert 'aria-label="Expand all panels"' in html
+    assert "panel-toggle" in html
+    assert "collapse-icon" in html
+    assert "data-collapsible-header" in html
+    assert 'data-collapse-target="details"' in html
     assert "correctionNotice" in html
     assert "Open Sorted Folder" in html
     assert "Train Brains From Corrections" in html
@@ -138,13 +157,16 @@ def test_brain_family_training_command_rebuilds_all_gui_brains(tmp_path: Path) -
 def test_backup_active_brain_family_copies_existing_gui_brains(tmp_path: Path) -> None:
     full_brain = tmp_path / "stage4_folder_brain.json"
     core_brain = tmp_path / "stage4_folder_brain_core_baby.json"
+    memory_brain = tmp_path / USER_MEMORY_BRAIN_NAME
     full_brain.write_text('{"labels": ["full"]}', encoding="utf-8")
     core_brain.write_text('{"labels": ["core"]}', encoding="utf-8")
+    memory_brain.write_text('{"labels": ["memory"]}', encoding="utf-8")
 
     backup_dir = backup_active_brain_family(tmp_path, tmp_path / "_reports" / "run" / "brain_backups")
 
     assert (backup_dir / "stage4_folder_brain.json").read_text(encoding="utf-8") == '{"labels": ["full"]}'
     assert (backup_dir / "stage4_folder_brain_core_baby.json").read_text(encoding="utf-8") == '{"labels": ["core"]}'
+    assert (backup_dir / USER_MEMORY_BRAIN_NAME).read_text(encoding="utf-8") == '{"labels": ["memory"]}'
     assert not (backup_dir / "stage4_folder_brain_spread_baby.json").exists()
 
 
@@ -214,3 +236,77 @@ def test_preview_job_progress_tracks_completed_and_total_files() -> None:
     assert job.total_files == 10
     assert job.latest_file == "snare.wav"
     assert job.message == "Classified 3 of 10: snare.wav"
+    assert job.updated_at >= job.started_at
+
+
+def test_preview_job_payload_streams_completed_rows_in_final_order() -> None:
+    job = PreviewJob(job_id="job-1")
+    first_row = PreviewRow(
+        row_id="00001",
+        source_path=Path("/tmp/source/kick.wav"),
+        display_name="kick.wav",
+        proposed_folder="Drums/Kick Drums/Generic Kick/One Shots",
+        approved_folder="Drums/Kick Drums/Generic Kick/One Shots",
+        final_top="Drums",
+        consensus_status="strong_consensus",
+        confidence=0.91,
+        duration_sec=0.4,
+        read_status="ok",
+        decision_reason="test",
+        diagnostic_summary="shape=drum_hit",
+    )
+    second_row = PreviewRow(
+        row_id="00002",
+        source_path=Path("/tmp/source/snare.wav"),
+        display_name="snare.wav",
+        proposed_folder="Drums/Snares/Generic Snare/One Shots",
+        approved_folder="Drums/Snares/Generic Snare/One Shots",
+        final_top="Drums",
+        consensus_status="strong_consensus",
+        confidence=0.88,
+        duration_sec=0.5,
+        read_status="ok",
+        decision_reason="test",
+        diagnostic_summary="shape=drum_hit",
+    )
+
+    add_preview_job_row(job, second_row)
+    add_preview_job_row(job, first_row)
+    payload = preview_job_to_payload(job)
+
+    assert [row["display_name"] for row in payload["partial_rows"]] == ["kick.wav", "snare.wav"]
+    assert [row["index"] for row in payload["partial_rows"]] == [0, 1]
+    assert payload["updated_at"] >= payload["started_at"]
+
+
+def test_create_export_job_starts_as_pollable_background_job() -> None:
+    job = create_export_job()
+
+    assert job.job_id
+    assert job.status == "queued"
+    assert job.message == "Export queued..."
+    assert job.updated_at >= job.started_at
+
+
+def test_export_job_payload_preserves_long_running_export_status() -> None:
+    job = ExportJob(
+        job_id="export-1",
+        status="done",
+        message="Exported 2 files.",
+        exported_count=2,
+        corrected_count=1,
+        sorted_root="/tmp/sorted",
+        approved_plan_path="/tmp/plan.csv",
+        corrections_path="/tmp/corrections.csv",
+        errors=["warning"],
+    )
+
+    payload = export_job_to_payload(job)
+
+    assert payload["job_id"] == "export-1"
+    assert payload["status"] == "done"
+    assert payload["exported_count"] == 2
+    assert payload["corrected_count"] == 1
+    assert payload["sorted_root"] == "/tmp/sorted"
+    assert payload["errors"] == ["warning"]
+    assert payload["updated_at"] >= payload["started_at"]

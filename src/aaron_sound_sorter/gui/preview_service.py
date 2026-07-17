@@ -14,6 +14,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
+from aaron_audio_intelligence.user_memory_brain import USER_MEMORY_BRAIN_NAME
 from aaron_sound_sorter.domain.models import SortFileResult, SortRequest
 from aaron_sound_sorter.domain.policies import BrainVoterPolicy, ConsensusPolicy, PhysicsVoterPolicy, ShapeVoterPolicy
 from aaron_sound_sorter.engine.consensus import ConsensusRunner
@@ -47,6 +48,7 @@ DEFAULT_MASTER_TAXONOMY_LEDGER = Path("Aaron_Master_Attribute_Classification_Led
 DEFAULT_TRAINING_TAXONOMY_ROOT = Path("training/locked_curated_v1")
 SORTED_ROOT_NAME = "Aaron_Sorted_Sounds"
 PreviewProgressCallback = Callable[[int, int, str], None]
+PreviewRowCallback = Callable[[PreviewRow], None]
 REVIEW_LABELS = [
     "_TO_REVIEW/Needs Human Review",
     "_TO_REVIEW/Measured Role Conflict",
@@ -73,6 +75,8 @@ class BrainFamilyConfig:
         spread_baby_brain_path: Diversity baby brain path, when configured.
         outlier_baby_brain_path: Outlier recall baby brain path, when
             configured.
+        user_memory_brain_path: GUI correction memory brain path, when
+            configured.
         harmonic_core_baby_brain_path: Harmonic-core baby brain path, when
             configured.
         harmonic_spread_baby_brain_path: Harmonic-spread baby brain path, when
@@ -96,6 +100,7 @@ class BrainFamilyConfig:
     core_baby_brain_path: Path | None
     spread_baby_brain_path: Path | None
     outlier_baby_brain_path: Path | None
+    user_memory_brain_path: Path | None
     harmonic_core_baby_brain_path: Path | None
     harmonic_spread_baby_brain_path: Path | None
     harmonic_outlier_baby_brain_path: Path | None
@@ -109,6 +114,7 @@ class BrainFamilyConfig:
             self.core_baby_brain_path,
             self.spread_baby_brain_path,
             self.outlier_baby_brain_path,
+            self.user_memory_brain_path,
         ]
         harmonic_lanes = [
             self.harmonic_core_baby_brain_path,
@@ -154,6 +160,7 @@ class SortPreviewService:
         candidate_count: int = 100,
         sort_workers: int = 1,
         progress_callback: PreviewProgressCallback | None = None,
+        row_callback: PreviewRowCallback | None = None,
     ) -> SortPreviewSession:
         """Return an editable preview session for the selected input.
 
@@ -165,6 +172,7 @@ class SortPreviewService:
             sort_workers: Per-file classification worker count.
             progress_callback: Optional callback receiving completed file count,
                 total file count, and the latest display file name.
+            row_callback: Optional callback receiving each completed preview row.
 
         Returns:
             A preview session containing one row per classified audio file.
@@ -186,6 +194,7 @@ class SortPreviewService:
             core_baby_brain_path=brain_config.core_baby_brain_path,
             spread_baby_brain_path=brain_config.spread_baby_brain_path,
             outlier_baby_brain_path=brain_config.outlier_baby_brain_path,
+            user_memory_brain_path=brain_config.user_memory_brain_path,
             harmonic_core_baby_brain_path=brain_config.harmonic_core_baby_brain_path,
             harmonic_spread_baby_brain_path=brain_config.harmonic_spread_baby_brain_path,
             harmonic_outlier_baby_brain_path=brain_config.harmonic_outlier_baby_brain_path,
@@ -200,6 +209,7 @@ class SortPreviewService:
             brain = sorter.brain_repository.load(request.brain_path)
             baby_brains = sorter.load_baby_brains_if_available(request)
             harmonic_baby_brains = sorter.load_harmonic_baby_brains_if_available(request)
+            sorter.attach_user_memory_brain(brain, baby_brains)
             prepared_input = sorter.audio_repository.prepare(request.input_path, request.output_dir)
             total_files = len(prepared_input.audio_files)
             if progress_callback is not None:
@@ -214,6 +224,7 @@ class SortPreviewService:
                 use_harmonic_brains_in_sort=request.use_harmonic_brains_in_sort,
                 max_workers=request.sort_workers,
                 progress_callback=progress_callback,
+                row_callback=row_callback,
             )
             labels = load_available_labels(brain_config.full_brain_path, project_root=self.project_root)
             rows = [preview_row_from_result(index, result) for index, result in enumerate(results, start=1)]
@@ -275,6 +286,9 @@ class SortPreviewService:
             core_baby_brain_path=self.resolve_optional_project_path(baby.get("core")),
             spread_baby_brain_path=self.resolve_optional_project_path(baby.get("spread")),
             outlier_baby_brain_path=self.resolve_optional_project_path(baby.get("outlier")),
+            user_memory_brain_path=self.resolve_optional_project_path(
+                brains.get("user_memory") or USER_MEMORY_BRAIN_NAME
+            ),
             harmonic_core_baby_brain_path=self.resolve_optional_project_path(harmonic_baby.get("core")),
             harmonic_spread_baby_brain_path=self.resolve_optional_project_path(harmonic_baby.get("spread")),
             harmonic_outlier_baby_brain_path=self.resolve_optional_project_path(harmonic_baby.get("outlier")),
@@ -795,6 +809,7 @@ def classify_audio_files_with_progress(
     use_harmonic_brains_in_sort: bool,
     max_workers: int,
     progress_callback: PreviewProgressCallback | None,
+    row_callback: PreviewRowCallback | None = None,
 ) -> list[SortFileResult]:
     """Classify audio files and optionally publish GUI progress.
 
@@ -809,6 +824,7 @@ def classify_audio_files_with_progress(
         max_workers: Maximum per-file classification workers.
         progress_callback: Optional callback receiving completed count, total
             count, and latest file name.
+        row_callback: Optional callback receiving each completed preview row.
 
     Returns:
         Sort results in the same order as ``audio_files``.
@@ -817,7 +833,7 @@ def classify_audio_files_with_progress(
         Calls ``progress_callback`` from the worker collection thread. It does
         not write sorted output or mutate brains.
     """
-    if progress_callback is None:
+    if progress_callback is None and row_callback is None:
         return sorter.classify_audio_files(
             audio_files,
             brain,
@@ -831,17 +847,19 @@ def classify_audio_files_with_progress(
     if max_workers <= 1 or total_files <= 1:
         ordered_results = []
         for completed_count, audio_file in enumerate(audio_files, start=1):
-            ordered_results.append(
-                sorter.classify_one_file(
-                    audio_file,
-                    brain,
-                    baby_brains,
-                    harmonic_baby_brains,
-                    use_baby_brains_in_sort=use_baby_brains_in_sort,
-                    use_harmonic_brains_in_sort=use_harmonic_brains_in_sort,
-                )
+            result = sorter.classify_one_file(
+                audio_file,
+                brain,
+                baby_brains,
+                harmonic_baby_brains,
+                use_baby_brains_in_sort=use_baby_brains_in_sort,
+                use_harmonic_brains_in_sort=use_harmonic_brains_in_sort,
             )
-            progress_callback(completed_count, total_files, audio_file.name)
+            ordered_results.append(result)
+            if row_callback is not None:
+                row_callback(preview_row_from_result(completed_count, result))
+            if progress_callback is not None:
+                progress_callback(completed_count, total_files, audio_file.name)
         return ordered_results
     ordered_results: list[SortFileResult | None] = [None] * total_files
     worker_count = max(1, min(int(max_workers), total_files))
@@ -861,9 +879,13 @@ def classify_audio_files_with_progress(
         }
         for future in as_completed(futures):
             index, audio_file = futures[future]
-            ordered_results[index] = future.result()
+            result = future.result()
+            ordered_results[index] = result
             completed_count += 1
-            progress_callback(completed_count, total_files, audio_file.name)
+            if row_callback is not None:
+                row_callback(preview_row_from_result(index + 1, result))
+            if progress_callback is not None:
+                progress_callback(completed_count, total_files, audio_file.name)
     return [result for result in ordered_results if result is not None]
 
 

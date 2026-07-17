@@ -6,6 +6,11 @@ from pathlib import Path
 
 import numpy as np
 
+from aaron_audio_intelligence.user_memory_brain import (
+    USER_MEMORY_BRAIN_NAME,
+    build_empty_user_memory_brain,
+    merge_user_memory_into_brain,
+)
 from aaron_sound_sorter.core import FEATURE_WEIGHTS, FP_SIZE, FeatureRow
 from aaron_sound_sorter.domain.models import AudioPhysics, SharedAudioFacts
 from aaron_sound_sorter.gui import incremental_brain_update as updater_module
@@ -250,6 +255,41 @@ def test_incremental_updater_backs_up_and_updates_active_brain(
     assert updated["incremental_gui_update_policy"] == "weighted_prototype_fact_profile_delta_only"
 
 
+def test_incremental_updater_creates_dedicated_user_memory_brain(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    brain_path = tmp_path / "stage4_folder_brain.json"
+    brain_path.write_text(json.dumps(_base_brain()), encoding="utf-8")
+    audio_path = tmp_path / "koto.wav"
+    audio_path.write_bytes(b"not real audio")
+    monkeypatch.setattr(
+        updater_module,
+        "make_fingerprint_safe",
+        lambda path: (np.asarray(_fingerprint(0.55), dtype=np.float32), 1.0, "ok"),
+    )
+    correction = IncrementalCorrection(
+        label="Instruments/Plucked Strings/Koto/One Shots",
+        audio_path=audio_path,
+        source_path=audio_path,
+        row_id="00001",
+        status="staged",
+    )
+
+    summary = IncrementalBrainUpdater(tmp_path, ("stage4_folder_brain.json", USER_MEMORY_BRAIN_NAME)).apply(
+        [correction],
+        report_dir=tmp_path / "_reports" / "gui_training_imports" / "run",
+        backup_dir=tmp_path / "_reports" / "gui_training_imports" / "run" / "brain_backups",
+    )
+
+    memory_path = tmp_path / USER_MEMORY_BRAIN_NAME
+    memory = json.loads(memory_path.read_text(encoding="utf-8"))
+    updated_names = {result.brain_path.name for result in summary.updated_brains}
+    assert memory["brain_type"] == "user_correction_memory_brain"
+    assert "Instruments/Plucked Strings/Koto/One Shots" in memory["labels"]
+    assert USER_MEMORY_BRAIN_NAME in updated_names
+
+
 def test_incremental_updater_uses_dynamic_competitor_aware_weight(
     tmp_path: Path,
     monkeypatch,
@@ -287,6 +327,37 @@ def test_incremental_updater_uses_dynamic_competitor_aware_weight(
     assert updated["counts"][label] > updated["counts"][competitor]
     assert updated["label_reliability_by_label"][label]["human_override_effective_weight"] > 180
     assert summary.updated_brains[0].effective_evidence_weight == updated["counts"][label]
+
+
+def test_user_memory_merge_makes_correction_visible_to_brain_and_physics(tmp_path: Path) -> None:
+    label = "Instruments/Plucked Strings/Koto/One Shots"
+    competitor = "Instruments/Synths/Synth Chord/One Shots"
+    query = _fingerprint(0.55)
+    brain = _base_brain([competitor])
+    brain["category_fact_profiles"] = {competitor: _profile_for_vector(query)}
+    memory = build_empty_user_memory_brain(brain)
+    update_brain_label_with_row(memory, _row(label, tmp_path / "koto.wav", value=0.55), evidence_weight=240)
+
+    merge_user_memory_into_brain(brain, memory)
+
+    assert brain["_user_memory_brain_loaded"] is True
+    assert label in brain["labels"]
+    brain_rows = BrainVoter().score_labels(
+        _audio_physics_for_vector(tmp_path, query),
+        _facts_for_vector(query),
+        brain,
+        [label, competitor],
+    )
+    physics_rows = PhysicsVoter().score_labels(
+        _audio_physics_for_vector(tmp_path, query),
+        _facts_for_vector(query),
+        brain,
+        [label, competitor],
+        brain["category_fact_profiles"],
+    )
+
+    assert sorted(brain_rows, key=lambda row: float(row["score"]))[0]["label"] == label
+    assert sorted(physics_rows, key=lambda row: float(row["score"]))[0]["label"] == label
 
 
 def test_brain_voter_honors_exact_human_override_fingerprint(tmp_path: Path) -> None:

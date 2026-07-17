@@ -278,6 +278,7 @@ def test_gui_brain_config_loads_full_and_baby_brain_paths(tmp_path: Path) -> Non
 
     assert brain_config.full_brain_path == tmp_path / "brains" / "full.json"
     assert brain_config.core_baby_brain_path == tmp_path / "brains" / "core.json"
+    assert brain_config.user_memory_brain_path == tmp_path / "stage4_folder_brain_user_memory.json"
     assert brain_config.harmonic_outlier_baby_brain_path == tmp_path / "brains" / "harmonic_outlier.json"
     assert brain_config.use_baby_brains_in_sort is True
     assert brain_config.use_harmonic_brains_in_sort is False

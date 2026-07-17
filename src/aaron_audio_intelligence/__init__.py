@@ -15,6 +15,7 @@ from aaron_audio_intelligence.sidecar_schema import (
     AudioIntelligenceSidecar,
     build_sidecar_from_sort_result,
 )
+from aaron_audio_intelligence.user_memory_brain import USER_MEMORY_BRAIN_NAME
 
 __all__ = [
     "AAI_SIDECAR_SCHEMA_VERSION",
@@ -22,5 +23,6 @@ __all__ = [
     "OwnerBrainResult",
     "PrototypeOwnerBrain",
     "TrainableBrainExample",
+    "USER_MEMORY_BRAIN_NAME",
     "build_sidecar_from_sort_result",
 ]

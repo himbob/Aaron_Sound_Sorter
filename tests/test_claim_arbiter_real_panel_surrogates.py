@@ -1269,3 +1269,73 @@ def test_weak_review_releases_when_raw_and_physics_are_already_drums() -> None:
 
     assert final.folder_path == "Drums/Kick Drums/Generic Kick/One Shots"
     assert final.consensus_status == "final_weak_review_measured_drums_release"
+
+
+def test_pitched_tonal_phrase_blocks_weak_measured_drums_release() -> None:
+    """A weak cymbal-like physics top must not release a tonal phrase into Drums."""
+    shared = [
+        shared_row("Instruments/Woodwinds/Saxophone/One Shots", 22.0),
+        shared_row("Instruments/Instrument Loops/Loops", 28.0),
+    ]
+    raw = raw_claim("Instruments/Woodwinds/Saxophone/One Shots", shared, score=22.0)
+    measured = SharedAudioFacts(
+        is_broken_or_tiny=False,
+        is_loop_like=True,
+        is_single_event_like=False,
+        is_short_hit_like=False,
+        is_long=True,
+        evidence={
+            "shape_vote": {
+                "primary_shape": "designed_tonal_fx",
+                "confidence": 0.80,
+                "pitched_event_ratio": 0.95,
+                "pitch_confidence": 0.90,
+                "f0_voiced_ratio": 0.90,
+                "sustained_tonal_frame_ratio": 0.82,
+                "non_event_tonal_ratio": 0.84,
+                "percussive_event_ratio": 0.10,
+                "drumlike_frame_ratio": 0.10,
+            },
+            "measured_roles": {
+                "pitched_music_phrase": 0.78,
+                "pitched_music_loop": 0.70,
+                "percussive_drum_loop": 0.0,
+                "low_rhythmic_drum_loop": 0.0,
+                "bright_drum_loop": 0.12,
+            },
+            "physics_vote_result": {
+                "top_guesses": [
+                    {
+                        "label": "Drums/Cymbals/Crash Cymbal/Loops",
+                        "folder_path": "Drums/Cymbals/Crash Cymbal/Loops",
+                        "top_family": "Drums",
+                    }
+                ]
+            },
+            "physics_subpanels": {
+                "flat": {
+                    "drum_loop_source_score": 0.20,
+                    "drum_hit_score": 0.28,
+                    "drum_cymbal_source_score": 0.70,
+                    "onset_percussive_onset_score": 0.30,
+                    "synth_tonal_source_score": 0.53,
+                    "plucked_string_score": 0.57,
+                    "reed_wind_score": 0.59,
+                }
+            },
+        },
+    )
+    review = review_claim(
+        label="_TO_REVIEW/No Strong Voter Consensus",
+        reason="synthetic weak consensus review",
+        source="weak_voter_consensus",
+        shared=raw.shared_candidates,
+        winner=raw,
+        strength=1.0,
+    )
+    core = DecisionCoreV2()
+
+    final = core.arbiter.adjudicate(raw_claim=raw, consensus_claims=[], eligibility_claims=[review], facts=measured)
+
+    assert final.folder_path == "Instruments/Instrument Loops/Loops"
+    assert final.consensus_status != "final_weak_review_measured_drums_release"

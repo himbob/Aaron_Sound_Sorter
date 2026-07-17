@@ -5,6 +5,7 @@
 # full brains, baby brains, harmonic lanes, or internal voter wiring.
 brains:
   full: stage4_folder_brain.json
+  user_memory: stage4_folder_brain_user_memory.json
   baby:
     legacy: stage4_folder_brain_baby.json
     core: stage4_folder_brain_core_baby.json
