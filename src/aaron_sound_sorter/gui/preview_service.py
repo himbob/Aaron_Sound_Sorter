@@ -8,7 +8,7 @@ import json
 import os
 import shutil
 import traceback
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -31,7 +31,7 @@ from aaron_sound_sorter.gui.models import (
     SortPreviewSession,
     TrainingImportSummary,
 )
-from aaron_sound_sorter.infrastructure.audio_repository import AudioInputRepository
+from aaron_sound_sorter.infrastructure.audio_repository import AudioInputRepository, InputPreparationCancelled
 from aaron_sound_sorter.infrastructure.brain_repository import BrainRepository
 from aaron_sound_sorter.infrastructure.report_writer import (
     compact_top_guess,
@@ -53,6 +53,13 @@ DEFAULT_TRAINING_TAXONOMY_ROOT = Path("training/locked_curated_v1")
 SORTED_ROOT_NAME = "Aaron_Sorted_Sounds"
 PreviewProgressCallback = Callable[[int, int, str], None]
 PreviewRowCallback = Callable[[PreviewRow], None]
+CancelRequestedCallback = Callable[[], bool]
+
+
+class PreviewCancelled(Exception):
+    """Raised when a GUI preview run is cancelled by the user."""
+
+
 REVIEW_LABELS = [
     "_TO_REVIEW/Needs Human Review",
     "_TO_REVIEW/Measured Role Conflict",
@@ -181,6 +188,7 @@ class SortPreviewService:
         sort_workers: int = 1,
         progress_callback: PreviewProgressCallback | None = None,
         row_callback: PreviewRowCallback | None = None,
+        cancel_requested: CancelRequestedCallback | None = None,
     ) -> SortPreviewSession:
         """Return an editable preview session for the selected input.
 
@@ -193,6 +201,8 @@ class SortPreviewService:
             progress_callback: Optional callback receiving completed file count,
                 total file count, and the latest display file name.
             row_callback: Optional callback receiving each completed preview row.
+            cancel_requested: Optional callback returning true when the browser
+                has requested cooperative cancellation.
 
         Returns:
             A preview session containing one row per classified audio file.
@@ -200,6 +210,7 @@ class SortPreviewService:
         Raises:
             ValueError: If input preparation finds no supported audio files.
             FileNotFoundError: If the selected brain does not exist.
+            PreviewCancelled: If the browser cancels the preview run.
         """
         brain_config = self.load_brain_family_config(full_brain_override=brain_path)
         if not brain_config.full_brain_path.exists():
@@ -229,15 +240,21 @@ class SortPreviewService:
             sort_workers=max(1, int(sort_workers)),
         )
         try:
+            _raise_if_preview_cancelled(cancel_requested)
             sorter = build_product_sorter(candidate_count=request.candidate_count)
             brain = sorter.brain_repository.load(request.brain_path)
             baby_brains = sorter.load_baby_brains_if_available(request)
             harmonic_baby_brains = sorter.load_harmonic_baby_brains_if_available(request)
             sorter.attach_memory_brains(brain, baby_brains)
-            prepared_input = sorter.audio_repository.prepare(request.input_path, request.output_dir)
+            prepared_input = sorter.audio_repository.prepare(
+                request.input_path,
+                request.output_dir,
+                cancel_requested=cancel_requested,
+            )
             total_files = len(prepared_input.audio_files)
             if progress_callback is not None:
                 progress_callback(0, total_files, "Prepared audio input")
+            _raise_if_preview_cancelled(cancel_requested)
             results = classify_audio_files_with_progress(
                 sorter,
                 prepared_input.audio_files,
@@ -249,7 +266,9 @@ class SortPreviewService:
                 max_workers=request.sort_workers,
                 progress_callback=progress_callback,
                 row_callback=row_callback,
+                cancel_requested=cancel_requested,
             )
+            _raise_if_preview_cancelled(cancel_requested)
             labels = load_available_labels(brain_config.full_brain_path, project_root=self.project_root)
             rows = [preview_row_from_result(index, result) for index, result in enumerate(results, start=1)]
             session = SortPreviewSession(
@@ -261,6 +280,10 @@ class SortPreviewService:
             )
             write_preview_manifest(run_dir / "Aaron_GUI_Preview.csv", session)
             return session
+        except InputPreparationCancelled as exc:
+            raise PreviewCancelled("Preview cancelled while preparing input.") from exc
+        except PreviewCancelled:
+            raise
         except Exception as exc:
             error_path = write_preview_error_report(run_dir, request.input_path, exc)
             message = friendly_preview_error_message(exc)
@@ -851,6 +874,7 @@ def classify_audio_files_with_progress(
     max_workers: int,
     progress_callback: PreviewProgressCallback | None,
     row_callback: PreviewRowCallback | None = None,
+    cancel_requested: CancelRequestedCallback | None = None,
 ) -> list[SortFileResult]:
     """Classify audio files and optionally publish GUI progress.
 
@@ -866,15 +890,21 @@ def classify_audio_files_with_progress(
         progress_callback: Optional callback receiving completed count, total
             count, and latest file name.
         row_callback: Optional callback receiving each completed preview row.
+        cancel_requested: Optional callback returning true when classification
+            should stop scheduling more audio files.
 
     Returns:
         Sort results in the same order as ``audio_files``.
+
+    Raises:
+        PreviewCancelled: If ``cancel_requested`` returns true before or during
+            classification.
 
     Side Effects:
         Calls ``progress_callback`` from the worker collection thread. It does
         not write sorted output or mutate brains.
     """
-    if progress_callback is None and row_callback is None:
+    if progress_callback is None and row_callback is None and cancel_requested is None:
         return sorter.classify_audio_files(
             audio_files,
             brain,
@@ -888,6 +918,7 @@ def classify_audio_files_with_progress(
     if max_workers <= 1 or total_files <= 1:
         ordered_results = []
         for completed_count, audio_file in enumerate(audio_files, start=1):
+            _raise_if_preview_cancelled(cancel_requested)
             result = sorter.classify_one_file(
                 audio_file,
                 brain,
@@ -901,13 +932,22 @@ def classify_audio_files_with_progress(
                 row_callback(preview_row_from_result(completed_count, result))
             if progress_callback is not None:
                 progress_callback(completed_count, total_files, audio_file.name)
+            _raise_if_preview_cancelled(cancel_requested)
         return ordered_results
     ordered_results: list[SortFileResult | None] = [None] * total_files
     worker_count = max(1, min(int(max_workers), total_files))
     completed_count = 0
+    next_index = 0
     with ThreadPoolExecutor(max_workers=worker_count, thread_name_prefix="aaron-gui-preview") as executor:
-        futures = {
-            executor.submit(
+        futures = {}
+
+        def submit_next_file() -> bool:
+            nonlocal next_index
+            _raise_if_preview_cancelled(cancel_requested)
+            if next_index >= total_files:
+                return False
+            audio_file = audio_files[next_index]
+            future = executor.submit(
                 sorter.classify_one_file,
                 audio_file,
                 brain,
@@ -915,19 +955,36 @@ def classify_audio_files_with_progress(
                 harmonic_baby_brains,
                 use_baby_brains_in_sort=use_baby_brains_in_sort,
                 use_harmonic_brains_in_sort=use_harmonic_brains_in_sort,
-            ): (index, audio_file)
-            for index, audio_file in enumerate(audio_files)
-        }
-        for future in as_completed(futures):
-            index, audio_file = futures[future]
-            result = future.result()
-            ordered_results[index] = result
-            completed_count += 1
-            if row_callback is not None:
-                row_callback(preview_row_from_result(index + 1, result))
-            if progress_callback is not None:
-                progress_callback(completed_count, total_files, audio_file.name)
+            )
+            futures[future] = (next_index, audio_file)
+            next_index += 1
+            return True
+
+        for _ in range(worker_count):
+            if not submit_next_file():
+                break
+        while futures:
+            _raise_if_preview_cancelled(cancel_requested)
+            done_futures, _pending_futures = wait(futures, timeout=0.25, return_when=FIRST_COMPLETED)
+            if not done_futures:
+                continue
+            for future in done_futures:
+                index, audio_file = futures.pop(future)
+                result = future.result()
+                ordered_results[index] = result
+                completed_count += 1
+                if row_callback is not None:
+                    row_callback(preview_row_from_result(index + 1, result))
+                if progress_callback is not None:
+                    progress_callback(completed_count, total_files, audio_file.name)
+                submit_next_file()
     return [result for result in ordered_results if result is not None]
+
+
+def _raise_if_preview_cancelled(cancel_requested: CancelRequestedCallback | None) -> None:
+    """Raise when the browser has requested cancellation."""
+    if cancel_requested is not None and cancel_requested():
+        raise PreviewCancelled("Preview cancelled by user.")
 
 
 def preview_row_from_result(index: int, result: SortFileResult) -> PreviewRow:

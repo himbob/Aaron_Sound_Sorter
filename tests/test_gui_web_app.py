@@ -17,6 +17,7 @@ from aaron_sound_sorter.gui.web_app import (
     backup_active_brain_family,
     browser_preview_audio_path,
     build_brain_family_training_command,
+    cancel_preview_job,
     chooser_default_location,
     create_export_job,
     export_job_to_payload,
@@ -42,10 +43,17 @@ def test_web_gui_shell_contains_core_controls() -> None:
     html = render_index_html(
         brain_config_path="/tmp/config/gui_brains.yaml",
         brain_summary="full=stage4_folder_brain.json; baby=3 lanes (on)",
+        available_labels=[
+            "Instruments/Guitars/Electric Guitar/Loops",
+            "_TO_REVIEW/Measured Role Conflict",
+        ],
     )
 
     assert "Aaron Sound Sorter" in html
     assert "Preview Sort" in html
+    assert "cancelPreviewButton" in html
+    assert "/api/preview-cancel" in html
+    assert "cancelPreview()" in html
     assert "Export Approved Sort" in html
     assert "audioPlayer" in html
     assert "Listen" in html
@@ -56,6 +64,12 @@ def test_web_gui_shell_contains_core_controls() -> None:
     assert "categoryModal" in html
     assert "Choose Approved Folder" in html
     assert "Apply Approved Folder" in html
+    assert "initialAvailableLabels" in html
+    assert "Instruments/Guitars/Electric Guitar/Loops" in html
+    assert "_TO_REVIEW/Measured Role Conflict" in html
+    assert "state.labels = []" not in html
+    assert "No matching taxonomy folders" in html
+    assert "No matching trained folders" not in html
     assert "progressBar" in html
     assert "queueTopScroll" in html
     assert "queueTopScrollSpacer" in html
@@ -329,6 +343,25 @@ def test_preview_job_payload_streams_completed_rows_in_final_order() -> None:
     assert [row["display_name"] for row in payload["partial_rows"]] == ["kick.wav", "snare.wav"]
     assert [row["index"] for row in payload["partial_rows"]] == [0, 1]
     assert payload["updated_at"] >= payload["started_at"]
+
+
+def test_cancel_preview_job_marks_live_job_cancelled() -> None:
+    job = PreviewJob(
+        job_id="job-1",
+        status="running",
+        message="Classifying preview...",
+        completed_files=3,
+        total_files=10,
+    )
+
+    cancel_preview_job(job)
+    payload = preview_job_to_payload(job)
+
+    assert job.cancel_event.is_set()
+    assert job.status == "cancelled"
+    assert job.message == "Preview cancelled after 3 of 10 files."
+    assert payload["status"] == "cancelled"
+    assert payload["cancel_requested"] is True
 
 
 def test_create_export_job_starts_as_pollable_background_job() -> None:

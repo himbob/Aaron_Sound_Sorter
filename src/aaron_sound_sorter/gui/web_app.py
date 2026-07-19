@@ -30,10 +30,12 @@ from aaron_sound_sorter.gui.incremental_brain_update import (
 )
 from aaron_sound_sorter.gui.models import PreviewRow, SortPreviewSession, TrainingImportSummary
 from aaron_sound_sorter.gui.preview_service import (
+    PreviewCancelled,
     SortPlanExporter,
     SortPreviewService,
     TrainingCorrectionImporter,
     gui_worker_count,
+    load_available_labels,
 )
 
 DEFAULT_HOST = "127.0.0.1"
@@ -55,6 +57,7 @@ class PreviewJob:
     partial_rows: list[dict[str, Any]] = field(default_factory=list)
     started_at: float = field(default_factory=time.time)
     updated_at: float = field(default_factory=time.time)
+    cancel_event: threading.Event = field(default_factory=threading.Event, repr=False)
 
 
 @dataclass
@@ -209,10 +212,15 @@ class SorterRequestHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         if parsed.path == "/":
             brain_config = self.gui_state.preview_service.load_brain_family_config()
+            available_labels = load_available_labels(
+                brain_config.full_brain_path,
+                project_root=self.gui_state.project_root,
+            )
             self.send_html(
                 render_index_html(
                     brain_config_path=str(brain_config.config_path),
                     brain_summary=brain_config.display_summary(),
+                    available_labels=available_labels,
                 )
             )
             return
@@ -248,6 +256,9 @@ class SorterRequestHandler(BaseHTTPRequestHandler):
         payload = self.read_json()
         if parsed.path == "/api/preview":
             self.start_preview(payload)
+            return
+        if parsed.path == "/api/preview-cancel":
+            self.cancel_preview(payload)
             return
         if parsed.path == "/api/export":
             self.export_session(payload)
@@ -438,7 +449,11 @@ class SorterRequestHandler(BaseHTTPRequestHandler):
                     latest,
                 ),
                 row_callback=lambda row: add_preview_job_row(job, row),
+                cancel_requested=job.cancel_event.is_set,
             )
+            if job.cancel_event.is_set():
+                cancel_preview_job(job)
+                return
             session_id = uuid.uuid4().hex
             self.gui_state.sessions[session_id] = session
             job.status = "done"
@@ -447,11 +462,26 @@ class SorterRequestHandler(BaseHTTPRequestHandler):
             job.message = f"Preview ready: {len(session.rows)} files"
             job.session_id = session_id
             job.updated_at = time.time()
+        except PreviewCancelled:
+            cancel_preview_job(job)
         except Exception as exc:
+            if job.cancel_event.is_set():
+                cancel_preview_job(job)
+                return
             job.status = "error"
             job.error = str(exc)
             job.message = "Preview failed"
             job.updated_at = time.time()
+
+    def cancel_preview(self, payload: dict[str, Any]) -> None:
+        """Request cooperative cancellation for a live preview job."""
+        job_id = str(payload.get("job_id", "")).strip()
+        job = self.gui_state.jobs.get(job_id)
+        if job is None:
+            self.send_json({"error": "Unknown job"}, HTTPStatus.NOT_FOUND)
+            return
+        cancel_preview_job(job)
+        self.send_json(preview_job_to_payload(job))
 
     def export_session(self, payload: dict[str, Any]) -> None:
         """Start an approved-folder export in a background thread."""
@@ -568,6 +598,8 @@ def bind_server(
 
 def update_preview_job_progress(job: PreviewJob, completed_files: int, total_files: int, latest_file: str) -> None:
     """Update preview job progress for the browser status bar."""
+    if job.cancel_event.is_set():
+        return
     job.completed_files = int(completed_files)
     job.total_files = int(total_files)
     job.latest_file = str(latest_file)
@@ -579,6 +611,16 @@ def update_preview_job_progress(job: PreviewJob, completed_files: int, total_fil
         job.message = f"Prepared {total_files} files. Starting classification..."
         return
     job.message = f"Classified {completed_files} of {total_files}: {latest_file}"
+
+
+def cancel_preview_job(job: PreviewJob) -> None:
+    """Mark a live preview job as cancelled and request worker shutdown."""
+    if job.status in {"done", "error"}:
+        return
+    job.cancel_event.set()
+    job.status = "cancelled"
+    job.message = f"Preview cancelled after {job.completed_files} of {job.total_files or '?'} files."
+    job.updated_at = time.time()
 
 
 def create_export_job() -> ExportJob:
@@ -872,6 +914,7 @@ def preview_job_to_payload(job: PreviewJob) -> dict[str, Any]:
         "completed_files": job.completed_files,
         "total_files": job.total_files,
         "latest_file": job.latest_file,
+        "cancel_requested": job.cancel_event.is_set(),
         "partial_rows": sorted(job.partial_rows, key=lambda row: int(row.get("index", 0))),
         "started_at": job.started_at,
         "updated_at": job.updated_at,
@@ -928,10 +971,19 @@ on run argv
     end if
 
     if chooserKind is "folder" then
-        if defaultLocation is missing value then
-            return POSIX path of (choose folder with prompt "Choose the exact sample folder to sort")
-        end if
-        return POSIX path of (choose folder with prompt "Choose the exact sample folder to sort" default location defaultLocation)
+        repeat
+            if defaultLocation is missing value then
+                set selectedFolder to choose folder with prompt "Choose the exact sample folder to sort"
+            else
+                set selectedFolder to choose folder with prompt "Choose the exact sample folder to sort" default location defaultLocation
+            end if
+            set selectedPath to POSIX path of selectedFolder
+            set confirmation to display dialog "Preview will scan exactly this folder recursively:" & return & return & selectedPath buttons {"Pick Again", "Use Folder"} default button "Use Folder"
+            if button returned of confirmation is "Use Folder" then
+                return selectedPath
+            end if
+            set defaultLocation to selectedFolder
+        end repeat
     end if
 
     if chooserKind is "destination" then
@@ -1139,8 +1191,14 @@ def parse_range_header(range_header: str | None, file_size: int) -> tuple[int, i
     return (start_byte, min(end_byte, file_size - 1), True)
 
 
-def render_index_html(*, brain_config_path: str, brain_summary: str) -> str:
+def render_index_html(
+    *,
+    brain_config_path: str,
+    brain_summary: str,
+    available_labels: list[str] | None = None,
+) -> str:
     """Render the browser GUI shell."""
+    labels_json = json.dumps(available_labels or []).replace("</", "<\\/")
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -1374,7 +1432,7 @@ def render_index_html(*, brain_config_path: str, brain_summary: str) -> str:
       }}
       .row {{
         display: grid;
-        grid-template-columns: minmax(160px, 1fr) auto auto auto;
+        grid-template-columns: minmax(160px, 1fr) auto auto auto auto;
         gap: 8px;
       align-items: end;
       margin-bottom: 10px;
@@ -1406,6 +1464,15 @@ def render_index_html(*, brain_config_path: str, brain_summary: str) -> str:
       color: white;
     }}
     button.primary:hover {{ background: var(--accent-dark); }}
+    button.danger {{
+      border-color: #c94c4c;
+      background: #fff1f1;
+      color: #8b1f1f;
+    }}
+    button.danger:hover:not(:disabled) {{
+      background: #fbe0e0;
+      border-color: #a52f2f;
+    }}
       button:disabled {{
         cursor: not-allowed;
         opacity: 0.55;
@@ -1882,6 +1949,7 @@ def render_index_html(*, brain_config_path: str, brain_summary: str) -> str:
             <button id="chooseFolder">Folder</button>
             <button id="chooseFile">ZIP/File</button>
             <button class="primary" id="previewButton">Preview Sort</button>
+            <button class="danger" id="cancelPreviewButton" disabled>Cancel</button>
           </div>
           <div class="config-line">
             <strong>Brains</strong>
@@ -2068,11 +2136,12 @@ def render_index_html(*, brain_config_path: str, brain_summary: str) -> str:
 
   <datalist id="labelOptions"></datalist>
 <script>
-const state = {{
-  sessionId: "",
-  rows: [],
-  labels: [],
-  selectedIndex: -1,
+  const initialAvailableLabels = {labels_json};
+  const state = {{
+    sessionId: "",
+    rows: [],
+    labels: [...initialAvailableLabels],
+    selectedIndex: -1,
   categoryEditIndex: -1,
   selectedCategory: "",
   lastReportPath: "",
@@ -2098,6 +2167,8 @@ const progressArea = document.getElementById("progressArea");
 const progressText = document.getElementById("progressText");
 const progressCount = document.getElementById("progressCount");
 const progressBar = document.getElementById("progressBar");
+const previewButton = document.getElementById("previewButton");
+const cancelPreviewButton = document.getElementById("cancelPreviewButton");
 const correctionNotice = document.getElementById("correctionNotice");
 const correctionCount = document.getElementById("correctionCount");
 const categoryModal = document.getElementById("categoryModal");
@@ -2272,7 +2343,8 @@ const trainingStatus = document.getElementById("trainingStatus");
 
 function setBusy(isBusy) {{
   document.body.classList.toggle("busy", isBusy);
-  document.getElementById("previewButton").disabled = isBusy;
+  previewButton.disabled = isBusy;
+  cancelPreviewButton.disabled = !isBusy || !state.livePreviewJobId;
   exportButton.disabled = isBusy || !state.sessionId;
   trainCorrectionsButton.disabled = isBusy || correctionRows().length === 0 || !state.sessionId || Boolean(state.trainingJobId) || Boolean(state.exportJobId);
   syncStickyActionDock();
@@ -2341,6 +2413,7 @@ function updateProgress(job) {{
 
 function showPreviewFailure(message) {{
   const text = message || "Preview failed.";
+  state.livePreviewJobId = "";
   progressArea.hidden = false;
   progressText.textContent = "Preview failed";
   progressCount.textContent = "Error";
@@ -2433,7 +2506,8 @@ async function startPreview() {{
     clearAudioSource();
   rowCountEl.textContent = "0 files";
   state.rows = [];
-  state.labels = [];
+  if (!state.labels.length) state.labels = [...initialAvailableLabels];
+  syncLabelOptions(state.labels);
   state.sessionId = "";
   state.selectedIndex = -1;
   state.lastReportPath = "";
@@ -2458,7 +2532,9 @@ async function startPreview() {{
       body: JSON.stringify({{ input_path: inputPath }})
     }});
     state.livePreviewJobId = payload.job_id || "";
-    pollJob(payload.job_id);
+    if (!state.livePreviewJobId) throw new Error("Preview did not return a job id.");
+    setBusy(true);
+    pollJob(state.livePreviewJobId);
   }} catch (error) {{
     showPreviewFailure(error.message || "Could not start preview.");
   }}
@@ -2482,6 +2558,12 @@ async function pollJob(jobId, retryCount=0) {{
     setBusy(false);
     return;
   }}
+  if (job.status === "cancelled") {{
+    state.livePreviewJobId = "";
+    setBusy(false);
+    setStatus(job.message || "Preview cancelled.", true);
+    return;
+  }}
   if (job.status === "error") {{
     showPreviewFailure(job.error || job.message || "Preview failed.");
     return;
@@ -2489,12 +2571,33 @@ async function pollJob(jobId, retryCount=0) {{
   window.setTimeout(() => pollJob(jobId, 0), PREVIEW_POLL_MS);
 }}
 
+async function cancelPreview() {{
+  if (!state.livePreviewJobId) return;
+  const jobId = state.livePreviewJobId;
+  cancelPreviewButton.disabled = true;
+  setStatus("Cancelling preview...");
+  try {{
+    const job = await jsonFetch("/api/preview-cancel", {{
+      method: "POST",
+      body: JSON.stringify({{ job_id: jobId }})
+    }});
+    updateProgress(job);
+    mergeLivePreviewRows(job.partial_rows || []);
+    state.livePreviewJobId = "";
+    setBusy(false);
+    setStatus(job.message || "Preview cancelled.", true);
+  }} catch (error) {{
+    cancelPreviewButton.disabled = false;
+    setStatus(error.message || "Could not cancel preview.", true);
+  }}
+}}
+
 async function loadSession(sessionId) {{
   const session = await jsonFetch(`/api/session/${{sessionId}}`);
   const selectedKey = state.selectedIndex >= 0 ? rowStableKey(state.rows[state.selectedIndex]) : "";
   state.sessionId = sessionId;
   state.rows = rowsWithPreservedCorrections(session.rows);
-  state.labels = session.available_labels || [];
+  state.labels = session.available_labels && session.available_labels.length ? session.available_labels : [...initialAvailableLabels];
   state.lastReportPath = session.run_dir || "";
   state.lastTrainingReportPath = "";
   state.trainingJobId = "";
@@ -2507,13 +2610,7 @@ async function loadSession(sessionId) {{
   openTrainingReportButton.disabled = true;
   exportButton.disabled = !state.sessionId;
   trainingStatus.hidden = true;
-  const labels = document.getElementById("labelOptions");
-  labels.innerHTML = "";
-  state.labels.forEach(label => {{
-    const option = document.createElement("option");
-    option.value = label;
-    labels.appendChild(option);
-  }});
+  syncLabelOptions(state.labels);
     renderRows();
     if (state.selectedIndex >= 0 && state.rows[state.selectedIndex]) refreshSelectedRowDetails();
     updateCorrectionNotice();
@@ -2521,6 +2618,16 @@ async function loadSession(sessionId) {{
     setStatus(`Preview ready: ${{state.rows.length}} files. Run folder: ${{session.run_dir}}`);
     syncStickyActionDock();
   }}
+
+function syncLabelOptions(labels) {{
+  const labelOptions = document.getElementById("labelOptions");
+  labelOptions.innerHTML = "";
+  (labels || []).forEach(label => {{
+    const option = document.createElement("option");
+    option.value = label;
+    labelOptions.appendChild(option);
+  }});
+}}
 
 function renderRows() {{
   rowCountEl.textContent = `${{state.rows.length}} files`;
@@ -2769,11 +2876,12 @@ function closeCategoryChooser() {{
   function renderCategoryTree() {{
     categoryTree.innerHTML = "";
     const query = categorySearch.value.trim().toLowerCase();
-    const labels = state.labels.filter(label => !query || label.toLowerCase().includes(query));
+    const availableLabels = state.labels.length ? state.labels : initialAvailableLabels;
+    const labels = availableLabels.filter(label => !query || label.toLowerCase().includes(query));
   if (!labels.length) {{
     const empty = document.createElement("div");
     empty.className = "small";
-    empty.textContent = "No matching trained folders. Type a new category below if this sound needs one.";
+    empty.textContent = "No matching taxonomy folders. Type a new category below if this sound needs one.";
     categoryTree.appendChild(empty);
     return;
     }}
@@ -3055,10 +3163,11 @@ function escapeAttr(value) {{
 document.getElementById("chooseFolder").addEventListener("click", () => choosePath("folder", "inputPath"));
 document.getElementById("chooseFile").addEventListener("click", () => choosePath("file", "inputPath"));
 document.getElementById("chooseDestination").addEventListener("click", () => choosePath("destination", "destinationPath"));
-document.getElementById("previewButton").addEventListener("click", () => startPreview().catch(error => {{
+previewButton.addEventListener("click", () => startPreview().catch(error => {{
   setBusy(false);
   setStatus(error.message, true);
 }}));
+cancelPreviewButton.addEventListener("click", () => cancelPreview().catch(error => setStatus(error.message, true)));
 exportButton.addEventListener("click", () => exportApproved().catch(error => setStatus(error.message, true)));
 trainCorrectionsButton.addEventListener("click", () => trainBrainsFromCorrections().catch(error => setStatus(error.message, true)));
 openSortedButton.addEventListener("click", () => revealPath(state.lastSortedPath).catch(error => setStatus(error.message, true)));
@@ -3107,6 +3216,7 @@ document.getElementById("applyCategoryButton").addEventListener("click", () => a
   window.addEventListener("resize", () => updateQueueScrollbars());
   restoreDetailsPaneWidth();
   initDetailsResizer();
+  syncLabelOptions(state.labels);
   updateQueueScrollbars();
   syncStickyActionDock();
   categorySearch.addEventListener("input", () => renderCategoryTree());
