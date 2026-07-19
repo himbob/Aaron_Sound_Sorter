@@ -12,12 +12,22 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
+from aaron_audio_intelligence.physics_memory_brain import (
+    PHYSICS_MEMORY_BRAIN_NAME,
+    attach_physics_memory_to_facts,
+    merge_physics_memory_into_brain,
+)
 from aaron_audio_intelligence.shape_memory_brain import (
     SHAPE_MEMORY_BRAIN_NAME,
     SHAPE_STARTER_MEMORY_BRAIN_NAME,
     merge_shape_memory_into_brain,
 )
 from aaron_audio_intelligence.user_memory_brain import USER_MEMORY_BRAIN_NAME, merge_user_memory_into_brain
+from aaron_audio_intelligence.voter_memory_brain import (
+    VOTER_MEMORY_BRAIN_NAME,
+    attach_voter_memory_to_facts,
+    merge_voter_memory_into_brain,
+)
 from aaron_sound_sorter.domain.facts import build_shared_audio_facts
 from aaron_sound_sorter.domain.models import (
     AudioPhysics,
@@ -134,6 +144,8 @@ class SortSamplesUseCase:
         default_spread = full_path.with_name("stage4_folder_brain_spread_baby.json")
         default_outlier = full_path.with_name("stage4_folder_brain_outlier_baby.json")
         default_user_memory = full_path.with_name(USER_MEMORY_BRAIN_NAME)
+        default_physics_memory = full_path.with_name(PHYSICS_MEMORY_BRAIN_NAME)
+        default_voter_memory = full_path.with_name(VOTER_MEMORY_BRAIN_NAME)
         default_shape_starter_memory = full_path.with_name(SHAPE_STARTER_MEMORY_BRAIN_NAME)
         default_shape_memory = full_path.with_name(SHAPE_MEMORY_BRAIN_NAME)
         legacy = request.baby_brain_path or full_path.with_name("stage4_folder_brain_baby.json")
@@ -143,6 +155,8 @@ class SortSamplesUseCase:
             or (legacy if Path(legacy).expanduser().exists() else default_spread),
             "outlier_baby": request.outlier_baby_brain_path or default_outlier,
             "user_memory": request.user_memory_brain_path or default_user_memory,
+            "physics_memory": request.physics_memory_brain_path or default_physics_memory,
+            "voter_memory": request.voter_memory_brain_path or default_voter_memory,
             "shape_starter_memory": request.shape_starter_memory_brain_path or default_shape_starter_memory,
             "shape_memory": request.shape_memory_brain_path or default_shape_memory,
         }
@@ -168,6 +182,8 @@ class SortSamplesUseCase:
     ) -> None:
         """Attach all GUI correction memory lanes to the current brain view."""
         SortSamplesUseCase.attach_user_memory_brain(brain, baby_brains)
+        merge_voter_memory_into_brain(brain, baby_brains.get("voter_memory"))
+        merge_physics_memory_into_brain(brain, baby_brains.get("physics_memory"))
         merge_shape_memory_into_brain(brain, baby_brains.get("shape_starter_memory"))
         merge_shape_memory_into_brain(brain, baby_brains.get("shape_memory"))
 
@@ -293,6 +309,8 @@ class SortSamplesUseCase:
         facts.evidence["audio_analysis_packet_summary"] = analysis_packet.summary()
         facts.evidence["audio_analysis_cache_stats"] = dict(analysis_packet.cache_stats_after)
         facts.evidence["top_family_order_policy"] = family_order_policy_summary()
+        attach_voter_memory_to_facts(brain, facts)
+        attach_physics_memory_to_facts(brain, facts)
         with self.sort_timing.file_stage(audio_file, "dynamic_role_gate"):
             role_gate = dynamic_role_gate(physics, facts, brain)
         facts.evidence["dynamic_role_gate"] = role_gate.evidence()
@@ -511,11 +529,13 @@ class SortSamplesUseCase:
             facts=facts,
         )
         facts.evidence["brain_ensemble_vote_result"] = voter_result_digest(brain_votes)
+        facts.evidence["brain_ensemble_vote_1"] = brain_votes.guesses[0].folder_path if brain_votes.guesses else ""
         facts.evidence["brain_ensemble_lane_weights"] = brain_votes.diagnostics.get("lane_weights", {})
         facts.evidence["brain_ensemble_lanes_affecting_product_vote"] = brain_votes.diagnostics.get(
             "lanes_affecting_product_vote", []
         )
         physics_votes = self.voters[4].vote(physics, facts, brain)
+        facts.evidence["physics_vote_1"] = physics_votes.guesses[0].folder_path if physics_votes.guesses else ""
         for extra_voter in self.voters[5:]:
             extra_result = extra_voter.vote(physics, facts, brain)
             if extra_result.voter_name == "shape":

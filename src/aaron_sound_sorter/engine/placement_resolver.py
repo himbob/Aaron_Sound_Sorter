@@ -52,7 +52,10 @@ class PlacementResolver:
         if claim.source in {
             "final_measured_sax_loop_invariant",
             "final_measured_musical_loop_sax_depth_invariant",
+            "final_measured_voice_invariant",
             "final_measured_transition_fx_invariant",
+            "raw_contract_true_voice_instrument_over_human_voice_fx",
+            "true_voice_instrument_rehome",
         }:
             return True
         return bool(claim.source == "final_measured_branch_loop_broad_bucket" and "sax" in path)

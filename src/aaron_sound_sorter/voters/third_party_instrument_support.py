@@ -21,6 +21,7 @@ from __future__ import annotations
 from typing import Any
 
 from aaron_sound_sorter.domain.models import SharedAudioFacts
+from aaron_sound_sorter.score_math import average_score
 from aaron_sound_sorter.voters.physics_layer_utils import clamp01, inverse_ramp, ramp, safe_float
 
 
@@ -34,8 +35,7 @@ def _number(data: dict[str, Any], name: str, default: float = 0.0) -> float:
 
 
 def _mean_strength(*parts: float) -> float:
-    usable = [clamp01(part) for part in parts]
-    return float(sum(usable) / max(1, len(usable)))
+    return average_score(*parts)
 
 
 def _geo_strength(*parts: float) -> float:

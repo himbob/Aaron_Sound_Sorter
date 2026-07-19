@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from aaron_sound_sorter.domain.models import SharedAudioFacts
 from aaron_sound_sorter.engine.family_claim_arbiter import FamilyClaimArbiter
 from aaron_sound_sorter.engine.family_claims import ConsensusClaim, claim_from_folder_path
 
@@ -83,3 +84,56 @@ def test_non_final_claims_keep_existing_arbiter_behavior() -> None:
     guarded = arbiter._enforce_final_invariant_consensus_firewall(raw, competing, facts=None)
 
     assert guarded is competing
+
+
+def test_measured_short_tonal_fx_raw_survives_blocked_instrument_shortcut() -> None:
+    """Blocked old role shortcuts should not review a measured short FX blip."""
+    arbiter = FamilyClaimArbiter()
+    raw = make_claim("FX/Designed Noise FX/Beep/One Shots", score=14.0)
+    blocked = make_claim(
+        "Instruments/Keys/Wurlitzer/One Shots",
+        source="shape_sanity_consensus",
+        score=21.0,
+    )
+    measured = SharedAudioFacts(
+        is_broken_or_tiny=False,
+        is_loop_like=False,
+        is_single_event_like=False,
+        is_short_hit_like=True,
+        is_long=False,
+        evidence={
+            "shape_vote": {
+                "primary_shape": "solo_phrase",
+                "confidence": 0.88,
+                "percussive_event_ratio": 0.0,
+                "drumlike_frame_ratio": 0.0,
+            },
+            "physics_subpanels": {
+                "flat": {
+                    "fx_blip_beep_score": 0.86,
+                    "physics_subpanel_clean_tone": 0.94,
+                    "onset_pitched_onset_score": 0.93,
+                    "onset_percussive_onset_score": 0.57,
+                    "drum_hit_score": 0.34,
+                    "drum_kick_source_score": 0.42,
+                    "drum_snare_source_score": 0.38,
+                    "drum_clap_source_score": 0.37,
+                    "drum_tom_conga_source_score": 0.39,
+                    "drum_rim_stick_source_score": 0.43,
+                    "drum_cymbal_source_score": 0.26,
+                    "drum_metallic_percussion_source_score": 0.31,
+                }
+            },
+        },
+        feature_values_by_name={"duration_sec": 0.48},
+    )
+
+    final = arbiter.adjudicate(
+        raw_claim=raw,
+        consensus_claims=[],
+        eligibility_claims=[blocked],
+        facts=measured,
+    )
+
+    assert final.folder_path == "FX/Designed Noise FX/Beep/One Shots"
+    assert final.consensus_status == "strong_consensus"

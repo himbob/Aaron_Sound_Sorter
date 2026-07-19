@@ -12,13 +12,21 @@ passes filename truth into the sorter.
 
 from __future__ import annotations
 
+import os
 import shutil
 from collections.abc import Callable
 from pathlib import Path
+from types import ModuleType
+from typing import TextIO
 
 import numpy as np
 
 from tests import synthetic_audio_fixtures as fixtures
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - non-POSIX fallback
+    fcntl = None  # type: ignore[assignment]
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 LOCKED_SMOKE_AUDIO_DIR = PROJECT_ROOT / "tests" / "acceptance" / "locked_smoke_v1" / "samples"
@@ -29,6 +37,7 @@ WaveFactory = Callable[[str], np.ndarray]
 
 def pytest_sessionstart(session) -> None:  # type: ignore[no-untyped-def]
     """Materialize generated private-audio stand-ins before tests run."""
+    _acquire_pytest_session_lock(session)
     _ensure_v23_voice_short_hit_guard()
     _ensure_v24_drum_loop_steal_guard()
     _ensure_v25_transition_reverb()
@@ -36,6 +45,42 @@ def pytest_sessionstart(session) -> None:  # type: ignore[no-untyped-def]
     _ensure_v28_fx_zip_matrix()
     _ensure_uploaded_regression_audio()
     _ensure_full_thread_matrix()
+
+
+def pytest_sessionfinish(session, exitstatus: int) -> None:  # type: ignore[no-untyped-def]
+    """Release the session lock even when tests fail or are interrupted."""
+    del exitstatus
+    lock_handle: TextIO | None = getattr(session.config, "_aaron_pytest_lock_handle", None)
+    if lock_handle is None:
+        return
+    lock_module = _lock_module()
+    if lock_module is not None:
+        lock_module.flock(lock_handle.fileno(), lock_module.LOCK_UN)
+    lock_handle.close()
+
+
+def _lock_module() -> ModuleType | None:
+    """Return the POSIX lock module when file locking is available."""
+    return fcntl
+
+
+def _acquire_pytest_session_lock(session) -> None:  # type: ignore[no-untyped-def]
+    """Serialize pytest sessions that share generated fixture/report folders."""
+    if os.environ.get("AARON_PYTEST_DISABLE_SESSION_LOCK") == "1":
+        return
+    lock_module = _lock_module()
+    if lock_module is None:
+        return
+
+    lock_dir = PROJECT_ROOT / "_reports" / "pytest_locks"
+    lock_dir.mkdir(parents=True, exist_ok=True)
+    lock_handle = (lock_dir / "session.lock").open("a", encoding="utf-8")
+    try:
+        lock_module.flock(lock_handle.fileno(), lock_module.LOCK_EX | lock_module.LOCK_NB)
+    except BlockingIOError:
+        print("Another Aaron Sound Sorter pytest session is running; waiting for its generated fixtures.")
+        lock_module.flock(lock_handle.fileno(), lock_module.LOCK_EX)
+    session.config._aaron_pytest_lock_handle = lock_handle
 
 
 def _link_generated_fixture_dir(folder_name: str, samples: dict[str, WaveFactory | str]) -> None:

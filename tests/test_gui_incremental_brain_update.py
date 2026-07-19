@@ -6,8 +6,19 @@ from pathlib import Path
 
 import numpy as np
 
+from aaron_audio_intelligence.physics_memory_brain import (
+    PHYSICS_MEMORY_BRAIN_NAME,
+    PHYSICS_MEMORY_KEY,
+    attach_physics_memory_to_facts,
+    build_empty_physics_memory_brain,
+    merge_physics_memory_into_brain,
+    physics_memory_match_for_facts,
+    physics_memory_target_for_label,
+    update_physics_memory_with_row,
+)
 from aaron_audio_intelligence.shape_memory_brain import (
     SHAPE_MEMORY_BRAIN_NAME,
+    SHAPE_MEMORY_KEY,
     SHAPE_STARTER_MEMORY_BRAIN_NAME,
     build_empty_shape_memory_brain,
     merge_shape_memory_into_brain,
@@ -19,6 +30,15 @@ from aaron_audio_intelligence.user_memory_brain import (
     USER_MEMORY_BRAIN_NAME,
     build_empty_user_memory_brain,
     merge_user_memory_into_brain,
+)
+from aaron_audio_intelligence.voter_memory_brain import (
+    VOTER_MEMORY_BRAIN_NAME,
+    VOTER_MEMORY_KEY,
+    build_empty_voter_memory_brain,
+    merge_voter_memory_into_brain,
+    update_voter_memory_with_row,
+    voter_memory_match_for_facts,
+    voter_memory_role_for_label,
 )
 from aaron_sound_sorter.core import FEATURE_WEIGHTS, FP_SIZE, FeatureRow
 from aaron_sound_sorter.domain.models import AudioPhysics, SharedAudioFacts
@@ -32,9 +52,14 @@ from aaron_sound_sorter.gui.incremental_brain_update import (
     bounded_human_override_weight,
     corrections_from_import_manifest,
     dynamic_human_override_weight,
+    supersede_conflicting_label_examples,
+    supersede_conflicting_physics_examples,
+    supersede_conflicting_shape_examples,
+    supersede_conflicting_voter_examples,
     update_brain_label_with_row,
 )
 from aaron_sound_sorter.voters.brain_voter import BrainVoter
+from aaron_sound_sorter.voters.layered_physics_scorer import LayeredPhysicsScorer
 from aaron_sound_sorter.voters.physics_voter import PhysicsVoter
 from aaron_sound_sorter.voters.scoring_tools import PROFILE_FEATURES
 from aaron_sound_sorter.voters.shape_voter import ShapeVoter
@@ -195,6 +220,77 @@ def test_dynamic_human_override_weight_beats_competing_label_support() -> None:
     assert weight > 240
 
 
+def test_new_gui_correction_supersedes_same_audio_in_wrong_user_memory_label(tmp_path: Path) -> None:
+    wrong_label = "Drums/Percussion/Generic Percussion/One Shots"
+    right_label = "FX/Impacts and Hits/Generic Impact/One Shots"
+    brain = _base_brain()
+    update_brain_label_with_row(brain, _row(wrong_label, tmp_path / "old_slot.wav", value=0.42), evidence_weight=80)
+    right_row = _row(right_label, tmp_path / "new_slot.wav", value=0.42)
+
+    superseded = supersede_conflicting_label_examples(brain, right_row)
+    update_brain_label_with_row(brain, right_row, evidence_weight=240)
+
+    assert superseded == [wrong_label]
+    assert wrong_label not in brain["labels"]
+    assert wrong_label not in brain["training_examples_detailed_by_label"]
+    assert right_label in brain["labels"]
+    assert brain["incremental_gui_supersession_history"][-1]["old_target"] == wrong_label
+
+
+def test_new_gui_correction_supersedes_same_audio_in_wrong_shape_memory(tmp_path: Path) -> None:
+    wrong_label = "Drums/Kick Drums/Generic Kick/One Shots"
+    right_label = "FX/Structural and Transitional FX/Risers and Builds/Generic Riser/Long FX"
+    memory = build_empty_shape_memory_brain(_base_brain())
+    update_shape_memory_with_row(memory, _row(wrong_label, tmp_path / "kick_slot.wav", value=0.47), evidence_weight=80)
+    right_row = _row(right_label, tmp_path / "riser_slot.wav", value=0.47)
+    target_shape = shape_target_for_label(right_label, right_row.structure)
+
+    superseded = supersede_conflicting_shape_examples(memory, right_row, target_shape)
+    update_shape_memory_with_row(memory, right_row, evidence_weight=240)
+    examples_by_shape = memory[SHAPE_MEMORY_KEY]["shape_examples_by_shape"]
+
+    assert superseded
+    assert target_shape in examples_by_shape
+    assert all(
+        example["approved_label"] == right_label for examples in examples_by_shape.values() for example in examples
+    )
+
+
+def test_new_gui_correction_supersedes_same_audio_in_wrong_voter_and_physics_memory(tmp_path: Path) -> None:
+    wrong_label = "Drums/Kick Drums/Generic Kick/One Shots"
+    right_label = "FX/Impacts and Hits/Generic Impact/One Shots"
+    voter_memory = build_empty_voter_memory_brain(_base_brain())
+    physics_memory = build_empty_physics_memory_brain(_base_brain())
+    wrong_row = _row(wrong_label, tmp_path / "wrong_slot.wav", value=0.52)
+    right_row = _row(right_label, tmp_path / "right_slot.wav", value=0.52)
+    update_voter_memory_with_row(voter_memory, wrong_row, evidence_weight=80)
+    update_physics_memory_with_row(physics_memory, wrong_row, evidence_weight=80)
+
+    supersede_conflicting_voter_examples(
+        voter_memory,
+        right_row,
+        voter_memory_role_for_label(right_label, right_row.structure),
+    )
+    supersede_conflicting_physics_examples(
+        physics_memory,
+        right_row,
+        physics_memory_target_for_label(right_label, right_row.structure).key,
+    )
+    update_voter_memory_with_row(voter_memory, right_row, evidence_weight=240)
+    update_physics_memory_with_row(physics_memory, right_row, evidence_weight=240)
+
+    assert all(
+        example["approved_label"] == right_label
+        for examples in voter_memory[VOTER_MEMORY_KEY]["examples_by_role"].values()
+        for example in examples
+    )
+    assert all(
+        example["approved_label"] == right_label
+        for examples in physics_memory[PHYSICS_MEMORY_KEY]["examples_by_target"].values()
+        for example in examples
+    )
+
+
 def test_corrections_from_import_manifest_uses_duplicate_existing_as_trainable(tmp_path: Path) -> None:
     audio_path = tmp_path / "already_here.wav"
     audio_path.write_bytes(b"fake")
@@ -262,6 +358,9 @@ def test_incremental_updater_backs_up_and_updates_active_brain(
     assert summary.manifest_path.exists()
     assert "Instruments/Plucked Strings/Koto/One Shots" in updated["labels"]
     assert updated["counts"]["Instruments/Plucked Strings/Koto/One Shots"] == DEFAULT_HUMAN_OVERRIDE_EVIDENCE_WEIGHT
+    assert SHAPE_MEMORY_KEY not in updated
+    assert VOTER_MEMORY_KEY not in updated
+    assert PHYSICS_MEMORY_KEY not in updated
     assert updated["incremental_global_heads_need_full_rebuild"] is True
     assert updated["incremental_gui_update_policy"] == "weighted_prototype_fact_profile_delta_only"
 
@@ -298,6 +397,9 @@ def test_incremental_updater_creates_dedicated_user_memory_brain(
     updated_names = {result.brain_path.name for result in summary.updated_brains}
     assert memory["brain_type"] == "user_correction_memory_brain"
     assert "Instruments/Plucked Strings/Koto/One Shots" in memory["labels"]
+    assert SHAPE_MEMORY_KEY not in memory
+    assert VOTER_MEMORY_KEY not in memory
+    assert PHYSICS_MEMORY_KEY not in memory
     assert USER_MEMORY_BRAIN_NAME in updated_names
 
 
@@ -335,11 +437,96 @@ def test_incremental_updater_creates_dedicated_shape_memory_brain(
     assert memory["brain_type"] == "shape_memory_brain"
     assert "mixed_instrument_loop" in memory["labels"]
     assert payload["shape_counts_by_shape"]["mixed_instrument_loop"] == 1
+    assert VOTER_MEMORY_KEY not in memory
+    assert PHYSICS_MEMORY_KEY not in memory
     assert SHAPE_MEMORY_BRAIN_NAME in updated_names
 
 
+def test_incremental_updater_creates_dedicated_voter_memory_brain(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    brain_path = tmp_path / "stage4_folder_brain.json"
+    brain_path.write_text(json.dumps(_base_brain()), encoding="utf-8")
+    audio_path = tmp_path / "impact.wav"
+    audio_path.write_bytes(b"not real audio")
+    monkeypatch.setattr(
+        updater_module,
+        "make_fingerprint_safe",
+        lambda path: (np.asarray(_fingerprint(0.57), dtype=np.float32), 1.0, "ok"),
+    )
+    correction = IncrementalCorrection(
+        label="FX/Impacts and Hits/Generic Impact/Long FX",
+        audio_path=audio_path,
+        source_path=audio_path,
+        row_id="00001",
+        status="staged",
+    )
+
+    summary = IncrementalBrainUpdater(tmp_path, ("stage4_folder_brain.json", VOTER_MEMORY_BRAIN_NAME)).apply(
+        [correction],
+        report_dir=tmp_path / "_reports" / "gui_training_imports" / "run",
+        backup_dir=tmp_path / "_reports" / "gui_training_imports" / "run" / "brain_backups",
+    )
+
+    memory_path = tmp_path / VOTER_MEMORY_BRAIN_NAME
+    memory = json.loads(memory_path.read_text(encoding="utf-8"))
+    updated_names = {result.brain_path.name for result in summary.updated_brains}
+    assert memory["brain_type"] == "voter_memory_brain"
+    assert "fx_impact" in memory["labels"]
+    assert memory["voter_memory"]["counts_by_role"]["fx_impact"] == 1
+    assert SHAPE_MEMORY_KEY not in memory
+    assert PHYSICS_MEMORY_KEY not in memory
+    assert VOTER_MEMORY_BRAIN_NAME in updated_names
+
+
+def test_incremental_updater_creates_dedicated_physics_memory_brain(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    brain_path = tmp_path / "stage4_folder_brain.json"
+    brain_path.write_text(json.dumps(_base_brain()), encoding="utf-8")
+    audio_path = tmp_path / "spoken_voice.wav"
+    audio_path.write_bytes(b"not real audio")
+    monkeypatch.setattr(
+        updater_module,
+        "make_fingerprint_safe",
+        lambda path: (np.asarray(_fingerprint(0.61), dtype=np.float32), 1.0, "ok"),
+    )
+    correction = IncrementalCorrection(
+        label="FX/Human and Voice FX/Spoken Voice/Long FX",
+        audio_path=audio_path,
+        source_path=audio_path,
+        row_id="00001",
+        status="staged",
+    )
+
+    summary = IncrementalBrainUpdater(tmp_path, ("stage4_folder_brain.json", PHYSICS_MEMORY_BRAIN_NAME)).apply(
+        [correction],
+        report_dir=tmp_path / "_reports" / "gui_training_imports" / "run",
+        backup_dir=tmp_path / "_reports" / "gui_training_imports" / "run" / "brain_backups",
+    )
+
+    memory_path = tmp_path / PHYSICS_MEMORY_BRAIN_NAME
+    memory = json.loads(memory_path.read_text(encoding="utf-8"))
+    updated_names = {result.brain_path.name for result in summary.updated_brains}
+    assert memory["brain_type"] == "physics_memory_brain"
+    assert "FX/HumanCreatureFX" in memory["labels"]
+    assert memory["physics_memory"]["counts_by_target"]["FX/HumanCreatureFX"] == 1
+    assert SHAPE_MEMORY_KEY not in memory
+    assert VOTER_MEMORY_KEY not in memory
+    assert PHYSICS_MEMORY_BRAIN_NAME in updated_names
+
+
 def test_default_incremental_updater_does_not_mutate_shape_starter_memory() -> None:
+    assert "stage4_folder_brain.json" not in updater_module.DEFAULT_INCREMENTAL_BRAIN_NAMES
+    assert "stage4_folder_brain_core_baby.json" not in updater_module.DEFAULT_INCREMENTAL_BRAIN_NAMES
+    assert "stage4_folder_brain_spread_baby.json" not in updater_module.DEFAULT_INCREMENTAL_BRAIN_NAMES
+    assert "stage4_folder_brain_outlier_baby.json" not in updater_module.DEFAULT_INCREMENTAL_BRAIN_NAMES
+    assert USER_MEMORY_BRAIN_NAME in updater_module.DEFAULT_INCREMENTAL_BRAIN_NAMES
     assert SHAPE_MEMORY_BRAIN_NAME in updater_module.DEFAULT_INCREMENTAL_BRAIN_NAMES
+    assert VOTER_MEMORY_BRAIN_NAME in updater_module.DEFAULT_INCREMENTAL_BRAIN_NAMES
+    assert PHYSICS_MEMORY_BRAIN_NAME in updater_module.DEFAULT_INCREMENTAL_BRAIN_NAMES
     assert SHAPE_STARTER_MEMORY_BRAIN_NAME not in updater_module.DEFAULT_INCREMENTAL_BRAIN_NAMES
 
 
@@ -359,6 +546,22 @@ def test_shape_memory_target_uses_broad_taxonomy_structure() -> None:
     )
     assert shape_target_for_label("FX/Designed Noise FX/Siren/Long FX", "long_fx") == "hybrid_fx_motion"
     assert shape_target_for_label("FX/Textures/Noise and Static/Hiss/Long FX", "long_fx") == "texture_bed"
+
+
+def test_voter_memory_role_uses_supervised_label_metadata() -> None:
+    assert voter_memory_role_for_label("Instruments/Plucked Strings/Koto/One Shots") == "instrument_plucked_one_shot"
+    assert voter_memory_role_for_label("Instruments/Keys/Piano/One Shots") == "instrument_keys_one_shot"
+    assert voter_memory_role_for_label("FX/Impacts and Hits/Generic Impact/Long FX") == "fx_impact"
+    assert voter_memory_role_for_label("FX/Human and Voice FX/Spoken Voice/Long FX") == "fx_human_voice_long_fx"
+
+
+def test_physics_memory_target_uses_supervised_label_metadata() -> None:
+    assert physics_memory_target_for_label("Instruments/Voice/Vocal Loops/Loops").key == "Instruments/Voice"
+    assert physics_memory_target_for_label("FX/Human and Voice FX/Spoken Voice/Long FX").key == "FX/HumanCreatureFX"
+    assert physics_memory_target_for_label("Instruments/Plucked Strings/Koto/One Shots").key == (
+        "Instruments/PluckedString"
+    )
+    assert physics_memory_target_for_label("Drums/Drum Loops/Loops").key == "Drums/DrumLoop"
 
 
 def test_shape_memory_teaches_shape_voter_with_exact_correction(tmp_path: Path) -> None:
@@ -389,6 +592,100 @@ def test_shape_memory_does_not_fire_for_far_audio(tmp_path: Path) -> None:
 
     assert match.example_count == 1
     assert match.matched is False
+
+
+def test_voter_memory_teaches_low_level_role_with_exact_correction(tmp_path: Path) -> None:
+    label = "FX/Impacts and Hits/Generic Impact/Long FX"
+    brain = _base_brain([label])
+    memory = build_empty_voter_memory_brain(brain)
+    update_voter_memory_with_row(memory, _row(label, tmp_path / "impact.wav", value=0.60), evidence_weight=240)
+    merge_voter_memory_into_brain(brain, memory)
+
+    match = voter_memory_match_for_facts(brain, _fingerprint(0.60))
+
+    assert match.matched is True
+    assert match.role == "fx_impact"
+    assert match.top_family == "FX"
+
+
+def test_physics_memory_teaches_physics_branch_with_exact_correction(tmp_path: Path) -> None:
+    label = "Instruments/Voice/Phrase/One Shots"
+    query = _fingerprint(0.60)
+    brain = _base_brain()
+    memory = build_empty_physics_memory_brain(brain)
+    update_physics_memory_with_row(memory, _row(label, tmp_path / "voice.wav", value=0.60), evidence_weight=240)
+    merge_physics_memory_into_brain(brain, memory)
+
+    match = physics_memory_match_for_facts(brain, query)
+
+    assert match.matched is True
+    assert match.target_key == "Instruments/Voice"
+    assert match.top_family == "Instruments"
+    assert match.branch == "Voice"
+    assert match.match_kind == "fingerprint"
+
+
+def test_physics_memory_does_not_seed_from_voter_memory_when_dedicated_lane_exists(tmp_path: Path) -> None:
+    voter_label = "FX/Impacts and Hits/Generic Impact/Long FX"
+    physics_label = "Instruments/Voice/Phrase/One Shots"
+    brain = _base_brain()
+    voter_memory = build_empty_voter_memory_brain(brain)
+    physics_memory = build_empty_physics_memory_brain(brain)
+    update_voter_memory_with_row(
+        voter_memory, _row(voter_label, tmp_path / "impact.wav", value=0.62), evidence_weight=240
+    )
+    update_physics_memory_with_row(
+        physics_memory,
+        _row(physics_label, tmp_path / "voice.wav", value=0.40),
+        evidence_weight=240,
+    )
+
+    merge_voter_memory_into_brain(brain, voter_memory)
+    merge_physics_memory_into_brain(brain, physics_memory)
+
+    payload = brain[PHYSICS_MEMORY_KEY]
+    assert physics_memory_target_for_label(physics_label).key in payload["examples_by_target"]
+    assert physics_memory_target_for_label(voter_label).key not in payload["examples_by_target"]
+    assert brain["_physics_memory_brain_loaded"] is True
+
+
+def test_physics_memory_can_migrate_legacy_voter_memory_when_no_dedicated_lane_exists(tmp_path: Path) -> None:
+    voter_label = "FX/Impacts and Hits/Generic Impact/Long FX"
+    brain = _base_brain()
+    voter_memory = build_empty_voter_memory_brain(brain)
+    update_voter_memory_with_row(
+        voter_memory, _row(voter_label, tmp_path / "impact.wav", value=0.62), evidence_weight=240
+    )
+
+    merge_voter_memory_into_brain(brain, voter_memory)
+    merge_physics_memory_into_brain(brain, None)
+
+    payload = brain[PHYSICS_MEMORY_KEY]
+    assert physics_memory_target_for_label(voter_label).key in payload["examples_by_target"]
+    assert brain["_physics_memory_brain_loaded"] is False
+
+
+def test_physics_memory_calibrates_layered_physics_scoring(tmp_path: Path) -> None:
+    label = "Instruments/Voice/Phrase/One Shots"
+    competitor = "Drums/Drum Loops/Loops"
+    query = _fingerprint(0.62)
+    brain = _base_brain()
+    memory = build_empty_physics_memory_brain(brain)
+    update_physics_memory_with_row(memory, _row(label, tmp_path / "voice.wav", value=0.62), evidence_weight=240)
+    merge_physics_memory_into_brain(brain, memory)
+    facts = _facts_for_vector(query)
+    attach_physics_memory_to_facts(brain, facts)
+    scorer = LayeredPhysicsScorer()
+    decision = scorer.analyze(facts)
+
+    voice_score, voice_evidence = scorer.apply(label, 0.90, decision)
+    drum_score, drum_evidence = scorer.apply(competitor, 0.90, decision)
+
+    assert decision.top_family == "Instruments"
+    assert decision.branch == "Voice"
+    assert voice_score < drum_score
+    assert voice_evidence["physics_memory_score_calibration"] == "applied"
+    assert drum_evidence["physics_memory_score_calibration"] == "applied"
 
 
 def test_incremental_updater_uses_dynamic_competitor_aware_weight(

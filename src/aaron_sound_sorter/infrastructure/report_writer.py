@@ -143,6 +143,41 @@ PHYSICS_SUBPANEL_MANIFEST_FIELDS = [
     *CATEGORY_PANEL_MANIFEST_FIELDS,
 ]
 
+LEARNED_VOTER_MEMORY_MANIFEST_FIELDS = [
+    "learned_voter_memory_enabled",
+    "learned_voter_memory_matched",
+    "learned_voter_memory_role",
+    "learned_voter_memory_top_family",
+    "learned_voter_memory_label",
+    "learned_voter_memory_shape",
+    "learned_voter_memory_confidence",
+    "learned_voter_memory_nearest_distance",
+    "learned_voter_memory_threshold",
+    "learned_voter_memory_example_count",
+    "learned_voter_memory_effective_weight",
+    "learned_voter_memory_match_kind",
+    "learned_voter_memory_policy",
+    "learned_voter_memory_json",
+]
+
+LEARNED_PHYSICS_MEMORY_MANIFEST_FIELDS = [
+    "learned_physics_memory_enabled",
+    "learned_physics_memory_matched",
+    "learned_physics_memory_target_key",
+    "learned_physics_memory_top_family",
+    "learned_physics_memory_branch",
+    "learned_physics_memory_label",
+    "learned_physics_memory_shape",
+    "learned_physics_memory_confidence",
+    "learned_physics_memory_nearest_distance",
+    "learned_physics_memory_threshold",
+    "learned_physics_memory_example_count",
+    "learned_physics_memory_effective_weight",
+    "learned_physics_memory_match_kind",
+    "learned_physics_memory_policy",
+    "learned_physics_memory_json",
+]
+
 
 class SortReportWriter:
     """Write user-facing sort outputs."""
@@ -268,6 +303,8 @@ def write_manifest(path: Path, file_results: list[SortFileResult]) -> None:
         "shape_vote",
         "shape_confidence",
         "shape_vote_json",
+        *LEARNED_VOTER_MEMORY_MANIFEST_FIELDS,
+        *LEARNED_PHYSICS_MEMORY_MANIFEST_FIELDS,
         *PHYSICS_SUBPANEL_MANIFEST_FIELDS,
         "physics_subpanels_json",
         "parent_role_audit_json",
@@ -291,6 +328,36 @@ def physics_subpanel_manifest_values(facts_evidence: dict[str, Any]) -> dict[str
     for field in PHYSICS_SUBPANEL_MANIFEST_FIELDS:
         value = flat.get(field, facts_evidence.get(field, "") if isinstance(facts_evidence, dict) else "")
         row[field] = str(value)
+    return row
+
+
+def learned_voter_memory_manifest_values(facts_evidence: dict[str, Any]) -> dict[str, str]:
+    """Return flattened learned-voter-memory manifest columns."""
+    memory = facts_evidence.get("learned_voter_memory", {}) if isinstance(facts_evidence, dict) else {}
+    if not isinstance(memory, dict):
+        memory = {}
+    row: dict[str, str] = {}
+    for field in LEARNED_VOTER_MEMORY_MANIFEST_FIELDS:
+        if field == "learned_voter_memory_json":
+            continue
+        memory_key = field.removeprefix("learned_voter_memory_")
+        row[field] = str(memory.get(memory_key, ""))
+    row["learned_voter_memory_json"] = json.dumps(memory, sort_keys=True, default=str)
+    return row
+
+
+def learned_physics_memory_manifest_values(facts_evidence: dict[str, Any]) -> dict[str, str]:
+    """Return flattened learned-physics-memory manifest columns."""
+    memory = facts_evidence.get("learned_physics_memory", {}) if isinstance(facts_evidence, dict) else {}
+    if not isinstance(memory, dict):
+        memory = {}
+    row: dict[str, str] = {}
+    for field in LEARNED_PHYSICS_MEMORY_MANIFEST_FIELDS:
+        if field == "learned_physics_memory_json":
+            continue
+        memory_key = field.removeprefix("learned_physics_memory_")
+        row[field] = str(memory.get(memory_key, ""))
+    row["learned_physics_memory_json"] = json.dumps(memory, sort_keys=True, default=str)
     return row
 
 
@@ -366,6 +433,8 @@ def compact_shared_facts(facts_evidence: dict[str, Any]) -> dict[str, Any]:
         "wetness_score": (facts_evidence.get("wetness_profile", {}) or {}).get("wetness_score", "")
         if isinstance(facts_evidence.get("wetness_profile", {}), dict)
         else "",
+        "learned_voter_memory": facts_evidence.get("learned_voter_memory", {}),
+        "learned_physics_memory": facts_evidence.get("learned_physics_memory", {}),
         "physics_vote_1": compact_top_guess(facts_evidence.get("physics_vote_result", {})),
         "brain_ensemble_vote_1": compact_top_guess(facts_evidence.get("brain_ensemble_vote_result", {})),
     }
@@ -487,40 +556,17 @@ def brain_lane_agreement(
 
 def manifest_row(result: SortFileResult) -> dict[str, str]:
     """Return one manifest row."""
+    facts_evidence = result.facts.evidence if isinstance(result.facts.evidence, dict) else {}
     brain_first = result.brain_votes.guesses[0].label if result.brain_votes.guesses else ""
-    full_digest = (
-        result.facts.evidence.get("full_brain_vote_result", {}) if isinstance(result.facts.evidence, dict) else {}
-    )
-    baby_digest = (
-        result.facts.evidence.get("baby_brain_vote_result", {}) if isinstance(result.facts.evidence, dict) else {}
-    )
-    core_digest = (
-        result.facts.evidence.get("core_baby_vote_result", {}) if isinstance(result.facts.evidence, dict) else {}
-    )
-    spread_digest = (
-        result.facts.evidence.get("spread_baby_vote_result", {}) if isinstance(result.facts.evidence, dict) else {}
-    )
-    outlier_digest = (
-        result.facts.evidence.get("outlier_baby_vote_result", {}) if isinstance(result.facts.evidence, dict) else {}
-    )
-    harmonic_core_digest = (
-        result.facts.evidence.get("harmonic_core_baby_vote_result", {})
-        if isinstance(result.facts.evidence, dict)
-        else {}
-    )
-    harmonic_spread_digest = (
-        result.facts.evidence.get("harmonic_spread_baby_vote_result", {})
-        if isinstance(result.facts.evidence, dict)
-        else {}
-    )
-    harmonic_outlier_digest = (
-        result.facts.evidence.get("harmonic_outlier_baby_vote_result", {})
-        if isinstance(result.facts.evidence, dict)
-        else {}
-    )
-    ensemble_digest = (
-        result.facts.evidence.get("brain_ensemble_vote_result", {}) if isinstance(result.facts.evidence, dict) else {}
-    )
+    full_digest = facts_evidence.get("full_brain_vote_result", {})
+    baby_digest = facts_evidence.get("baby_brain_vote_result", {})
+    core_digest = facts_evidence.get("core_baby_vote_result", {})
+    spread_digest = facts_evidence.get("spread_baby_vote_result", {})
+    outlier_digest = facts_evidence.get("outlier_baby_vote_result", {})
+    harmonic_core_digest = facts_evidence.get("harmonic_core_baby_vote_result", {})
+    harmonic_spread_digest = facts_evidence.get("harmonic_spread_baby_vote_result", {})
+    harmonic_outlier_digest = facts_evidence.get("harmonic_outlier_baby_vote_result", {})
+    ensemble_digest = facts_evidence.get("brain_ensemble_vote_result", {})
     full_top = ""
     baby_top = ""
     baby_enabled = ""
@@ -573,12 +619,15 @@ def manifest_row(result: SortFileResult) -> dict[str, str]:
     harmonic_core_top, harmonic_core_enabled = _lane_top_and_enabled(harmonic_core_digest)
     harmonic_spread_top, harmonic_spread_enabled = _lane_top_and_enabled(harmonic_spread_digest)
     harmonic_outlier_top, harmonic_outlier_enabled = _lane_top_and_enabled(harmonic_outlier_digest)
-    wet_profile = result.facts.evidence.get("wetness_profile", {}) if isinstance(result.facts.evidence, dict) else {}
+    wet_profile = facts_evidence.get("wetness_profile", {})
     wetness_score = ""
     if isinstance(wet_profile, dict):
         wetness_score = str(wet_profile.get("wetness_score", ""))
-    physics_first = result.physics_votes.guesses[0].label if result.physics_votes.guesses else ""
-    shape_vote = result.facts.evidence.get("shape_vote", {}) if isinstance(result.facts.evidence, dict) else {}
+    physics_top_guess = compact_top_guess(facts_evidence.get("physics_vote_result", {}))
+    physics_first = str(physics_top_guess.get("label", ""))
+    if not physics_first:
+        physics_first = result.physics_votes.guesses[0].label if result.physics_votes.guesses else ""
+    shape_vote = facts_evidence.get("shape_vote", {})
     if not isinstance(shape_vote, dict):
         shape_vote = {}
     lane_agreement = brain_lane_agreement(
@@ -651,35 +700,29 @@ def manifest_row(result: SortFileResult) -> dict[str, str]:
         "harmonic_outlier_baby_vote_1": harmonic_outlier_top,
         "harmonic_outlier_baby_enabled": harmonic_outlier_enabled,
         "wetness_score": wetness_score,
-        "harmonic_core_recall_enabled": str(result.facts.evidence.get("harmonic_core_recall_enabled", ""))
-        if isinstance(result.facts.evidence, dict)
-        else "",
-        "harmonic_core_recall_reason": str(result.facts.evidence.get("harmonic_core_recall_reason", ""))
-        if isinstance(result.facts.evidence, dict)
-        else "",
-        "baby_brains_affect_product_vote": str(result.facts.evidence.get("baby_brains_affect_product_vote", ""))
-        if isinstance(result.facts.evidence, dict)
-        else "",
-        "harmonic_brains_affect_product_vote": str(result.facts.evidence.get("harmonic_brains_affect_product_vote", ""))
-        if isinstance(result.facts.evidence, dict)
-        else "",
+        "harmonic_core_recall_enabled": str(facts_evidence.get("harmonic_core_recall_enabled", "")),
+        "harmonic_core_recall_reason": str(facts_evidence.get("harmonic_core_recall_reason", "")),
+        "baby_brains_affect_product_vote": str(facts_evidence.get("baby_brains_affect_product_vote", "")),
+        "harmonic_brains_affect_product_vote": str(facts_evidence.get("harmonic_brains_affect_product_vote", "")),
         "physics_vote_1": physics_first,
         "shape_vote": str(shape_vote.get("primary_shape", "")),
         "shape_confidence": str(shape_vote.get("confidence", "")),
         "shape_vote_json": json.dumps(shape_vote, sort_keys=True),
-        **physics_subpanel_manifest_values(result.facts.evidence if isinstance(result.facts.evidence, dict) else {}),
+        **learned_voter_memory_manifest_values(facts_evidence),
+        **learned_physics_memory_manifest_values(facts_evidence),
+        **physics_subpanel_manifest_values(facts_evidence),
         "physics_subpanels_json": json.dumps(
-            compact_physics_subpanels(result.facts.evidence if isinstance(result.facts.evidence, dict) else {}),
+            compact_physics_subpanels(facts_evidence),
             sort_keys=True,
             default=str,
         ),
         "parent_role_audit_json": json.dumps(
-            compact_parent_role_audit(result.facts.evidence if isinstance(result.facts.evidence, dict) else {}),
+            compact_parent_role_audit(facts_evidence),
             sort_keys=True,
             default=str,
         ),
         "shared_facts_json": json.dumps(
-            compact_shared_facts(result.facts.evidence if isinstance(result.facts.evidence, dict) else {}),
+            compact_shared_facts(facts_evidence),
             sort_keys=True,
             default=str,
         ),

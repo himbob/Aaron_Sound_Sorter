@@ -50,15 +50,24 @@ class LayeredPhysicsScorer:
         else:
             branch, branch_confidence, branch_evidence = self.branch_layer.decide(top_family, facts)
         category_evidence = self.category_panel_evidence(facts)
+        memory_evidence = self.voter_memory_evidence(facts)
+        physics_memory_evidence = self.physics_memory_evidence(facts)
         base_decision = PhysicsLayerDecision(
             top_family=top_family,
             top_confidence=top_confidence,
             branch=branch,
             branch_confidence=branch_confidence,
             leaf_strategy="",
-            evidence={**top_evidence, **branch_evidence, **category_evidence},
+            evidence={
+                **top_evidence,
+                **branch_evidence,
+                **category_evidence,
+                **memory_evidence,
+                **physics_memory_evidence,
+            },
         )
-        return replace(base_decision, leaf_strategy=self.leaf_layer.strategy(base_decision))
+        learned_decision = self.apply_physics_memory_decision(base_decision)
+        return replace(learned_decision, leaf_strategy=self.leaf_layer.strategy(learned_decision))
 
     def category_panel_evidence(self, facts: SharedAudioFacts) -> dict[str, Any]:
         """Extract category panel evidence from SharedAudioFacts for leaf scoring."""
@@ -78,11 +87,114 @@ class LayeredPhysicsScorer:
             "physics_category_panel_coverage": coverage if isinstance(coverage, dict) else {},
         }
 
+    def voter_memory_evidence(self, facts: SharedAudioFacts) -> dict[str, Any]:
+        """Extract learned voter-memory evidence from shared facts."""
+        evidence = getattr(facts, "evidence", {})
+        if not isinstance(evidence, dict):
+            return {"learned_voter_memory": {"enabled": False}}
+        memory = evidence.get("learned_voter_memory", {})
+        if not isinstance(memory, dict):
+            return {"learned_voter_memory": {"enabled": False}}
+        return {"learned_voter_memory": memory}
+
+    def physics_memory_evidence(self, facts: SharedAudioFacts) -> dict[str, Any]:
+        """Extract learned physics-memory evidence from shared facts."""
+        evidence = getattr(facts, "evidence", {})
+        if not isinstance(evidence, dict):
+            return {"learned_physics_memory": {"enabled": False}}
+        memory = evidence.get("learned_physics_memory", {})
+        if not isinstance(memory, dict):
+            return {"learned_physics_memory": {"enabled": False}}
+        return {"learned_physics_memory": memory}
+
+    def apply_physics_memory_decision(self, decision: PhysicsLayerDecision) -> PhysicsLayerDecision:
+        """Let trained physics memory calibrate the top/branch decision.
+
+        The memory brain is allowed to correct weak or unresolved static
+        physics decisions. It is deliberately more conservative when static
+        physics has a strong contradictory top-family read, unless the match is
+        an exact human-taught fingerprint.
+        """
+        memory = decision.evidence.get("learned_physics_memory", {})
+        if not isinstance(memory, dict) or not bool(memory.get("matched")):
+            return decision
+        confidence = safe_float(memory.get("confidence"), 0.0)
+        if confidence < 0.74:
+            return decision
+        target_top = str(memory.get("top_family", ""))
+        target_branch = str(memory.get("branch", ""))
+        match_kind = str(memory.get("match_kind", ""))
+        exact_or_strong = bool(match_kind == "fingerprint" or confidence >= 0.88)
+        top_can_change = bool(
+            target_top in {"Drums", "Instruments", "FX"}
+            and (
+                target_top == decision.top_family
+                or decision.top_family not in {"Drums", "Instruments", "FX"}
+                or decision.top_confidence < 0.86
+                or exact_or_strong
+            )
+        )
+        top_family = target_top if top_can_change else decision.top_family
+        top_confidence = float(decision.top_confidence)
+        branch = str(decision.branch)
+        branch_confidence = float(decision.branch_confidence)
+        reasons: list[str] = []
+        if top_can_change:
+            if target_top != decision.top_family:
+                reasons.append(f"learned_physics_memory_top:{decision.top_family}->{target_top}")
+            static_top_confidence = top_confidence if target_top == decision.top_family else 0.0
+            top_confidence = max(
+                static_top_confidence,
+                min(0.97, 0.72 + 0.23 * confidence),
+            )
+        if (
+            target_branch
+            and target_top == top_family
+            and (branch == target_branch or branch == "Unresolved" or branch_confidence < 0.78 or exact_or_strong)
+        ):
+            if target_branch != branch:
+                reasons.append(f"learned_physics_memory_branch:{branch}->{target_branch}")
+            branch = target_branch
+            static_branch_confidence = branch_confidence if branch == decision.branch else 0.0
+            branch_confidence = max(
+                static_branch_confidence,
+                min(0.97, 0.70 + 0.24 * confidence),
+            )
+        if not reasons:
+            return decision
+        evidence = {
+            **decision.evidence,
+            "physics_memory_decision_calibration": "applied",
+            "physics_memory_decision_reasons": reasons,
+            "physics_memory_decision_static_top_family": decision.top_family,
+            "physics_memory_decision_static_branch": decision.branch,
+        }
+        return replace(
+            decision,
+            top_family=top_family,
+            top_confidence=round(float(top_confidence), 6),
+            branch=branch,
+            branch_confidence=round(float(branch_confidence), 6),
+            evidence=evidence,
+        )
+
     def apply(self, folder_path: str, score: float, decision: PhysicsLayerDecision) -> tuple[float, dict[str, Any]]:
         folder = normalized_path(folder_path)
         candidate_top_family = folder.split("/", 1)[0] if folder else ""
         adjusted = float(score)
         reasons: list[str] = []
+        adjusted, memory_reasons, memory_evidence = self.apply_voter_memory_calibration(
+            folder,
+            adjusted,
+            decision,
+        )
+        reasons.extend(memory_reasons)
+        adjusted, physics_memory_reasons, physics_memory_evidence = self.apply_physics_memory_calibration(
+            folder,
+            adjusted,
+            decision,
+        )
+        reasons.extend(physics_memory_reasons)
         top_family_gate = (
             0.68 if decision.top_family == "Drums" else (0.74 if decision.top_family == "Instruments" else 0.78)
         )
@@ -160,6 +272,8 @@ class LayeredPhysicsScorer:
         reasons.extend(category_reasons)
         return max(0.0, adjusted), {
             **category_evidence,
+            **memory_evidence,
+            **physics_memory_evidence,
             **decision.evidence,
             "physics_layer_top_family": decision.top_family,
             "physics_layer_top_confidence": round(float(decision.top_confidence), 6),
@@ -170,6 +284,116 @@ class LayeredPhysicsScorer:
             "physics_layer_score_after": round(float(adjusted), 6),
             "physics_layer_adjustment_reasons": reasons,
         }
+
+    def apply_voter_memory_calibration(
+        self,
+        folder: str,
+        score: float,
+        decision: PhysicsLayerDecision,
+    ) -> tuple[float, list[str], dict[str, Any]]:
+        """Blend learned role memory into physics scoring without routing.
+
+        The learned voter-memory lane is a calibration witness.  It can make
+        same-family candidates slightly easier to rank and make cross-family
+        candidates slightly harder when the fingerprint is very close to a
+        human-taught role.  It cannot force a folder or bypass eligibility.
+        """
+        memory = decision.evidence.get("learned_voter_memory", {})
+        if not isinstance(memory, dict) or not bool(memory.get("matched")):
+            return score, [], {"voter_memory_physics_calibration": "not_matched"}
+        confidence = safe_float(memory.get("confidence"), 0.0)
+        if confidence < 0.72:
+            return score, [], {"voter_memory_physics_calibration": "below_confidence_gate"}
+        target_top = str(memory.get("top_family", ""))
+        target_label = normalized_path(str(memory.get("label", "")))
+        role = str(memory.get("role", ""))
+        candidate_top = folder.split("/", 1)[0] if folder else ""
+        adjusted = float(score)
+        reasons: list[str] = []
+        if target_top and candidate_top == target_top:
+            pull = 0.10 + 0.22 * min(1.0, confidence)
+            if target_label and folder == target_label and confidence >= 0.78:
+                pull += 0.18
+            adjusted = max(0.0, adjusted - pull)
+            reasons.append(f"learned_voter_memory_same_family:{role}:-{pull:.2f}")
+        elif target_top and confidence >= 0.86 and target_top in {"Drums", "Instruments", "FX"}:
+            penalty = 0.10 + 0.24 * min(1.0, confidence)
+            adjusted += penalty
+            reasons.append(f"learned_voter_memory_family_conflict:{role}:+{penalty:.2f}")
+        return (
+            adjusted,
+            reasons,
+            {
+                "voter_memory_physics_calibration": "applied" if reasons else "no_family_target",
+                "voter_memory_physics_score_before": round(float(score), 6),
+                "voter_memory_physics_score_after": round(float(adjusted), 6),
+                "voter_memory_physics_role": role,
+                "voter_memory_physics_confidence": round(float(confidence), 6),
+            },
+        )
+
+    def apply_physics_memory_calibration(
+        self,
+        folder: str,
+        score: float,
+        decision: PhysicsLayerDecision,
+    ) -> tuple[float, list[str], dict[str, Any]]:
+        """Blend learned PhysicsVoter memory into candidate scoring."""
+        memory = decision.evidence.get("learned_physics_memory", {})
+        if not isinstance(memory, dict) or not bool(memory.get("matched")):
+            return score, [], {"physics_memory_score_calibration": "not_matched"}
+        confidence = safe_float(memory.get("confidence"), 0.0)
+        if confidence < 0.70:
+            return score, [], {"physics_memory_score_calibration": "below_confidence_gate"}
+        target_top = str(memory.get("top_family", ""))
+        target_branch = str(memory.get("branch", ""))
+        target_label = normalized_path(str(memory.get("label", "")))
+        match_kind = str(memory.get("match_kind", ""))
+        candidate_top = folder.split("/", 1)[0] if folder else ""
+        adjusted = float(score)
+        reasons: list[str] = []
+        if target_label and folder == target_label:
+            pull = 0.24 + 0.42 * min(1.0, confidence)
+            adjusted = max(0.0, adjusted - pull)
+            if match_kind == "fingerprint" or confidence >= 0.92:
+                teacher_score = max(0.015, 0.16 * (1.0 - min(1.0, confidence)))
+                adjusted = min(adjusted, teacher_score)
+                reasons.append(f"learned_physics_memory_exact_teacher:{target_branch}:={teacher_score:.3f}")
+            else:
+                reasons.append(f"learned_physics_memory_exact_label:{target_branch}:-{pull:.2f}")
+        elif target_top and candidate_top == target_top:
+            branch_matches = self.candidate_matches_physics_memory_branch(folder, target_top, target_branch)
+            pull = 0.12 + 0.22 * min(1.0, confidence)
+            if branch_matches:
+                pull += 0.14
+            adjusted = max(0.0, adjusted - pull)
+            reason_name = "branch" if branch_matches else "same_family"
+            reasons.append(f"learned_physics_memory_{reason_name}:{target_branch}:-{pull:.2f}")
+        elif target_top and confidence >= 0.78 and target_top in {"Drums", "Instruments", "FX"}:
+            penalty = 0.12 + 0.28 * min(1.0, confidence)
+            adjusted += penalty
+            reasons.append(f"learned_physics_memory_family_conflict:{target_branch}:+{penalty:.2f}")
+        return (
+            adjusted,
+            reasons,
+            {
+                "physics_memory_score_calibration": "applied" if reasons else "no_family_target",
+                "physics_memory_score_before": round(float(score), 6),
+                "physics_memory_score_after": round(float(adjusted), 6),
+                "physics_memory_score_branch": target_branch,
+                "physics_memory_score_confidence": round(float(confidence), 6),
+            },
+        )
+
+    def candidate_matches_physics_memory_branch(self, folder: str, top_family: str, branch: str) -> bool:
+        """Return whether a candidate label matches the learned branch."""
+        if top_family == "Drums":
+            return drum_candidate_matches_branch(folder, branch)
+        if top_family == "Instruments":
+            return instrument_candidate_matches_branch(folder, branch)
+        if top_family == "FX":
+            return fx_candidate_matches_branch(folder, branch)
+        return False
 
     def apply_instrument_branch(
         self, folder: str, score: float, decision: PhysicsLayerDecision

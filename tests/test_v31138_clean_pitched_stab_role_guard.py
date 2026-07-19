@@ -1,17 +1,9 @@
 from __future__ import annotations
 
-import csv
-import shutil
-import subprocess
-import sys
-from pathlib import Path
-
 from aaron_sound_sorter.domain.roles import measured_roles_from_features
+from tests.sorter_harness import REGRESSION_AUDIO_DIR, row_label, run_regression_sample
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-SORTER = PROJECT_ROOT / "Aaron_Sound_Sorter.py"
-AUDIO_DIR = PROJECT_ROOT / "tests" / "regression_audio"
-OUT_ROOT = PROJECT_ROOT / "_pytest_regression_outputs" / "v31138_clean_pitched_stab"
+AUDIO_DIR = REGRESSION_AUDIO_DIR
 
 
 def test_clean_low_mid_pitched_stab_is_not_measured_as_drum_one_shot() -> None:
@@ -165,33 +157,13 @@ def test_short_repeated_low_sub_kick_does_not_get_music_phrase_role() -> None:
 
 
 def test_uploaded_chord_stab_routes_to_instruments_not_drums() -> None:
-    sample = AUDIO_DIR / "Chord 1_G.wav"
-    assert sample.exists(), sample
-    out_dir = OUT_ROOT / "chord_1_g"
-    if out_dir.exists():
-        shutil.rmtree(out_dir, ignore_errors=True)
-    out_dir.parent.mkdir(parents=True, exist_ok=True)
-    result = subprocess.run(
-        [
-            sys.executable,
-            str(SORTER),
-            "sort",
-            str(sample),
-            str(out_dir),
-            "--no-zip",
-            "--workers",
-            "1",
-        ],
-        cwd=PROJECT_ROOT,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
+    row = run_regression_sample(
+        "Chord 1_G.wav",
+        output_key="v31138_clean_pitched_stab",
+        audio_dir=AUDIO_DIR,
         timeout=90,
     )
-    assert result.returncode == 0, result.stdout
-    manifest = out_dir / "Aaron_Sorted_Sounds_manifest.csv"
-    row = list(csv.DictReader(manifest.open(encoding="utf-8")))[0]
-    label = (row.get("final_label") or row.get("new_relative_path") or "").replace("\\", "/")
+    label = row_label(row)
     assert label.startswith("Instruments/"), label
     assert label.startswith(("Instruments/Keys/", "Instruments/Synths/")), label
     assert "Drums/" not in label, label

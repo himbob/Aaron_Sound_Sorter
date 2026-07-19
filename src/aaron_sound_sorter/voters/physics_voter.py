@@ -25,7 +25,10 @@ from aaron_sound_sorter.features import (
     trim_and_normalize,
 )
 from aaron_sound_sorter.voters.base import Voter
-from aaron_sound_sorter.voters.human_override_recall import human_override_recall_match
+from aaron_sound_sorter.voters.human_override_recall import (
+    human_override_recall_allowed_by_memory,
+    human_override_recall_match,
+)
 from aaron_sound_sorter.voters.physics_layers import LayeredPhysicsScorer
 from aaron_sound_sorter.voters.scoring_tools import (
     feature_weights,
@@ -1667,8 +1670,11 @@ class PhysicsVoter(Voter):
                 feature_weight_vector=weights,
             )
             human_override_evidence = human_override.evidence()
-            if human_override.matched:
+            human_override_allowed = human_override_recall_allowed_by_memory(folder_path, facts)
+            if human_override.matched and human_override_allowed:
                 score = min(float(score), float(human_override.ranking_score))
+            elif human_override.matched:
+                human_override_evidence["human_override_suppressed_by_learned_memory_conflict"] = True
             rows.append(
                 {
                     "label": label,

@@ -500,6 +500,41 @@ def test_all_current_brain_category_panels_are_present() -> None:
         assert 0.0 <= float(flat[spec.score_key]) <= 1.0
 
 
+def test_struck_wood_one_shot_panel_supports_claves_and_wood_blocks() -> None:
+    """Dry wood-click evidence should have a Claves/Wood Blocks leaf witness."""
+    facts = make_facts(
+        log_transient_count=float(np.log1p(2.0)),
+        onset_span_ratio=0.10,
+        event_rate_hz=2.0,
+        attack_rise_time_norm=0.004,
+        temporal_centroid_ratio=0.10,
+        tail_energy_ratio=0.12,
+        spectral_flatness_mean=0.22,
+        spectral_entropy_mean=0.46,
+        mid_ratio_500_2000hz=0.42,
+        presence_ratio_2000_8000hz=0.26,
+        air_ratio_gt_8000hz=0.06,
+        sub_bass_ratio_lt_150hz=0.02,
+        bass_ratio_150_500hz=0.08,
+        pitch_confidence=0.38,
+        harmonic_energy_ratio=0.24,
+        inharmonicity=0.22,
+        log_crest=2.20,
+        attack_noise_ratio=0.25,
+        attack_high_ratio=0.26,
+        noise_burst_duration_ms=80.0,
+        zcr_mean=0.18,
+        spectral_peak_stability=0.46,
+    )
+    flat = facts.evidence["physics_subpanels"]["flat"]
+
+    clave_score = flat["drums_rims_and_sticks_claves_and_wood_blocks_one_shots_score"]
+
+    assert clave_score >= flat["drums_rims_and_sticks_rimshot_one_shots_score"] - 0.02
+    assert clave_score > flat["drums_rims_and_sticks_claves_and_wood_blocks_loops_score"]
+    assert clave_score > flat["drums_hi_hats_closed_hat_one_shots_score"]
+
+
 def test_pitched_repetition_subpanel_suppresses_weak_drum_loop_source() -> None:
     """Tonal repeated phrases should not become drum loops from repetition alone."""
     facts = make_facts(

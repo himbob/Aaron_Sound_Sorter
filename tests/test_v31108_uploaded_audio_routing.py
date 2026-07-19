@@ -1,52 +1,10 @@
 from __future__ import annotations
 
-import csv
-import shutil
-import subprocess
-import sys
-from pathlib import Path
-
-import pytest
-
-csv.field_size_limit(sys.maxsize)
-
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-SORTER = PROJECT_ROOT / "Aaron_Sound_Sorter.py"
-AUDIO_DIR = PROJECT_ROOT / "tests" / "regression_audio"
-OUT_ROOT = PROJECT_ROOT / "_pytest_regression_outputs" / "v31108_uploaded_audio"
+from tests.sorter_harness import row_label, run_regression_sample
 
 
 def _run_one(sample_name: str) -> str:
-    sample = AUDIO_DIR / sample_name
-    if not sample.exists():
-        pytest.skip(f"missing regression audio: {sample}")
-    out_dir = OUT_ROOT / sample.stem.replace(" ", "_")
-    if out_dir.exists():
-        shutil.rmtree(out_dir, ignore_errors=True)
-    out_dir.parent.mkdir(parents=True, exist_ok=True)
-    cmd = [
-        sys.executable,
-        str(SORTER),
-        "sort",
-        str(sample),
-        str(out_dir),
-        "--no-zip",
-        "--workers",
-        "1",
-    ]
-    result = subprocess.run(
-        cmd,
-        cwd=PROJECT_ROOT,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        timeout=75,
-    )
-    assert result.returncode == 0, result.stdout
-    manifest = out_dir / "Aaron_Sorted_Sounds_manifest.csv"
-    assert manifest.exists(), result.stdout
-    row = list(csv.DictReader(manifest.open(encoding="utf-8")))[0]
-    return (row.get("final_label") or row.get("new_relative_path") or "").replace("\\", "/")
+    return row_label(run_regression_sample(sample_name, output_key="v31108_uploaded_audio"))
 
 
 def test_uploaded_synth_bells_loop_is_not_voice() -> None:

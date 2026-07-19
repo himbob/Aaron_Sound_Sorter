@@ -135,6 +135,8 @@ class TrainingImportSummary:
         manifest_path: CSV manifest for staged and skipped corrections.
         correction_evidence_path: JSONL evidence pack for the same corrections.
         staged_count: Number of corrected audio files copied into training.
+        reused_existing_count: Number of byte-identical corrected files already
+            present in the approved training slot. These rows are trainable.
         skipped_count: Number of corrected rows skipped with a reason.
         staged_paths: Training-file paths created by the import.
         errors: Non-fatal per-row import errors.
@@ -148,6 +150,7 @@ class TrainingImportSummary:
     manifest_path: Path
     correction_evidence_path: Path
     staged_count: int
+    reused_existing_count: int
     skipped_count: int
     staged_paths: list[Path]
     errors: list[str]

@@ -23,6 +23,8 @@ build/
 
 # Large generated brain files
 stage4_folder_brain*.json
+stage4_physics_memory_brain*.json
+stage4_voter_memory_brain*.json
 stage4_shape_memory_brain*.json
 stage4_shape_memory_starter_brain*.json
 

@@ -11,7 +11,21 @@ from __future__ import annotations
 from typing import Any
 
 from aaron_sound_sorter.domain.models import SharedAudioFacts
-from aaron_sound_sorter.voters.physics_layer_utils import *
+from aaron_sound_sorter.score_math import average_score
+from aaron_sound_sorter.voters.physics_layer_utils import (
+    apply_source_panel_lifts,
+    clamp01,
+    expm1_value,
+    first_arrival,
+    fx_shape_vote,
+    inverse_ramp,
+    measured_roles,
+    number,
+    physics_subpanel_flat,
+    ramp,
+    role_value,
+    safe_float,
+)
 
 
 class PhysicsFXRoleLayer:
@@ -84,7 +98,7 @@ class PhysicsFXRoleLayer:
     ) -> dict[str, Any]:
         values = facts.feature_values_by_name or {}
         shape = fx_shape_vote(facts)
-        measured_roles(facts)
+        roles = measured_roles(facts)
         subpanel_flat = physics_subpanel_flat(facts)
         fa = first_arrival(facts)
 
@@ -273,6 +287,18 @@ class PhysicsFXRoleLayer:
             + 0.12 * ramp(max(f0_voiced, harmonic), 0.18, 0.76)
             + 0.08 * inverse_ramp(low_centered_tonal_hit, 0.28, 0.70)
         )
+        synthetic_alert_values = [
+            safe_float(subpanel_flat.get("tonal_alert_siren_score", 0.0), 0.0),
+            safe_float(subpanel_flat.get("fx_siren_score", 0.0), 0.0),
+            safe_float(subpanel_flat.get("fx_alarm_score", 0.0), 0.0),
+            safe_float(subpanel_flat.get("fx_boom_score", 0.0), 0.0),
+            safe_float(subpanel_flat.get("fx_sub_hit_score", 0.0), 0.0),
+            safe_float(subpanel_flat.get("fx_impact_score", 0.0), 0.0),
+            safe_float(subpanel_flat.get("fx_slam_score", 0.0), 0.0),
+        ]
+        synthetic_alert_pressure = max(synthetic_alert_values)
+        strongest_alert_values = sorted(synthetic_alert_values, reverse=True)[:3]
+        synthetic_alert_cluster = average_score(*strongest_alert_values)
         human_creature_fx = clamp01(
             0.30 * formant_motion
             + 0.18 * ramp(max(f0_voiced, formant_spacing), 0.28, 0.86)
@@ -330,6 +356,39 @@ class PhysicsFXRoleLayer:
             top_shape_scores.get("whoosh_sweep", 0.0),
             shape_confidence if shape_name == "whoosh_sweep" else 0.0,
         )
+        raw_transition_shape_support = max(riser_shape, drop_shape, reverse_shape, whoosh_shape)
+        designed_fx_shape_support = max(
+            top_shape_scores.get("designed_low_fx", 0.0),
+            top_shape_scores.get("designed_motion_fx_loop", 0.0),
+            top_shape_scores.get("hybrid_fx_motion", 0.0),
+            top_shape_scores.get("designed_tonal_fx", 0.0),
+            shape_confidence
+            if shape_name in {"designed_low_fx", "designed_motion_fx_loop", "hybrid_fx_motion", "designed_tonal_fx"}
+            else 0.0,
+        )
+        true_vocal_role_strength = max(
+            role_value(roles, "vocal_music_phrase"),
+            role_value(roles, "vocal_phrase"),
+            role_value(roles, "vocal_one_shot"),
+            role_value(roles, "voiced_one_shot"),
+        )
+        true_vocal_phrase_strength = max(
+            role_value(roles, "vocal_music_phrase"),
+            role_value(roles, "vocal_phrase"),
+        )
+        true_vocal_authority = bool(
+            true_vocal_phrase_strength >= 0.78
+            or (
+                shape_name in {"vocal_phrase", "vocal_one_shot"}
+                and shape_confidence >= 0.72
+                and true_vocal_role_strength >= 0.68
+            )
+        )
+        designed_fx_formant_decoy = bool(
+            designed_fx_shape_support >= 0.78
+            and not true_vocal_authority
+            and max(raw_transition_shape_support, spectral_motion) >= 0.34
+        )
         measured_transition_motion = bool(
             shape_name
             in {"transition_riser", "transition_drop", "transition_downlifter", "reverse_swell", "whoosh_sweep"}
@@ -353,6 +412,24 @@ class PhysicsFXRoleLayer:
             riser_shape, drop_shape, impact_shape, glitch_shape, blip_shape, reverse_shape, whoosh_shape
         )
         transition_shape_support = max(riser_shape, drop_shape, reverse_shape, whoosh_shape)
+        synthetic_alert_shape_support = max(
+            top_shape_scores.get("designed_tonal_fx", 0.0),
+            top_shape_scores.get("hybrid_fx_motion", 0.0),
+            top_shape_scores.get("siren_alarm_tone", 0.0),
+            top_shape_scores.get("impact_with_tail", 0.0),
+            top_shape_scores.get("designed_motion_fx_loop", 0.0),
+            top_shape_scores.get("designed_low_fx", 0.0),
+        )
+        synthetic_alert_fx_body = bool(
+            long_or_motion >= 0.78
+            and synthetic_alert_pressure >= 0.54
+            and synthetic_alert_cluster >= 0.49
+            and synthetic_alert_shape_support >= 0.50
+            and max(loop_percussive, loop_drumlike) <= 0.14
+            and f0_voiced <= 0.38
+            and true_vocal_role_strength < 0.58
+            and drum_anchor < 0.66
+        )
         repeated_rhythmic_loop = clamp01(
             0.24 * (1.0 if is_loop else 0.0)
             + 0.22 * ramp(true_repetition, 0.54, 0.88)
@@ -523,6 +600,20 @@ class PhysicsFXRoleLayer:
             scale=0.94,
             floor=0.42,
         )
+        if synthetic_alert_fx_body:
+            alert_floor = min(
+                0.92,
+                0.66
+                + 0.16 * ramp(synthetic_alert_pressure, 0.54, 0.72)
+                + 0.10 * ramp(synthetic_alert_shape_support, 0.50, 0.78),
+            )
+            branch_scores["SirenAlarm"] = max(branch_scores["SirenAlarm"], alert_floor)
+            branch_scores["DesignedNoiseHybrid"] = max(branch_scores["DesignedNoiseHybrid"], alert_floor - 0.05)
+            if slope <= 0.012:
+                branch_scores["DropDownlifter"] = max(branch_scores["DropDownlifter"], alert_floor - 0.08)
+            else:
+                branch_scores["RiserBuild"] = max(branch_scores["RiserBuild"], alert_floor - 0.10)
+            branch_scores["SmallObjectCluster"] = min(branch_scores["SmallObjectCluster"], alert_floor - 0.04)
         if (
             shape_name == "transition_riser"
             and shape_confidence >= 0.86
@@ -537,6 +628,20 @@ class PhysicsFXRoleLayer:
             branch_scores["RiserBuild"] = max(
                 branch_scores["RiserBuild"],
                 min(0.98, strongest_transition_neighbor + 0.026),
+            )
+        if designed_fx_formant_decoy:
+            human_creature_cap = clamp01(0.54 + 0.12 * ramp(true_vocal_role_strength, 0.42, 0.76))
+            branch_scores["HumanCreatureFX"] = min(branch_scores["HumanCreatureFX"], human_creature_cap)
+            branch_scores["FormantFX"] = min(branch_scores["FormantFX"], max(0.58, human_creature_cap + 0.04))
+            designed_hybrid_floor = min(
+                0.92,
+                0.68
+                + 0.16 * ramp(designed_fx_shape_support, 0.78, 0.96)
+                + 0.08 * ramp(max(raw_transition_shape_support, spectral_motion), 0.34, 0.76),
+            )
+            branch_scores["DesignedNoiseHybrid"] = max(
+                branch_scores["DesignedNoiseHybrid"],
+                designed_hybrid_floor,
             )
 
         if transition_loop_decoy_guard:
@@ -603,6 +708,10 @@ class PhysicsFXRoleLayer:
             - 0.48 * ramp(branch_scores["TextureAmbience"], 0.58, 0.86)
             - 0.30 * ramp(action_strength, 0.66, 0.92)
         )
+        if synthetic_alert_fx_body:
+            drum_conflict = min(drum_conflict, 0.52)
+            instrument_conflict = min(instrument_conflict, 0.52)
+            mixed_loop_conflict = min(mixed_loop_conflict, 0.48)
         conflict = max(drum_conflict, instrument_conflict, mixed_loop_conflict, texture_conflict)
         role_raw = clamp01(0.72 * strongest + 0.18 * action_strength + 0.10 * spectral_motion)
         role_raw = max(
@@ -615,6 +724,16 @@ class PhysicsFXRoleLayer:
                 + 0.14 * spectral_motion
             ),
         )
+        if synthetic_alert_fx_body:
+            role_raw = max(
+                role_raw,
+                clamp01(
+                    0.48 * branch_scores["SirenAlarm"]
+                    + 0.26 * synthetic_alert_pressure
+                    + 0.16 * synthetic_alert_shape_support
+                    + 0.10 * long_or_motion
+                ),
+            )
         role_strength = clamp01(role_raw - 0.24 * conflict)
         non_action_fx_strength = max(
             branch_scores["TextureAmbience"],
@@ -680,11 +799,18 @@ class PhysicsFXRoleLayer:
             "fx_low_centered_tonal_hit": round(float(low_centered_tonal_hit), 6),
             "fx_blip_band_support": round(float(blip_band_support), 6),
             "fx_clean_mid_blip_tone": round(float(clean_mid_blip_tone), 6),
+            "fx_synthetic_alert_pressure": round(float(synthetic_alert_pressure), 6),
+            "fx_synthetic_alert_cluster": round(float(synthetic_alert_cluster), 6),
+            "fx_synthetic_alert_shape_support": round(float(synthetic_alert_shape_support), 6),
+            "fx_synthetic_alert_fx_body": bool(synthetic_alert_fx_body),
             "fx_siren_alarm_motion": round(float(siren_alarm_motion), 6),
             "fx_machine_mechanical_motion": round(float(machine_mechanical_motion), 6),
             "fx_foley_material_motion": round(float(foley_material_motion), 6),
             "fx_small_object_cluster": round(float(small_object_cluster), 6),
             "fx_human_creature_motion": round(float(human_creature_fx), 6),
+            "fx_designed_formant_decoy_guard": bool(designed_fx_formant_decoy),
+            "fx_designed_fx_shape_support": round(float(designed_fx_shape_support), 6),
+            "fx_true_vocal_role_strength": round(float(true_vocal_role_strength), 6),
             "fx_measured_transition_motion": bool(measured_transition_motion),
             "fx_action_shape_support": round(float(fx_action_shape), 6),
             "fx_transition_shape_support": round(float(transition_shape_support), 6),

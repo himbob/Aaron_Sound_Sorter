@@ -2,10 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from aaron_audio_intelligence.physics_memory_brain import PHYSICS_MEMORY_BRAIN_NAME
 from aaron_audio_intelligence.shape_memory_brain import SHAPE_MEMORY_BRAIN_NAME, SHAPE_STARTER_MEMORY_BRAIN_NAME
 from aaron_audio_intelligence.user_memory_brain import USER_MEMORY_BRAIN_NAME
+from aaron_audio_intelligence.voter_memory_brain import VOTER_MEMORY_BRAIN_NAME
 from aaron_sound_sorter.gui.models import PreviewRow, SortPreviewSession
 from aaron_sound_sorter.gui.web_app import (
+    BrainTrainingJob,
     ExportJob,
     PreviewJob,
     add_preview_job_row,
@@ -14,12 +17,14 @@ from aaron_sound_sorter.gui.web_app import (
     backup_active_brain_family,
     browser_preview_audio_path,
     build_brain_family_training_command,
+    chooser_default_location,
     create_export_job,
     export_job_to_payload,
     parse_range_header,
     preview_job_to_payload,
     render_index_html,
     session_to_payload,
+    training_job_to_payload,
     update_preview_job_progress,
     write_audio_range_to_stream,
 )
@@ -44,19 +49,41 @@ def test_web_gui_shell_contains_core_controls() -> None:
     assert "Export Approved Sort" in html
     assert "audioPlayer" in html
     assert "Listen" in html
+    assert 'preload="metadata"' in html
+    assert "waitForAudioReady" in html
     assert "categoryHints" in html
     assert "Detected category options" in html
     assert "categoryModal" in html
     assert "Choose Approved Folder" in html
     assert "Apply Approved Folder" in html
     assert "progressBar" in html
-    assert "queueScrollSlider" in html
-    assert "queue-scroll-control" in html
-    assert "Scroll queue" in html
-    assert "Use the local slider" in html
+    assert "queueTopScroll" in html
+    assert "queueTopScrollSpacer" in html
+    assert "queue-scrollbar-top" in html
+    assert "Scroll from the top or bottom" in html
+    assert "syncQueueScrollbars" in html
+    assert "queueScrollSlider" not in html
+    assert "Use the local slider" not in html
+    assert "detailsResizeHandle" in html
+    assert "detailsRevealButton" in html
+    assert "pane-resizer" in html
+    assert "initDetailsResizer" in html
+    assert "--details-pane-width" in html
+    assert "stickyActionDock" in html
+    assert "quickExportButton" in html
+    assert "quickTrainCorrectionsButton" in html
+    assert "quickOpenTrainingReportButton" in html
+    assert "already in training" in html
+    assert "setAudioSourceForRow" in html
+    assert "audioIsActivelyPlaying" in html
+    assert "currentRowKey === nextRowKey" in html
+    assert "replaceChildren(fragment)" in html
+    assert "rowsEl.addEventListener" in html
     assert "/api/job-audio/" in html
     assert "/api/export-job/" in html
     assert "MAX_JOB_POLL_FAILURES" in html
+    assert "current=" in html
+    assert "Selected exact folder:" in html
     assert 'aria-label="Collapse all panels"' in html
     assert 'aria-label="Expand all panels"' in html
     assert "panel-toggle" in html
@@ -70,6 +97,18 @@ def test_web_gui_shell_contains_core_controls() -> None:
     assert "Commit Training Evidence" not in html
     assert "/tmp/config/gui_brains.yaml" in html
     assert "Brain JSON" not in html
+
+
+def test_chooser_default_location_uses_existing_path_context(tmp_path: Path) -> None:
+    folder = tmp_path / "sample pack"
+    folder.mkdir()
+    audio_file = folder / "sound.wav"
+    audio_file.write_bytes(b"fake")
+
+    assert chooser_default_location("folder", str(folder)) == str(folder.resolve())
+    assert chooser_default_location("folder", str(audio_file)) == str(folder.resolve())
+    assert chooser_default_location("file", str(audio_file)) == str(folder.resolve())
+    assert chooser_default_location("folder", str(tmp_path / "missing")) == ""
 
 
 def test_session_payload_preserves_preview_rows() -> None:
@@ -159,11 +198,15 @@ def test_backup_active_brain_family_copies_existing_gui_brains(tmp_path: Path) -
     full_brain = tmp_path / "stage4_folder_brain.json"
     core_brain = tmp_path / "stage4_folder_brain_core_baby.json"
     memory_brain = tmp_path / USER_MEMORY_BRAIN_NAME
+    voter_memory_brain = tmp_path / VOTER_MEMORY_BRAIN_NAME
+    physics_memory_brain = tmp_path / PHYSICS_MEMORY_BRAIN_NAME
     shape_memory_brain = tmp_path / SHAPE_MEMORY_BRAIN_NAME
     shape_starter_memory_brain = tmp_path / SHAPE_STARTER_MEMORY_BRAIN_NAME
     full_brain.write_text('{"labels": ["full"]}', encoding="utf-8")
     core_brain.write_text('{"labels": ["core"]}', encoding="utf-8")
     memory_brain.write_text('{"labels": ["memory"]}', encoding="utf-8")
+    voter_memory_brain.write_text('{"labels": ["voter"]}', encoding="utf-8")
+    physics_memory_brain.write_text('{"labels": ["physics"]}', encoding="utf-8")
     shape_memory_brain.write_text('{"labels": ["shape"]}', encoding="utf-8")
     shape_starter_memory_brain.write_text('{"labels": ["starter"]}', encoding="utf-8")
 
@@ -172,6 +215,8 @@ def test_backup_active_brain_family_copies_existing_gui_brains(tmp_path: Path) -
     assert (backup_dir / "stage4_folder_brain.json").read_text(encoding="utf-8") == '{"labels": ["full"]}'
     assert (backup_dir / "stage4_folder_brain_core_baby.json").read_text(encoding="utf-8") == '{"labels": ["core"]}'
     assert (backup_dir / USER_MEMORY_BRAIN_NAME).read_text(encoding="utf-8") == '{"labels": ["memory"]}'
+    assert (backup_dir / VOTER_MEMORY_BRAIN_NAME).read_text(encoding="utf-8") == '{"labels": ["voter"]}'
+    assert (backup_dir / PHYSICS_MEMORY_BRAIN_NAME).read_text(encoding="utf-8") == '{"labels": ["physics"]}'
     assert (backup_dir / SHAPE_STARTER_MEMORY_BRAIN_NAME).read_text(encoding="utf-8") == '{"labels": ["starter"]}'
     assert (backup_dir / SHAPE_MEMORY_BRAIN_NAME).read_text(encoding="utf-8") == '{"labels": ["shape"]}'
     assert not (backup_dir / "stage4_folder_brain_spread_baby.json").exists()
@@ -317,3 +362,24 @@ def test_export_job_payload_preserves_long_running_export_status() -> None:
     assert payload["sorted_root"] == "/tmp/sorted"
     assert payload["errors"] == ["warning"]
     assert payload["updated_at"] >= payload["started_at"]
+
+
+def test_training_job_payload_reports_reused_existing_corrections() -> None:
+    job = BrainTrainingJob(
+        job_id="train-1",
+        status="done",
+        message="Updated brains.",
+        corrected_count=12,
+        staged_count=6,
+        reused_existing_count=6,
+        trainable_count=12,
+        skipped_count=0,
+    )
+
+    payload = training_job_to_payload(job)
+
+    assert payload["corrected_count"] == 12
+    assert payload["staged_count"] == 6
+    assert payload["reused_existing_count"] == 6
+    assert payload["trainable_count"] == 12
+    assert payload["skipped_count"] == 0

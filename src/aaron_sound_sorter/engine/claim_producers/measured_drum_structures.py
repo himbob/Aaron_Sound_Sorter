@@ -621,6 +621,18 @@ class MeasuredDrumStructureClaimProducer:
             and struck_material >= 0.78
             and max(onset_percussive, drum_hit, drum_branch) >= 0.50
         )
+        synthetic_tonal_fx_decoy = bool(
+            shape in {"solo_phrase", "ui_blip", "designed_tonal_fx", "siren_alarm_tone"}
+            and self._subpanel_score(facts, "fx_blip_beep_score") >= 0.78
+            and self._subpanel_score(facts, "physics_subpanel_clean_tone") >= 0.78
+            and self._subpanel_score(facts, "onset_pitched_onset_score") >= 0.72
+            and self._subpanel_score(facts, "onset_pitched_onset_score") >= onset_percussive + 0.14
+            and drum_hit <= 0.46
+            and drum_branch <= 0.46
+            and self._subpanel_score(facts, "drum_metallic_percussion_source_score") <= 0.54
+        )
+        if synthetic_tonal_fx_decoy:
+            return False
         pitched_music_stab_decoy = bool(
             not struck_percussion_body
             and _measured_role_from_facts(facts) == "pitched_music_phrase"

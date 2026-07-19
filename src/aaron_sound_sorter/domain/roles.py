@@ -16,6 +16,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 
+from aaron_sound_sorter.score_math import average_score
+
 
 @dataclass(frozen=True)
 class MeasuredRoles:
@@ -485,7 +487,4 @@ def inverse_ramp(number: float, good_at_or_below: float, bad_at_or_above: float)
 
 
 def average_strength(*parts: float) -> float:
-    usable = [clamp01(part) for part in parts]
-    if not usable:
-        return 0.0
-    return sum(usable) / len(usable)
+    return average_score(*parts)

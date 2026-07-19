@@ -14,8 +14,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
+from aaron_audio_intelligence.physics_memory_brain import PHYSICS_MEMORY_BRAIN_NAME
 from aaron_audio_intelligence.shape_memory_brain import SHAPE_MEMORY_BRAIN_NAME, SHAPE_STARTER_MEMORY_BRAIN_NAME
 from aaron_audio_intelligence.user_memory_brain import USER_MEMORY_BRAIN_NAME
+from aaron_audio_intelligence.voter_memory_brain import VOTER_MEMORY_BRAIN_NAME
 from aaron_sound_sorter.domain.models import SortFileResult, SortRequest
 from aaron_sound_sorter.domain.policies import BrainVoterPolicy, ConsensusPolicy, PhysicsVoterPolicy, ShapeVoterPolicy
 from aaron_sound_sorter.engine.consensus import ConsensusRunner
@@ -32,6 +34,7 @@ from aaron_sound_sorter.gui.models import (
 from aaron_sound_sorter.infrastructure.audio_repository import AudioInputRepository
 from aaron_sound_sorter.infrastructure.brain_repository import BrainRepository
 from aaron_sound_sorter.infrastructure.report_writer import (
+    compact_top_guess,
     disable_macos_metadata_sidecars,
     safe_folder_path,
     unique_path,
@@ -78,6 +81,10 @@ class BrainFamilyConfig:
             configured.
         user_memory_brain_path: GUI correction memory brain path, when
             configured.
+        physics_memory_brain_path: GUI correction PhysicsVoter memory brain
+            path, when configured.
+        voter_memory_brain_path: GUI correction low-level voter memory brain
+            path, when configured.
         shape_starter_memory_brain_path: Low-trust batch starter ShapeVoter
             memory brain path, when configured.
         shape_memory_brain_path: ShapeVoter correction memory brain path, when
@@ -106,6 +113,8 @@ class BrainFamilyConfig:
     spread_baby_brain_path: Path | None
     outlier_baby_brain_path: Path | None
     user_memory_brain_path: Path | None
+    physics_memory_brain_path: Path | None
+    voter_memory_brain_path: Path | None
     shape_starter_memory_brain_path: Path | None
     shape_memory_brain_path: Path | None
     harmonic_core_baby_brain_path: Path | None
@@ -122,6 +131,8 @@ class BrainFamilyConfig:
             self.spread_baby_brain_path,
             self.outlier_baby_brain_path,
             self.user_memory_brain_path,
+            self.physics_memory_brain_path,
+            self.voter_memory_brain_path,
             self.shape_starter_memory_brain_path,
             self.shape_memory_brain_path,
         ]
@@ -204,6 +215,8 @@ class SortPreviewService:
             spread_baby_brain_path=brain_config.spread_baby_brain_path,
             outlier_baby_brain_path=brain_config.outlier_baby_brain_path,
             user_memory_brain_path=brain_config.user_memory_brain_path,
+            physics_memory_brain_path=brain_config.physics_memory_brain_path,
+            voter_memory_brain_path=brain_config.voter_memory_brain_path,
             shape_starter_memory_brain_path=brain_config.shape_starter_memory_brain_path,
             shape_memory_brain_path=brain_config.shape_memory_brain_path,
             harmonic_core_baby_brain_path=brain_config.harmonic_core_baby_brain_path,
@@ -299,6 +312,12 @@ class SortPreviewService:
             outlier_baby_brain_path=self.resolve_optional_project_path(baby.get("outlier")),
             user_memory_brain_path=self.resolve_optional_project_path(
                 brains.get("user_memory") or USER_MEMORY_BRAIN_NAME
+            ),
+            physics_memory_brain_path=self.resolve_optional_project_path(
+                brains.get("physics_memory") or PHYSICS_MEMORY_BRAIN_NAME
+            ),
+            voter_memory_brain_path=self.resolve_optional_project_path(
+                brains.get("voter_memory") or VOTER_MEMORY_BRAIN_NAME
             ),
             shape_starter_memory_brain_path=self.resolve_optional_project_path(
                 brains.get("shape_starter_memory") or SHAPE_STARTER_MEMORY_BRAIN_NAME
@@ -620,6 +639,7 @@ class TrainingCorrectionImporter:
         correction_evidence_path = self.exporter.write_correction_evidence_package(session, correction_dir=report_dir)
         manifest_rows: list[dict[str, str]] = []
         staged_paths: list[Path] = []
+        reused_existing_paths: list[Path] = []
         errors: list[str] = []
         skipped_count = 0
         for row in session.rows:
@@ -629,6 +649,9 @@ class TrainingCorrectionImporter:
             manifest_rows.append(row_record)
             if row_record["status"] == "staged":
                 staged_paths.append(Path(row_record["staged_path"]))
+                continue
+            if row_record["status"] == "duplicate_existing":
+                reused_existing_paths.append(Path(row_record["staged_path"]))
                 continue
             skipped_count += 1
             errors.append(f"{row.row_id}: {row.display_name}: {row_record['message']}")
@@ -640,6 +663,7 @@ class TrainingCorrectionImporter:
             manifest_path=manifest_path,
             correction_evidence_path=correction_evidence_path,
             staged_count=len(staged_paths),
+            reused_existing_count=len(reused_existing_paths),
             skipped_count=skipped_count,
             staged_paths=staged_paths,
             errors=errors,
@@ -943,7 +967,10 @@ def diagnostic_summary(result: SortFileResult) -> str:
     primary_shape = shape.get("primary_shape", "")
     shape_conf = shape.get("confidence", "")
     brain_top = result.brain_votes.guesses[0].folder_path if result.brain_votes.guesses else ""
-    physics_top = result.physics_votes.guesses[0].folder_path if result.physics_votes.guesses else ""
+    physics_top_guess = compact_top_guess(evidence.get("physics_vote_result", {}))
+    physics_top = str(physics_top_guess.get("folder_path", ""))
+    if not physics_top:
+        physics_top = result.physics_votes.guesses[0].folder_path if result.physics_votes.guesses else ""
     return f"shape={primary_shape} ({shape_conf}); brain={brain_top or 'none'}; physics={physics_top or 'none'}"
 
 
@@ -1034,6 +1061,7 @@ def add_digest_folders(candidates: list[str], seen: set[str], digest: dict[str, 
 def diagnostic_vote_digest_keys() -> tuple[str, ...]:
     """Return evidence keys that may contain compact voter top candidates."""
     return (
+        "physics_vote_result",
         "brain_ensemble_vote_result",
         "full_brain_vote_result",
         "baby_brain_vote_result",
@@ -1356,7 +1384,7 @@ def correction_evidence(row: PreviewRow) -> dict[str, Any]:
             "shape_vote": evidence.get("shape_vote", {}),
             "physics_subpanels": evidence.get("physics_subpanels", {}),
             "brain_ensemble_vote_result": evidence.get("brain_ensemble_vote_result", {}),
-            "physics_vote_result": voter_result_digest(row.result.physics_votes),
+            "physics_vote_result": evidence.get("physics_vote_result", voter_result_digest(row.result.physics_votes)),
             "authority_trace": row.result.decision.authority_trace,
             "shared_candidates": row.result.decision.shared_candidates,
         }
@@ -1370,11 +1398,12 @@ def timestamp() -> str:
 
 
 def gui_worker_count() -> int:
-    """Return a conservative default worker count for desktop preview."""
+    """Return the default worker count for desktop preview sorting."""
     raw = str(os.environ.get("AARON_GUI_SORT_WORKERS", "")).strip()
     if raw:
         try:
             return max(1, int(raw))
         except ValueError:
             return 1
-    return max(1, min(4, (os.cpu_count() or 2) - 1))
+    available_cpus = max(1, os.cpu_count() or 2)
+    return max(1, min(10, available_cpus))

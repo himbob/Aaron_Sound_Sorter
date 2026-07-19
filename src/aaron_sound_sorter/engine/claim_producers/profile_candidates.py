@@ -146,6 +146,7 @@ class ProfileCandidateClaimProducer(
                 shape_confidence=shape_confidence,
                 raw_path=raw_path,
                 raw_score=raw_score,
+                facts=context.facts,
             ),
             self.non_voice_instrument_parent_claim(
                 raw=raw,

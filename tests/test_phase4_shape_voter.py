@@ -391,6 +391,63 @@ def test_single_low_pitched_hit_does_not_become_bass_phrase_shape() -> None:
     assert shape["primary_shape"] != "bass_phrase"
 
 
+def test_low_voicing_impact_tail_shape_beats_false_bass_phrase() -> None:
+    physics = _physics(
+        duration=4.3,
+        log_transient_count=np.log1p(10.0),
+        event_rate_hz=2.36,
+        onset_span_ratio=0.30,
+        onset_interval_regularity=0.52,
+        temporal_centroid_ratio=0.27,
+        attack_rise_time_norm=0.088,
+        tail_energy_ratio=0.29,
+        pitch_confidence=0.68,
+        f0_voiced_ratio=0.04,
+        loop_pitched_event_ratio=1.0,
+        loop_sustained_tonal_frame_ratio=1.0,
+        loop_non_event_tonal_ratio=1.0,
+        loop_percussive_event_ratio=0.0,
+        loop_drumlike_frame_ratio=0.0,
+        sub_bass_ratio_lt_150hz=0.86,
+        bass_ratio_150_500hz=0.07,
+        mid_ratio_500_2000hz=0.03,
+        presence_ratio_2000_8000hz=0.03,
+        air_ratio_gt_8000hz=0.01,
+        spectral_flatness_mean=0.20,
+        spectral_entropy_mean=0.33,
+    )
+    facts = build_shared_audio_facts(physics)
+    facts.evidence["physics_subpanels"] = {
+        "flat": {
+            "fx_impact_score": 0.51,
+            "fx_boom_score": 0.57,
+            "fx_slam_score": 0.54,
+            "fx_sub_hit_score": 0.55,
+            "drum_loop_source_score": 0.06,
+        }
+    }
+    for bass_score_name in (
+        "bass_sub_score",
+        "bass_synth_score",
+        "bass_808_score",
+        "bass_electric_score",
+        "low_end_source_score",
+    ):
+        facts.evidence[bass_score_name] = 0.50
+    facts.evidence["loop_onset_periodicity"] = 0.12
+    facts.evidence["loop_pulse_clarity"] = 0.22
+    facts.evidence["measured_roles"] = {
+        "pitched_music_loop": 0.15,
+        "bass_loop": 0.18,
+        "drum_loop": 0.05,
+    }
+
+    shape = ShapeVoter().vote(physics, facts, {}).diagnostics["shape_vote"]
+
+    assert shape["primary_shape"] == "impact_with_tail"
+    assert dict(shape["shape_scores"])["bass_phrase"] < shape["confidence"]
+
+
 def test_final_shape_invariant_blocks_beat_loop_from_bird_fx() -> None:
     facts = SharedAudioFacts(
         False,

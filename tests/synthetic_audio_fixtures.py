@@ -137,6 +137,72 @@ def synth_fx_hit(dur: float = 2.2) -> np.ndarray:
     return _normalize((sweep * 0.6 + noise * 0.4) * env)
 
 
+def _chirp(start_hz: float, end_hz: float, dur: float, sr: int = SAMPLE_RATE) -> np.ndarray:
+    """Return a deterministic linear frequency sweep."""
+    t = np.arange(int(sr * dur), dtype=np.float32) / sr
+    freq = np.linspace(start_hz, end_hz, t.size, dtype=np.float32)
+    phase = 2.0 * np.pi * np.cumsum(freq / sr)
+    return np.sin(phase).astype(np.float32)
+
+
+def synth_fx_riser(dur: float = 2.4) -> np.ndarray:
+    """Build a procedural upward transition FX fixture."""
+    t = np.arange(int(SAMPLE_RATE * dur), dtype=np.float32) / SAMPLE_RATE
+    sweep = _chirp(140.0, 4200.0, dur)
+    noise = np.random.default_rng(20).normal(0, 0.32, size=t.shape).astype(np.float32)
+    envelope = np.clip(t / max(dur, 1e-6), 0.0, 1.0) ** 1.35
+    shimmer = np.sin(2.0 * np.pi * 9.0 * t) * 0.18
+    return _normalize((0.62 * sweep + 0.38 * noise + shimmer) * envelope)
+
+
+def synth_fx_downlifter(dur: float = 2.4) -> np.ndarray:
+    """Build a procedural downward transition FX fixture."""
+    t = np.arange(int(SAMPLE_RATE * dur), dtype=np.float32) / SAMPLE_RATE
+    sweep = _chirp(3600.0, 80.0, dur)
+    low_bloom = np.sin(2.0 * np.pi * 70.0 * t) * (1.0 - np.exp(-5.0 * t))
+    envelope = np.exp(-0.62 * t) * np.linspace(1.0, 0.35, t.size, dtype=np.float32)
+    noise = np.random.default_rng(21).normal(0, 0.18, size=t.shape).astype(np.float32)
+    return _normalize((0.55 * sweep + 0.30 * low_bloom + 0.15 * noise) * envelope)
+
+
+def synth_fx_whoosh(dur: float = 1.4) -> np.ndarray:
+    """Build a broadband whoosh/sweep fixture from shaped noise."""
+    t = np.arange(int(SAMPLE_RATE * dur), dtype=np.float32) / SAMPLE_RATE
+    noise = np.random.default_rng(22).normal(0, 0.8, size=t.shape).astype(np.float32)
+    motion = 0.5 + 0.5 * np.sin(2.0 * np.pi * (1.0 / max(dur, 1e-6)) * t - np.pi / 2.0)
+    air_emphasis = 0.55 + 0.45 * np.sin(2.0 * np.pi * 11.0 * t)
+    envelope = np.sin(np.pi * t / dur) ** 1.3
+    return _normalize(noise * motion * air_emphasis * envelope)
+
+
+def synth_fx_impact_tail(dur: float = 1.8) -> np.ndarray:
+    """Build a hit-plus-tail FX impact fixture."""
+    t = np.arange(int(SAMPLE_RATE * dur), dtype=np.float32) / SAMPLE_RATE
+    transient = np.random.default_rng(23).normal(0, 1.0, size=t.shape).astype(np.float32) * np.exp(-95.0 * t)
+    boom = np.sin(2.0 * np.pi * 74.0 * t) * np.exp(-3.0 * t)
+    tail = np.random.default_rng(24).normal(0, 0.34, size=t.shape).astype(np.float32) * np.exp(-1.7 * t)
+    return _normalize(transient + 0.72 * boom + 0.36 * tail)
+
+
+def synth_fx_beep_alarm(dur: float = 1.2) -> np.ndarray:
+    """Build a short repeated tonal alert fixture."""
+    t = np.arange(int(SAMPLE_RATE * dur), dtype=np.float32) / SAMPLE_RATE
+    gate = ((t * 7.0) % 1.0 < 0.38).astype(np.float32)
+    tone = np.sin(2.0 * np.pi * 1220.0 * t) + 0.35 * np.sin(2.0 * np.pi * 2440.0 * t)
+    return _normalize(tone * gate * _fade_in_out(np.ones_like(t), SAMPLE_RATE, 0.01))
+
+
+def synth_fx_glitch_stutter(dur: float = 1.0) -> np.ndarray:
+    """Build a chopped digital glitch/stutter fixture."""
+    t = np.arange(int(SAMPLE_RATE * dur), dtype=np.float32) / SAMPLE_RATE
+    rng = np.random.default_rng(25)
+    tone = np.sin(2.0 * np.pi * (420.0 + 90.0 * np.sign(np.sin(2.0 * np.pi * 13.0 * t))) * t)
+    noise = rng.normal(0, 0.35, size=t.shape).astype(np.float32)
+    gate = ((t * 24.0) % 1.0 < 0.22).astype(np.float32)
+    jitter = (rng.random(t.shape) > 0.72).astype(np.float32)
+    return _normalize((tone * 0.65 + noise) * np.maximum(gate, jitter * 0.45))
+
+
 def synth_percussion_hit(dur: float = 0.32) -> np.ndarray:
     """Build a clearly percussive broadband one-shot fixture.
 

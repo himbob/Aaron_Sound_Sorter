@@ -9,7 +9,7 @@ These tests keep two real FX_Aaron2 failures below final arbitration:
 
 from __future__ import annotations
 
-from aaron_sound_sorter.domain.models import SharedAudioFacts
+from aaron_sound_sorter.domain.models import CategoryGuess, SharedAudioFacts, VoterResult
 from aaron_sound_sorter.engine.claim_producers.measured_instrument_branches import (
     MeasuredInstrumentBranchClaimProducer,
 )
@@ -17,9 +17,11 @@ from aaron_sound_sorter.engine.claim_producers.measured_music_structures import 
     MeasuredMusicStructureClaimProducer,
 )
 from aaron_sound_sorter.engine.decision_context import DecisionContext
+from aaron_sound_sorter.engine.decision_core_v2 import DecisionCoreV2
 from aaron_sound_sorter.engine.eligibility_decision import EligibilityDecision
 from aaron_sound_sorter.engine.family_claim_arbiter import FamilyClaimArbiter
 from aaron_sound_sorter.engine.family_claims import claim_from_folder_path, review_claim
+from aaron_sound_sorter.engine.placement_resolver import PlacementResolver
 
 
 def _claim(path: str, *, source: str = "strong_consensus", score: float = 7.0, strength: float = 0.50):
@@ -347,6 +349,18 @@ def _processed_voice_loop_facts() -> SharedAudioFacts:
                 "sustained_tonal_frame_ratio": 0.90,
             },
             "measured_roles": {"detected_parent_role": "vocal_music_phrase", "vocal_music_phrase": 0.88},
+            "brain_ensemble_vote_result": {
+                "top_guesses": [
+                    {
+                        "label": "Instruments/Voice/Vocal Loops/Loops",
+                        "folder_path": "Instruments/Voice/Vocal Loops/Loops",
+                        "top_family": "Instruments",
+                        "rank": 3,
+                        "score": 1.80,
+                        "confidence": 0.82,
+                    },
+                ]
+            },
             "physics_subpanels": {
                 "flat": {
                     "voice_score": 0.80,
@@ -436,6 +450,98 @@ def test_processed_voice_loop_emits_instrument_voice_claim_before_fx_human_bucke
         claim.source == "final_measured_voice_invariant" and claim.folder_path == "Instruments/Voice/Vocal Loops/Loops"
         for claim in claims
     )
+
+
+def test_processed_voice_candidate_blocks_broad_mixed_loop_claim() -> None:
+    raw = _claim("Instruments/Mixed Musical Loops/Multi Instrument/Loops", score=11.0, strength=0.40)
+    facts = _processed_voice_loop_facts()
+    brain_result = VoterResult(
+        voter_name="brain_full",
+        guesses=[
+            CategoryGuess(
+                label="Instruments/Mixed Musical Loops/Multi Instrument/Loops",
+                folder_path="Instruments/Mixed Musical Loops/Multi Instrument/Loops",
+                top_family="Instruments",
+                score=1.0,
+                confidence=0.90,
+                rank=1,
+                reason="synthetic mixed loop candidate",
+            ),
+            CategoryGuess(
+                label="Instruments/Voice/Vocal Loops/Loops",
+                folder_path="Instruments/Voice/Vocal Loops/Loops",
+                top_family="Instruments",
+                score=1.2,
+                confidence=0.86,
+                rank=2,
+                reason="synthetic voice candidate",
+            ),
+        ],
+    )
+
+    claims = DecisionCoreV2().gather_eligibility_claims(
+        raw,
+        EligibilityDecision(role_name="pitched_music_loop", confidence=0.90),
+        facts,
+        brain_result=brain_result,
+        physics_result=None,
+    )
+
+    assert not any(claim.source == "profile_candidate_mixed_musical_loop_claim" for claim in claims)
+
+
+def test_processed_voice_candidate_beats_clean_keys_loop_claim() -> None:
+    facts = _processed_voice_loop_facts()
+    raw = _claim("Instruments/Mixed Musical Loops/Multi Instrument/Loops", score=12.0, strength=0.45)
+    keys = claim_from_folder_path(
+        folder_path="Instruments/Keys/Electric Piano/Loops",
+        source="final_clean_keys_loop_invariant",
+        reason="test competing keys branch",
+        shared=[],
+        raw_candidate_score=5.0,
+        brain_rank=1,
+        physics_rank=3,
+        shared_winner="Instruments/Keys/Electric Piano/Loops",
+        can_override=True,
+        strength=1.0,
+        is_real_candidate=True,
+    )
+    voice = claim_from_folder_path(
+        folder_path="Instruments/Voice/Vocal Loops/Loops",
+        source="final_measured_voice_invariant",
+        reason="test measured processed voice branch",
+        shared=[],
+        raw_candidate_score=6.0,
+        brain_rank=3,
+        physics_rank=4,
+        shared_winner="Instruments/Voice/Vocal Loops/Loops",
+        can_override=True,
+        strength=0.99,
+        is_real_candidate=True,
+    )
+
+    winner = FamilyClaimArbiter().pick_winner(raw_claim=raw, claims=[keys, voice], facts=facts)
+
+    assert winner.source == "final_measured_voice_invariant"
+    assert winner.folder_path == "Instruments/Voice/Vocal Loops/Loops"
+
+
+def test_voice_loop_claim_keeps_specific_voice_loop_path_in_resolver() -> None:
+    claim = claim_from_folder_path(
+        folder_path="Instruments/Voice/Vocal Loops/Loops",
+        source="final_measured_voice_invariant",
+        reason="test measured processed voice branch",
+        shared=[],
+        raw_candidate_score=6.0,
+        brain_rank=3,
+        physics_rank=4,
+        shared_winner="Instruments/Voice/Vocal Loops/Loops",
+        can_override=True,
+        strength=0.99,
+        is_real_candidate=False,
+    )
+
+    assert PlacementResolver().resolve(claim) == "Instruments/Voice/Vocal Loops/Loops"
 
 
 def test_rank_one_concrete_plucked_instrument_blocks_synthetic_sax_claim() -> None:

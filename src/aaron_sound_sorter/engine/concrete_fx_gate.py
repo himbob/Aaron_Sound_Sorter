@@ -84,6 +84,8 @@ class ConcreteFxGateProtector:
             shape_confidence = 0.0
         if shape_confidence < 0.70:
             return False
+        if self._learned_or_measured_mixed_instrument_loop_shape(primary_shape, shape_confidence, facts.evidence):
+            return True
         if "FX" in shape_compatible_tops(primary_shape):
             return False
         roles = facts.evidence.get("measured_roles", {})
@@ -110,6 +112,29 @@ class ConcreteFxGateProtector:
             if bool(layer.get("fx_role_allows_fx")) and fx_strength >= 0.70 and fx_conflict < 0.56:
                 return False
         return True
+
+    @staticmethod
+    def _learned_or_measured_mixed_instrument_loop_shape(
+        primary_shape: str,
+        shape_confidence: float,
+        evidence: dict[str, Any],
+    ) -> bool:
+        """Return True when measured/learned shape says mixed musical loop.
+
+        Concrete FX protection is useful for real transition/action FX, but it
+        must stand down when the low-level shape lane has already identified a
+        mixed instrumental loop.  Wet, synthetic, or impact-like colors inside a
+        mixed loop are not enough to switch top family to FX.
+        """
+        if primary_shape == "mixed_instrument_loop" and shape_confidence >= 0.86:
+            return True
+        learned_shape = str(evidence.get("learned_shape_memory_shape") or "")
+        learned_matched = bool(evidence.get("learned_shape_memory_matched"))
+        try:
+            learned_confidence = float(evidence.get("learned_shape_memory_confidence", 0.0) or 0.0)
+        except Exception:
+            learned_confidence = 0.0
+        return bool(learned_matched and learned_shape == "mixed_instrument_loop" and learned_confidence >= 0.72)
 
     def measured_pitched_music_should_block_override(
         self,

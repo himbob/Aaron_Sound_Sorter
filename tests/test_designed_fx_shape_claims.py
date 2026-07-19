@@ -127,6 +127,135 @@ def test_designed_tonal_shape_can_rehome_instrument_decoy_to_broad_fx() -> None:
     assert final.consensus_status == "final_measured_transition_fx_invariant"
 
 
+def test_brain_and_physics_fx_owner_beats_stale_instrument_parent_role() -> None:
+    """Brain+physics FX ownership may pass an outdated pitched-loop parent role."""
+    raw = _claim(
+        "Instruments/Keys/Organ/Loops",
+        shared=[
+            _shared_row("Instruments/Keys/Organ/Loops", 26.0, brain_rank=24, physics_rank=2),
+            _shared_row("FX/Designed Noise FX/Siren/Long FX", 34.0, brain_rank=29, physics_rank=5),
+        ],
+    )
+    facts = _facts(
+        "designed_tonal_fx",
+        confidence=0.71,
+        flat={
+            "bass_synth_score": 0.77,
+            "synth_tonal_source_score": 0.73,
+            "fx_siren_score": 0.59,
+            "fx_alarm_score": 0.56,
+            "fx_boom_score": 0.58,
+            "fx_sub_hit_score": 0.57,
+            "fx_impact_score": 0.45,
+            "fx_motion_score": 0.15,
+            "fx_transition_authority_score": 0.21,
+            "drum_loop_source_score": 0.29,
+            "drum_hit_score": 0.24,
+        },
+        metrics={
+            "shape_scores": [
+                ["designed_tonal_fx", 0.71],
+                ["hybrid_fx_motion", 0.69],
+                ["siren_alarm_tone", 0.67],
+                ["pitched_repetition_phrase", 0.66],
+            ],
+            "pitch_confidence": 0.43,
+            "pitched_event_ratio": 1.0,
+            "sustained_tonal_frame_ratio": 1.0,
+            "non_event_tonal_ratio": 1.0,
+            "percussive_event_ratio": 0.0,
+            "drumlike_frame_ratio": 0.0,
+            "spectral_flatness_mean": 0.31,
+            "tail_ratio": 0.37,
+            "centroid_slope_norm": -0.03,
+        },
+    )
+    facts.evidence["brain_ensemble_vote_1"] = {
+        "folder_path": "FX/Impacts and Hits/Generic Impact/Long FX",
+        "top_family": "FX",
+    }
+    facts.evidence["physics_layer_decision"] = {
+        "physics_layer_top_family": "FX",
+        "physics_layer_top_confidence": 0.61,
+        "physics_layer_branch": "SirenAlarm",
+        "physics_layer_branch_confidence": 0.78,
+        "fx_branch_selected": "SirenAlarm",
+        "fx_role_strength": 0.61,
+        "fx_role_conflict_strength": 0.52,
+        "fx_role_allows_fx": True,
+        "fx_synthetic_alert_fx_body": True,
+    }
+
+    claims = MeasuredTransitionFxClaimProducer().produce(DecisionContext(raw, _instrument_only_eligibility(), facts))
+    final = FamilyClaimArbiter().adjudicate(raw_claim=raw, consensus_claims=[], eligibility_claims=claims, facts=facts)
+
+    assert claims[0].folder_path == "FX/Designed Noise FX/Alarm/Long FX"
+    assert final.folder_path == "FX/Designed Noise FX/Alarm/Long FX"
+    assert final.consensus_status == "final_measured_transition_fx_invariant"
+
+
+def test_measured_transition_fx_stands_down_for_brain_owned_clean_bass_loop() -> None:
+    """A brain-owned clean bass loop must not be stolen by alert-like FX physics."""
+    raw = _claim(
+        "Instruments/Mallets and Bells/Vibraphone/Loops",
+        shared=[
+            _shared_row("FX/Designed Noise FX/Alarm/Long FX", 20.0, brain_rank=14, physics_rank=6),
+            _shared_row("Instruments/Bass/Generic Bass/Loops", 22.0, brain_rank=1, physics_rank=21),
+        ],
+    )
+    facts = _facts(
+        "solo_phrase",
+        confidence=0.80,
+        flat={
+            "fx_siren_score": 0.68,
+            "fx_alarm_score": 0.66,
+            "fx_boom_score": 0.55,
+            "fx_sub_hit_score": 0.50,
+            "fx_motion_score": 0.18,
+            "fx_transition_authority_score": 0.22,
+            "bass_synth_score": 0.72,
+        },
+        metrics={
+            "shape_scores": [
+                ["solo_phrase", 0.80],
+                ["pitched_phrase", 0.78],
+                ["designed_tonal_fx", 0.76],
+                ["siren_alarm_tone", 0.72],
+            ],
+            "low_event_ratio": 0.98,
+            "pitch_confidence": 0.96,
+            "pitched_event_ratio": 1.0,
+            "sustained_tonal_frame_ratio": 0.65,
+            "non_event_tonal_ratio": 0.59,
+            "percussive_event_ratio": 0.0,
+            "drumlike_frame_ratio": 0.0,
+        },
+    )
+    facts.evidence["brain_ensemble_vote_1"] = {
+        "folder_path": "Instruments/Bass/Generic Bass/Loops",
+        "top_family": "Instruments",
+    }
+    facts.evidence["measured_roles"] = {
+        "bass_loop": 0.63,
+        "pitched_music_loop": 0.77,
+        "low_rhythmic_drum_loop": 0.74,
+    }
+    facts.evidence["physics_layer_decision"] = {
+        "physics_layer_top_family": "FX",
+        "physics_layer_top_confidence": 0.62,
+        "physics_layer_branch": "SirenAlarm",
+        "physics_layer_branch_confidence": 0.78,
+        "fx_role_strength": 0.62,
+        "fx_role_conflict_strength": 0.52,
+        "fx_role_allows_fx": True,
+        "fx_synthetic_alert_fx_body": True,
+    }
+
+    claims = MeasuredTransitionFxClaimProducer().produce(DecisionContext(raw, _eligibility(), facts))
+
+    assert claims == []
+
+
 def test_designed_fx_shape_stands_down_for_real_drum_material() -> None:
     """A designed-looking shape must not steal obvious drum material."""
     raw = _claim(
@@ -157,6 +286,41 @@ def test_designed_fx_shape_stands_down_for_real_drum_material() -> None:
     assert MeasuredTransitionFxClaimProducer().produce(DecisionContext(raw, _eligibility(), facts)) == []
 
 
+def test_impact_tail_shape_stands_down_for_short_drum_hit() -> None:
+    """Impact-tail shape alone must not steal a short measured drum hit."""
+    raw = _claim(
+        "Drums/Kick Drums/Short Kick/One Shots",
+        shared=[
+            _shared_row("Drums/Kick Drums/Short Kick/One Shots", 5.0, brain_rank=2, physics_rank=3),
+            _shared_row("FX/Impacts and Hits/Generic Impact/Long FX", 12.0, brain_rank=8, physics_rank=8),
+        ],
+    )
+    facts = _facts(
+        "impact_with_tail",
+        flat={
+            "drum_hit_score": 0.50,
+            "drum_kick_source_score": 0.72,
+            "fx_impact_score": 0.62,
+            "fx_boom_score": 0.75,
+            "fx_sub_hit_score": 0.83,
+            "fx_motion_score": 0.18,
+            "fx_transition_authority_score": 0.26,
+            "role_one_shot_score": 0.86,
+            "physics_subpanel_noisy_air": 0.12,
+            "physics_subpanel_clean_tone": 0.70,
+        },
+        metrics={
+            "shape_scores": [["impact_with_tail", 0.94], ["single_hit", 0.84], ["hit_with_tail", 0.82]],
+            "f0_voiced_ratio": 0.02,
+            "loop_onset_periodicity": 0.0,
+            "loop_pulse_clarity": 0.0,
+        },
+        confidence=0.94,
+    )
+
+    assert MeasuredTransitionFxClaimProducer().produce(DecisionContext(raw, _eligibility(), facts)) == []
+
+
 def test_clean_instrument_loop_without_fx_candidate_support_stays_instrument() -> None:
     """Clean stable instrument evidence blocks designed-FX rescue when no FX candidate supports it."""
     raw = _claim(
@@ -182,6 +346,60 @@ def test_clean_instrument_loop_without_fx_candidate_support_stays_instrument() -
     )
 
     assert MeasuredTransitionFxClaimProducer().produce(DecisionContext(raw, _eligibility(), facts)) == []
+
+
+def test_impact_tail_shape_with_brain_fx_candidate_beats_false_synth_loop() -> None:
+    """Impact-tail evidence may use brain FX support to block false synth-loop release."""
+    raw = _claim(
+        "Instruments/Synths/Synth Loops",
+        shared=[
+            _shared_row("Instruments/Mixed Musical Loops/Multi Instrument/Loops", 36.0, brain_rank=6, physics_rank=30),
+            _shared_row("Instruments/Synths/Synth Chord/One Shots", 47.0, brain_rank=39, physics_rank=8),
+            _shared_row("FX/Impacts and Hits/Short Impact/Long FX", 60.0, brain_rank=4, physics_rank=56),
+        ],
+        strength=0.82,
+    )
+    facts = _facts(
+        "impact_with_tail",
+        confidence=0.88,
+        flat={
+            "fx_impact_score": 0.51,
+            "fx_boom_score": 0.57,
+            "fx_slam_score": 0.54,
+            "fx_sub_hit_score": 0.55,
+            "synth_tonal_source_score": 0.60,
+            "bass_synth_score": 0.53,
+            "drum_kick_source_score": 0.45,
+            "drum_loop_source_score": 0.06,
+        },
+        metrics={
+            "shape_scores": [
+                ["impact_with_tail", 0.88],
+                ["bass_phrase", 0.70],
+                ["pitched_repetition_phrase", 0.66],
+            ],
+            "f0_voiced_ratio": 0.04,
+            "tail_ratio": 0.29,
+            "loop_onset_periodicity": 0.12,
+            "loop_pulse_clarity": 0.22,
+            "pitched_event_ratio": 1.0,
+            "sustained_tonal_frame_ratio": 1.0,
+            "spectral_flatness_mean": 0.20,
+            "percussive_event_ratio": 0.0,
+            "drumlike_frame_ratio": 0.0,
+        },
+    )
+    facts.evidence["measured_roles"] = {
+        "detected_parent_role": "pitched_music_loop",
+        "pitched_music_loop": 0.15,
+        "bass_loop": 0.18,
+    }
+
+    claims = MeasuredTransitionFxClaimProducer().produce(DecisionContext(raw, _eligibility(), facts))
+
+    assert claims
+    assert claims[0].folder_path == "FX/Impacts and Hits/Generic Impact/Long FX"
+    assert claims[0].source == "final_measured_transition_fx_invariant"
 
 
 def test_high_confidence_tonal_riser_shape_beats_crash_cymbal_decoy_even_with_review() -> None:
@@ -381,6 +599,34 @@ def test_parent_eligibility_lets_designed_fx_loop_shape_own_parent() -> None:
     assert decision.broad_folder_path == "FX/Hybrid Designed FX"
 
 
+def test_parent_eligibility_uses_designed_low_secondary_shape_for_fx_decoy() -> None:
+    """A top-loop primary can still be a designed-low FX decoy when secondary shape agrees."""
+    facts = _eligibility_facts_for_shape_owner(
+        shape="top_loop",
+        confidence=0.95,
+        pulse=0.02,
+        drum_source=0.58,
+        drum_hit=0.48,
+        designed=0.10,
+    )
+    facts.evidence["shape_vote"]["shape_scores"] = [
+        ["top_loop", 0.95],
+        ["beat_loop", 0.82],
+        ["designed_low_fx", 0.88],
+        ["designed_motion_fx_loop", 0.32],
+        ["designed_tonal_fx", 0.10],
+    ]
+    facts.evidence["fx_motion_score"] = 0.68
+    facts.evidence["fx_whoosh_sweep_score"] = 0.70
+    facts.evidence["low_designed_fx_score"] = 0.80
+
+    decision = infer_parent_eligibility(facts)
+
+    assert decision.role_name == "designed_fx_loop_shape"
+    assert decision.allowed_top_families == ("FX", "_TO_REVIEW")
+    assert decision.broad_folder_path == "FX/Hybrid Designed FX"
+
+
 def test_parent_eligibility_keeps_real_pulsed_drum_loop_in_drums() -> None:
     """Shape ownership stands down when real pulse/drum-source anchors are present."""
     decision = infer_parent_eligibility(
@@ -465,6 +711,83 @@ def test_designed_low_fx_motion_claim_beats_broad_drum_parent() -> None:
     final = FamilyClaimArbiter().adjudicate(
         raw_claim=raw,
         consensus_claims=[broad_drum_parent],
+        eligibility_claims=transition_claims,
+        facts=facts,
+    )
+
+    assert transition_claims
+    assert final.final_top == "FX"
+    assert final.consensus_status == "final_measured_transition_fx_invariant"
+
+
+def test_designed_low_fx_motion_claim_beats_broad_instrument_parent() -> None:
+    """A measured designed-low FX body must not collapse into generic Instrument Loops."""
+    shared = [
+        _shared_row("Instruments/Instrument Loops/Loops", 5.0, brain_rank=2, physics_rank=2),
+        _shared_row(
+            "FX/Structural and Transitional FX/Risers and Builds/Generic Riser/Long FX",
+            8.0,
+            brain_rank=6,
+            physics_rank=6,
+        ),
+    ]
+    raw = _claim("Instruments/Instrument Loops/Loops", shared=shared, strength=0.78)
+    facts = _facts(
+        "designed_low_fx",
+        confidence=0.92,
+        flat={
+            "fx_transition_authority_score": 0.58,
+            "fx_whoosh_sweep_score": 0.78,
+            "fx_riser_build_score": 0.64,
+            "fx_reverse_score": 0.60,
+            "fx_radio_electrical_score": 0.72,
+            "drum_loop_source_score": 0.44,
+            "drum_hit_score": 0.36,
+            "synth_tonal_source_score": 0.52,
+        },
+        metrics={
+            "onset_count": 24.0,
+            "onset_span_ratio": 0.84,
+            "true_repetition_score": 0.74,
+            "pulse_regularity": 0.04,
+            "pitched_event_ratio": 0.46,
+            "percussive_event_ratio": 0.18,
+            "drumlike_frame_ratio": 0.16,
+            "sustained_tonal_frame_ratio": 0.40,
+            "non_event_tonal_ratio": 0.36,
+            "tail_ratio": 0.82,
+            "spectral_flatness_mean": 0.34,
+            "spectral_entropy_mean": 0.70,
+            "centroid_slope_norm": 0.18,
+            "shape_scores": [
+                ["designed_low_fx", 0.92],
+                ["designed_motion_fx_loop", 0.82],
+                ["hybrid_fx_motion", 0.80],
+                ["transition_riser", 0.72],
+                ["top_loop", 0.70],
+            ],
+        },
+    )
+    broad_instrument_parent = claim_from_folder_path(
+        folder_path="Instruments/Instrument Loops/Loops",
+        source="instrument_sibling_conflict_parent_claim",
+        reason="synthetic broad instrument parent",
+        shared=shared,
+        raw_candidate_score=5.0,
+        brain_rank=2,
+        physics_rank=2,
+        shared_winner="Instruments/Instrument Loops/Loops",
+        can_override=True,
+        strength=0.88,
+        is_real_candidate=False,
+    )
+
+    transition_claims = MeasuredTransitionFxClaimProducer().produce(
+        DecisionContext(raw, _instrument_only_eligibility(), facts)
+    )
+    final = FamilyClaimArbiter().adjudicate(
+        raw_claim=raw,
+        consensus_claims=[broad_instrument_parent],
         eligibility_claims=transition_claims,
         facts=facts,
     )
@@ -603,6 +926,51 @@ def test_parent_instrument_eligibility_allows_strong_noisy_designed_motion_fx() 
 
     assert claims
     assert claims[0].folder_path.startswith("FX/")
+
+
+def test_designed_low_fx_slow_swell_tail_claims_broad_riser_fx() -> None:
+    """A slow one-event designed FX body should not vanish into weak review."""
+    raw = _claim(
+        "FX/Textures/Natural Ambience/Coffee Shop Ambience/Long FX",
+        shared=[
+            _shared_row("FX/Structural and Transitional FX/Risers and Builds/Long Riser/Long FX", 11.0),
+            _shared_row("FX/Textures/Natural Ambience/Coffee Shop Ambience/Long FX", 30.0),
+        ],
+    )
+    facts = _facts(
+        "designed_low_fx",
+        confidence=0.94,
+        flat={
+            "fx_formant_score": 0.86,
+            "fx_transition_authority_score": 0.48,
+            "fx_motion_score": 0.37,
+            "fx_riser_build_score": 0.46,
+            "drum_hit_score": 0.36,
+            "drum_cymbal_source_score": 0.70,
+        },
+        metrics={
+            "shape_scores": [
+                ["designed_low_fx", 0.94],
+                ["transition_riser", 0.75],
+                ["transition_drop", 0.75],
+                ["texture_bed", 0.89],
+            ],
+            "onset_count": 1.0,
+            "onset_span_ratio": 0.0,
+            "tail_ratio": 0.94,
+            "attack_rise_time_norm": 0.19,
+            "temporal_centroid_ratio": 0.48,
+            "centroid_slope_norm": 0.006,
+            "percussive_event_ratio": 0.38,
+            "drumlike_frame_ratio": 0.35,
+            "spectral_flatness_mean": 0.29,
+        },
+    )
+
+    claims = MeasuredTransitionFxClaimProducer().produce(DecisionContext(raw, _eligibility(), facts))
+
+    assert claims
+    assert claims[0].folder_path == "FX/Structural and Transitional FX/Risers and Builds/Generic Riser/Long FX"
 
 
 def test_high_confidence_transition_drop_beats_broad_instrument_parent() -> None:

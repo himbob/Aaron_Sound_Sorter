@@ -1,0 +1,129 @@
+{
+  "ontology_name": "fx_role_ontology_v1",
+  "version": "2026-07-19",
+  "description": "Producer-facing FX role ontology used for coverage auditing and future trainable FX memory targets. Runtime sorting must keep using measured audio evidence, not source filenames or folders.",
+  "external_references": [
+    {
+      "name": "Universal Category System",
+      "url": "https://universalcategorysystem.com/",
+      "use": "Professional sound-effects category vocabulary and material/source coverage reference."
+    },
+    {
+      "name": "Freesound Broad Sound Taxonomy",
+      "url": "https://freesound.org/help/broad-sound-taxonomy/",
+      "use": "Broad user-facing split between Music, Instrument samples, Speech, Sound effects, and Soundscapes."
+    },
+    {
+      "name": "AudioSet Ontology",
+      "url": "https://research.google.com/audioset/ontology/",
+      "use": "Trainable hierarchical event vocabulary reference for broad sound-event models."
+    }
+  ],
+  "roles": [
+    {
+      "role_id": "fx_transition_motion",
+      "display_name": "Transition Motion",
+      "intent": "Designed movement used as a transition, build, drop, sweep, or reverse.",
+      "producer_examples": ["riser", "build", "downlifter", "drop", "whoosh", "sweep", "reverse"],
+      "target_memory_roles": ["fx_riser", "fx_downlifter", "fx_sweep"],
+      "target_physics_branches": ["FX/RiserBuild", "FX/DropDownlifter", "FX/WhooshSweep"],
+      "label_prefixes": [
+        "FX/Structural and Transitional FX/Risers and Builds",
+        "FX/Structural and Transitional FX/Drops and Downlifters",
+        "FX/Structural and Transitional FX/Sweeps and Whooshes",
+        "FX/Structural and Transitional FX/Reverses and Tails"
+      ],
+      "must_not_steal": ["Instruments/Voice", "Instruments/Woodwinds", "Instruments/Synths", "Drums/Cymbals"],
+      "training_goal_per_role": 12
+    },
+    {
+      "role_id": "fx_impact_punctuation",
+      "display_name": "Impact and Punctuation",
+      "intent": "Designed hits, booms, slams, sub hits, crashes, and break events.",
+      "producer_examples": ["impact", "boom", "slam", "sub hit", "crash", "break"],
+      "target_memory_roles": ["fx_impact"],
+      "target_physics_branches": ["FX/ImpactHit"],
+      "label_prefixes": [
+        "FX/Impacts and Hits",
+        "FX/Crashes and Breaks"
+      ],
+      "must_not_steal": ["Drums/Kick Drums", "Drums/Snares", "Drums/Claps Snaps Slaps", "Drums/Cymbals"],
+      "training_goal_per_role": 12
+    },
+    {
+      "role_id": "fx_designed_electronic",
+      "display_name": "Designed Electronic",
+      "intent": "Synthetic UI, sci-fi, alert, radio, electrical, glitch, and digital effects.",
+      "producer_examples": ["blip", "beep", "laser", "alarm", "siren", "glitch", "stutter", "radio", "electrical"],
+      "target_memory_roles": ["fx_blip", "fx_glitch"],
+      "target_physics_branches": ["FX/BlipBeep", "FX/SirenAlarm", "FX/GlitchStutter"],
+      "label_prefixes": [
+        "FX/Designed Noise FX",
+        "FX/Digital Mechanical Industrial Transport/Glitches and Stutters"
+      ],
+      "must_not_steal": ["Instruments/Synths", "Instruments/Keys", "Drums/Hi Hats"],
+      "training_goal_per_role": 12
+    },
+    {
+      "role_id": "fx_machine_transport",
+      "display_name": "Machine and Transport",
+      "intent": "Engines, motors, servos, mechanical loops, and vehicle-like mechanical motion.",
+      "producer_examples": ["engine", "motor", "servo", "machine", "mechanical loop"],
+      "target_memory_roles": ["fx_general"],
+      "target_physics_branches": ["FX/TextureAmbience"],
+      "label_prefixes": [
+        "FX/Digital Mechanical Industrial Transport/Machines",
+        "FX/Everyday Foley/Machines"
+      ],
+      "must_not_steal": ["Drums/Drum Loops", "Instruments/Bass", "Instruments/Synths"],
+      "training_goal_per_role": 10
+    },
+    {
+      "role_id": "fx_foley_material_event",
+      "display_name": "Foley Material Event",
+      "intent": "Object, contact, material, footstep, door, key, coin, glass, wood, metal, cloth, paper, or splash events.",
+      "producer_examples": ["door", "footstep", "keys", "coins", "glass", "wood", "metal", "paper", "cloth", "splash"],
+      "target_memory_roles": ["fx_general"],
+      "target_physics_branches": ["FX/ImpactHit", "FX/TextureAmbience"],
+      "label_prefixes": [
+        "FX/Everyday Foley/Doors",
+        "FX/Everyday Foley/Footsteps",
+        "FX/Everyday Foley/Keys Coins and Small Objects",
+        "FX/Everyday Foley/Water Foley",
+        "FX/Everyday Foley/Glass",
+        "FX/Everyday Foley/Metal",
+        "FX/Everyday Foley/Wood",
+        "FX/Everyday Foley/Paper and Cloth"
+      ],
+      "must_not_steal": ["Drums/Percussion", "Drums/Rims and Sticks", "Instruments/Mallets"],
+      "training_goal_per_role": 10
+    },
+    {
+      "role_id": "fx_human_creature_event",
+      "display_name": "Human and Creature Event",
+      "intent": "Non-singing human/body/creature/animal sounds used as effects, not musical voice performances.",
+      "producer_examples": ["breath", "mouth", "applause", "crowd", "creature", "animal", "bird", "dog", "cat", "cricket"],
+      "target_memory_roles": ["fx_human_voice_long_fx", "fx_human_voice_one_shot"],
+      "target_physics_branches": ["FX/HumanCreatureFX"],
+      "label_prefixes": [
+        "FX/Human and Voice FX",
+        "FX/Animals and Creatures"
+      ],
+      "must_not_steal": ["Instruments/Voice", "Instruments/Woodwinds", "Instruments/Synths"],
+      "training_goal_per_role": 12
+    },
+    {
+      "role_id": "fx_texture_soundscape",
+      "display_name": "Texture and Soundscape",
+      "intent": "Sustained beds, ambience, environmental textures, drones, noise, static, weather, and atmospheric layers.",
+      "producer_examples": ["ambience", "drone", "texture", "granular", "ocean", "water", "rain", "wind", "fire", "hiss", "static", "vinyl noise"],
+      "target_memory_roles": ["fx_noise_texture"],
+      "target_physics_branches": ["FX/TextureAmbience"],
+      "label_prefixes": [
+        "FX/Textures"
+      ],
+      "must_not_steal": ["Drums/Drum Loops", "Instruments/Instrument Loops", "Instruments/Bass"],
+      "training_goal_per_role": 12
+    }
+  ]
+}

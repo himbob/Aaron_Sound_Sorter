@@ -180,6 +180,52 @@ def test_clean_tonal_stab_with_light_formant_proxy_is_not_vocal() -> None:
     assert "Voice" in role.blocked_path_fragments
 
 
+def test_short_clean_tonal_blip_is_fx_one_shot_not_generic_instrument_review() -> None:
+    role = infer_parent_eligibility(
+        facts(
+            0.48,
+            shape="solo_phrase",
+            shape_conf=0.88,
+            roles={"voiced_one_shot": 0.24, "pitched_music_phrase": 0.76},
+            event_count_estimate=2,
+            event_rate_hz=5.07,
+            onset_span_ratio=0.38,
+            attack_rise_time_norm=0.004,
+            temporal_centroid_ratio=0.14,
+            pitch_confidence=0.83,
+            f0_voiced_ratio=1.0,
+            formant_like_peak_spacing=0.0,
+            sub_bass_ratio_lt_150hz=0.0,
+            bass_ratio_150_500hz=0.33,
+            mid_ratio_500_2000hz=0.66,
+            presence_ratio_2000_8000hz=0.006,
+            air_ratio_gt_8000hz=0.0,
+            loop_percussive_event_ratio=0.0,
+            loop_drumlike_frame_ratio=0.0,
+            loop_pitched_event_ratio=1.0,
+            loop_sustained_tonal_frame_ratio=1.0,
+            loop_non_event_tonal_ratio=1.0,
+            spectral_flatness_mean=0.047,
+            log_crest=2.10,
+            fx_blip_beep_score=0.86,
+            clean_tone_score=0.94,
+            onset_pitched_onset_score=0.93,
+            onset_percussive_onset_score=0.57,
+            drum_hit_score=0.34,
+            drum_kick_source_score=0.42,
+            drum_snare_source_score=0.38,
+            drum_clap_source_score=0.37,
+            drum_tom_conga_source_score=0.39,
+            drum_rim_stick_source_score=0.43,
+            drum_cymbal_source_score=0.26,
+            drum_metallic_percussion_source_score=0.31,
+        )
+    )
+    assert role.role_name == "short_designed_tonal_fx_hit"
+    assert role.allowed_top_families == ("FX", "_TO_REVIEW")
+    assert role.broad_folder_path == "FX/Designed Noise FX/Beep/One Shots"
+
+
 def test_processed_reverb_voice_shot_with_human_articulation_stays_vocal() -> None:
     role = infer_parent_eligibility(
         facts(

@@ -242,6 +242,18 @@ class PhysicsDrumLayer:
             drum_anchor = min(drum_anchor, 0.52)
         if not_long_texture <= 0.0 and event_count <= 2.0:
             drum_anchor *= 0.55
+        designed_fx_slow_tail_stand_down = bool(
+            shape_name in {"designed_low_fx", "designed_motion_fx_loop", "hybrid_fx_motion"}
+            and shape_confidence >= 0.78
+            and is_long
+            and event_count <= 2.25
+            and attack >= 0.09
+            and temporal >= 0.34
+            and tail >= 0.68
+            and not low_sub_kick_exception
+        )
+        if designed_fx_slow_tail_stand_down:
+            drum_anchor = min(drum_anchor, 0.50)
 
         low_body = sub + bass
         max(high, event_high, attack_high, body_high, tail_high)
@@ -531,13 +543,27 @@ class PhysicsDrumLayer:
             ):
                 branch_scores[branch_name] = min(branch_scores[branch_name], 0.38)
             drum_anchor = min(drum_anchor, 0.42)
+        if designed_fx_slow_tail_stand_down:
+            for branch_name in (
+                "Snare",
+                "Clap",
+                "Hat",
+                "Cymbal",
+                "RimOrStick",
+                "ShakerTambourine",
+                "ScrapeGuiro",
+                "MetallicPercussion",
+            ):
+                branch_scores[branch_name] = min(branch_scores[branch_name], 0.52)
+            drum_anchor = min(drum_anchor, 0.50)
 
         # Bias the family anchor upward when any concrete drum branch is very
         # strong.  This prevents single low pitched drum hits from being treated
         # as bass instruments just because they have stable F0.
         strongest_branch = max(branch_scores.values()) if branch_scores else 0.0
-        drum_anchor = max(drum_anchor, clamp01(0.80 * strongest_branch + 0.10 * short_hit + 0.10 * fast_attack))
-        if fa_status == "ok" and fa_events >= 1.0:
+        if not designed_fx_slow_tail_stand_down:
+            drum_anchor = max(drum_anchor, clamp01(0.80 * strongest_branch + 0.10 * short_hit + 0.10 * fast_attack))
+        if fa_status == "ok" and fa_events >= 1.0 and not designed_fx_slow_tail_stand_down:
             drum_anchor = max(drum_anchor, clamp01(0.88 * drum_anchor + 0.12 * early_struck))
 
         out = {
@@ -555,6 +581,7 @@ class PhysicsDrumLayer:
             "drum_anchor_clean_tonal_solo_phrase": bool(clean_tonal_solo_phrase),
             "drum_anchor_low_sub_kick_exception": bool(low_sub_kick_exception),
             "drum_anchor_tonal_synth_or_arp_loop_decoy": bool(tonal_synth_or_arp_loop_decoy),
+            "drum_anchor_designed_fx_slow_tail_stand_down": bool(designed_fx_slow_tail_stand_down),
             "drum_anchor_shape_name": shape_name,
             "drum_anchor_shape_confidence": round(float(shape_confidence), 6),
             "drum_low_body": round(float(low_body), 6),

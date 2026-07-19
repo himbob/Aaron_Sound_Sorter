@@ -15,65 +15,26 @@ Run from project root:
 
 from __future__ import annotations
 
-import csv
-import shutil
-import subprocess
-import sys
-from pathlib import Path
-
 import pytest
 
-csv.field_size_limit(sys.maxsize)
+from tests.sorter_harness import DEFAULT_BRAIN, REGRESSION_AUDIO_DIR, row_label, run_regression_sample
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-SORTER = PROJECT_ROOT / "Aaron_Sound_Sorter.py"
-BRAIN = PROJECT_ROOT / "stage4_folder_brain.json"
-AUDIO_DIR = PROJECT_ROOT / "tests" / "regression_audio"
-OUT_ROOT = PROJECT_ROOT / "_reports" / "pytest_regression_outputs" / "uploaded_audio_cases"
+BRAIN = DEFAULT_BRAIN
+AUDIO_DIR = REGRESSION_AUDIO_DIR
 SYNTHETIC_FIXTURE_MODE = AUDIO_DIR.is_symlink()
 
 
 def _run_sort(sample_name: str) -> str:
-    sample = AUDIO_DIR / sample_name
-    assert SORTER.exists(), f"Missing sorter: {SORTER}"
-    assert BRAIN.exists(), f"Missing brain: {BRAIN}"
-
-    out_dir = OUT_ROOT / sample.stem.replace(" ", "_")
-    if out_dir.exists():
-        shutil.rmtree(out_dir, ignore_errors=True)
-    out_dir.parent.mkdir(parents=True, exist_ok=True)
-
-    cmd = [
-        sys.executable,
-        str(SORTER),
-        "sort",
-        str(sample),
-        str(out_dir),
-        "--brain",
-        str(BRAIN),
-        "--no-zip",
-    ]
-    result = subprocess.run(
-        cmd, cwd=PROJECT_ROOT, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=60
+    row = run_regression_sample(
+        sample_name,
+        output_key="uploaded_audio_cases",
+        brain_path=BRAIN,
+        timeout=60,
+        workers=None,
     )
-    assert result.returncode == 0, result.stdout
-
-    manifest = out_dir / "Aaron_Sorted_Sounds_manifest.csv"
-    assert manifest.exists(), f"Missing manifest. Output was:\n{result.stdout}"
-    rows = list(csv.DictReader(manifest.open()))
-    assert rows, f"Manifest had no rows: {manifest}"
-    row = rows[0]
-
-    # Support both current and older manifest field variants.
-    label = row.get("final_label") or row.get("new_relative_path") or row.get("category") or ""
-    if not label:
-        # Fall back to finding the copied file under Aaron_Sorted_Sounds.
-        sorted_root = out_dir / "Aaron_Sorted_Sounds"
-        hits = [p for p in sorted_root.rglob(sample.name)] if sorted_root.exists() else []
-        if hits:
-            label = str(hits[0].relative_to(sorted_root).parent)
+    label = row_label(row)
     assert label, f"Could not determine final label from manifest row: {row}"
-    return label.replace("\\", "/")
+    return label
 
 
 def _assert_contains(label: str, *needles: str) -> None:
@@ -157,9 +118,3 @@ def test_compton_west_coast_loop_stays_broad_drum_or_mixed_not_narrow_kick_snare
     label = _run_sort("Compton_Fmin_100bpm.wav")
     _assert_not_contains(label, "Kick Drums", "Snares/Generic Snare", "Animals", "Bird")
     assert "Drum Loops" in label or "Instrument Loops" in label or "Mixed" in label, label
-
-
-@pytest.mark.xfail(reason="Unknown desired target; keep as diagnostic until Aaron labels it.", strict=False)
-def test_av5_hit_case_needs_human_target_label() -> None:
-    label = _run_sort("AV5_5_94bpm_Hit 2.wav")
-    _assert_not_contains(label, "Keys")

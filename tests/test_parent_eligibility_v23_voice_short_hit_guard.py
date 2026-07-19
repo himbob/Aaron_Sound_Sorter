@@ -7,54 +7,28 @@ short pitched one-shots must not be sent to loop folders.
 
 from __future__ import annotations
 
-import csv
-import shutil
-import subprocess
-import sys
-from pathlib import Path
-
 import pytest
 
-csv.field_size_limit(sys.maxsize)
+from tests.sorter_harness import DEFAULT_BRAIN, PROJECT_ROOT, row_label, run_folder_once
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-SORTER = PROJECT_ROOT / "Aaron_Sound_Sorter.py"
-BRAIN = PROJECT_ROOT / "stage4_folder_brain.json"
+BRAIN = DEFAULT_BRAIN
 AUDIO_DIR = PROJECT_ROOT / "tests" / "regression_audio_v23_voice_short_hit_guard"
-OUT_DIR = PROJECT_ROOT / "_pytest_regression_outputs" / "parent_eligibility_v23_voice_short_hit_guard"
 
 
 @pytest.fixture(scope="module")
 def sorted_rows() -> dict[str, dict[str, str]]:
     """Sort this focused fixture folder once and return rows by filename."""
-    if OUT_DIR.exists():
-        shutil.rmtree(OUT_DIR, ignore_errors=True)
-    OUT_DIR.parent.mkdir(parents=True, exist_ok=True)
-    result = subprocess.run(
-        [
-            "python3",
-            str(SORTER),
-            "sort",
-            str(AUDIO_DIR),
-            str(OUT_DIR),
-            "--brain",
-            str(BRAIN),
-            "--no-zip",
-        ],
-        cwd=PROJECT_ROOT,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
+    return run_folder_once(
+        AUDIO_DIR,
+        output_key="parent_eligibility_v23_voice_short_hit_guard",
+        brain_path=BRAIN,
         timeout=180,
     )
-    assert result.returncode == 0, result.stdout
-    rows = list(csv.DictReader((OUT_DIR / "Aaron_Sorted_Sounds_manifest.csv").open()))
-    return {Path(row.get("source_path", "")).name: row for row in rows}
 
 
 def final_label(row: dict[str, str]) -> str:
     """Return normalized final label."""
-    return (row.get("final_label") or row.get("folder_path") or row.get("placed_path") or "").replace("\\", "/")
+    return row_label(row)
 
 
 def assert_not_in(label: str, *fragments: str) -> None:

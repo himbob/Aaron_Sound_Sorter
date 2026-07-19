@@ -319,6 +319,131 @@ def test_profile_candidate_emits_synth_claim_against_broad_instrument_loop() -> 
     assert synth_claim.is_real_candidate is True
 
 
+def test_profile_candidate_bass_claim_beats_mallet_leaf_when_low_body_is_clean() -> None:
+    producer = ProfileCandidateClaimProducer()
+    measured = facts(
+        "solo_phrase",
+        0.81,
+        role_evidence={
+            "bass_loop": 0.63,
+            "pitched_music_loop": 0.76,
+            "low_rhythmic_drum_loop": 0.74,
+        },
+    )
+    measured.evidence["shape_vote"].update(
+        {
+            "low_event_ratio": 0.98,
+            "pitch_confidence": 0.96,
+            "pitched_event_ratio": 1.0,
+            "percussive_event_ratio": 0.0,
+            "drumlike_frame_ratio": 0.0,
+        }
+    )
+    context = DecisionContext(
+        raw=raw_claim("Instruments/Mallets and Bells/Vibraphone/Loops", score=20.0),
+        eligibility=eligibility("pitched_music_loop"),
+        facts=measured,
+        brain_result=VoterResult(
+            voter_name="brain",
+            guesses=[guess("Instruments/Bass/Generic Bass/Loops", 1)],
+        ),
+    )
+
+    claims = producer.produce(context)
+
+    assert any(claim.source == "profile_candidate_bass_claim" for claim in claims)
+    bass_claim = [claim for claim in claims if claim.source == "profile_candidate_bass_claim"][0]
+    assert bass_claim.folder_path == "Instruments/Bass/Bass Loops"
+
+
+def test_profile_candidate_bass_claim_stands_down_for_crowded_mixed_loop() -> None:
+    producer = ProfileCandidateClaimProducer()
+    measured = facts(
+        "bass_phrase",
+        0.98,
+        role_evidence={
+            "bass_loop": 0.63,
+            "pitched_music_loop": 0.76,
+            "low_rhythmic_drum_loop": 0.74,
+        },
+    )
+    measured.evidence["shape_vote"].update(
+        {
+            "low_event_ratio": 0.83,
+            "pitch_confidence": 0.80,
+            "pitched_event_ratio": 1.0,
+            "percussive_event_ratio": 0.0,
+            "drumlike_frame_ratio": 0.0,
+        }
+    )
+    context = DecisionContext(
+        raw=raw_claim("Instruments/Mixed Musical Loops/Multi Instrument/Loops", score=20.0),
+        eligibility=eligibility("pitched_music_loop"),
+        facts=measured,
+        brain_result=VoterResult(
+            voter_name="brain",
+            guesses=[
+                guess("Instruments/Synths/Synth Loops/Loops", 1),
+                guess("Instruments/Keys/Organ/Loops", 2),
+                guess("Instruments/Mixed Musical Loops/Multi Instrument/Loops", 3),
+                guess("Instruments/Keys/Piano/Loops", 4),
+                guess("Instruments/Bass/Generic Bass/Loops", 5),
+            ],
+        ),
+    )
+
+    claims = producer.produce(context)
+
+    assert all(claim.source != "profile_candidate_bass_claim" for claim in claims)
+
+
+def test_profile_candidate_synth_claim_stands_down_for_crowded_mixed_instrument_loop() -> None:
+    producer = ProfileCandidateClaimProducer()
+    synth_path = "Instruments/Synths/Synth Arp/Loops"
+    measured = facts(
+        "bass_phrase",
+        0.98,
+        role_evidence={
+            "loop_pitched_event_ratio": 1.0,
+            "loop_sustained_tonal_frame_ratio": 1.0,
+            "loop_tonal_to_percussive_balance": 1.0,
+        },
+    )
+    measured.evidence["physics_vote_result"] = {
+        "top_guesses": [
+            {
+                "folder_path": "Instruments/Keys/Organ/Loops",
+                "label": "Instruments/Keys/Organ/Loops",
+                "rank": 1,
+            }
+        ]
+    }
+    context = DecisionContext(
+        raw=raw_claim(
+            synth_path,
+            score=19.0,
+            shared=[
+                shared_row(synth_path, 19.0, brain_rank=12, physics_rank=7),
+                shared_row("Instruments/Keys/Organ/Loops", 20.0, brain_rank=18, physics_rank=2),
+                shared_row("Instruments/Plucked Strings/Harp/Loops", 22.0, brain_rank=17, physics_rank=5),
+                shared_row(
+                    "Instruments/Mixed Musical Loops/Multi Instrument/Loops", 24.0, brain_rank=13, physics_rank=11
+                ),
+            ],
+        ),
+        eligibility=eligibility("pitched_music_loop"),
+        facts=measured,
+        brain_result=VoterResult(
+            voter_name="brain",
+            guesses=[guess("Instruments/Synths/Synth Loops/Loops", 1)],
+        ),
+    )
+
+    claims = producer.produce(context)
+
+    assert all(claim.source != "profile_candidate_synth_claim" for claim in claims)
+
+
 def test_profile_candidate_emits_multiple_claims_so_arbiter_not_branch_order_decides() -> None:
     producer = ProfileCandidateClaimProducer()
     synth_path = "Instruments/Synths/Synth Pad/Loops"
@@ -776,6 +901,39 @@ def test_profile_candidate_synth_claim_can_challenge_non_plucked_string_false_po
     assert any(claim.source == "profile_candidate_synth_claim" for claim in claims)
     synth_claim = [claim for claim in claims if claim.source == "profile_candidate_synth_claim"][0]
     assert synth_claim.folder_path == synth_path
+
+
+def test_profile_candidate_synth_claim_stands_down_for_voice_like_solo_phrase() -> None:
+    producer = ProfileCandidateClaimProducer()
+    synth_path = "Instruments/Synths/Synth Pad/One Shots"
+    context = DecisionContext(
+        raw=raw_claim(synth_path, score=7.0, shared=[shared_row(synth_path, 9.0, brain_rank=7, physics_rank=23)]),
+        eligibility=eligibility("pitched_music_loop"),
+        facts=facts_with_shape_metrics(
+            "solo_phrase",
+            0.87,
+            role_evidence={
+                "pitched_music_loop": 0.70,
+                "pitched_music_phrase": 0.65,
+            },
+            shape_metrics={
+                "synth_tonal_source_score": 0.56,
+                "synth_pad_score": 0.68,
+                "human_spoken_voice_score": 0.50,
+                "voice_choir_score": 0.54,
+                "bass_synth_score": 0.64,
+                "drum_hit_score": 0.08,
+            },
+        ),
+        brain_result=VoterResult(
+            voter_name="brain",
+            guesses=[guess(synth_path, 7)],
+        ),
+    )
+
+    claims = producer.produce(context)
+
+    assert all(claim.source != "profile_candidate_synth_claim" for claim in claims)
 
 
 def test_profile_candidate_synth_claim_does_not_steal_plucked_string_with_pluck_body() -> None:

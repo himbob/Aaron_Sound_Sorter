@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from aaron_sound_sorter.domain.models import SharedAudioFacts
 from aaron_sound_sorter.engine.decision_context import DecisionContext
+from aaron_sound_sorter.engine.decision_helpers import _feature_number_from_facts
 from aaron_sound_sorter.engine.family_claim_arbiter import FamilyClaimArbiter
 from aaron_sound_sorter.engine.family_claims import ConsensusClaim, claim_from_folder_path
 
@@ -115,6 +116,9 @@ class MeasuredFinalGuardClaimProducer:
     def _facts_support_voice_one_shot_structure(facts: SharedAudioFacts | None) -> bool:
         """Return True when measured facts describe a single-event voice phrase."""
         if facts is None:
+            return False
+        duration = _feature_number_from_facts(facts, "duration_sec")
+        if duration <= 0.0 or duration > 1.80:
             return False
         if not (getattr(facts, "is_single_event_like", False) or getattr(facts, "is_short_hit_like", False)):
             return False

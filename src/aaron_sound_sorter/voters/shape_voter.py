@@ -26,6 +26,7 @@ from typing import Any
 from aaron_audio_intelligence.shape_memory_brain import ShapeMemoryMatch, shape_memory_match_for_facts
 from aaron_sound_sorter.domain.models import AudioPhysics, CategoryGuess, SharedAudioFacts, VoterResult
 from aaron_sound_sorter.domain.policies import ShapeVoterPolicy
+from aaron_sound_sorter.score_math import average_score as average
 from aaron_sound_sorter.voters.base import Voter, clamp01
 
 SHAPE_TOP = "_SHAPE_DIAGNOSTIC"
@@ -81,6 +82,13 @@ class ShapeEvidence:
     learned_shape_memory_effective_weight: int = 0
     learned_shape_memory_match_kind: str = "none"
     learned_shape_memory_policy: str = ""
+    learned_voter_memory_enabled: bool = False
+    learned_voter_memory_matched: bool = False
+    learned_voter_memory_shape: str = ""
+    learned_voter_memory_role: str = ""
+    learned_voter_memory_confidence: float = 0.0
+    learned_voter_memory_match_kind: str = "none"
+    learned_voter_memory_policy: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
@@ -95,6 +103,7 @@ class ShapeEvidence:
             "learned_shape_memory_confidence",
             "learned_shape_memory_nearest_distance",
             "learned_shape_memory_threshold",
+            "learned_voter_memory_confidence",
         ):
             data[key] = round(float(data[key]), 6)
         return data
@@ -115,6 +124,7 @@ class ShapeVoter(Voter):
         else:
             evidence = classify_shape(facts.feature_values_by_name, facts=facts)
             evidence = apply_shape_memory(evidence, facts=facts, brain=brain)
+            evidence = apply_voter_memory(evidence, facts=facts)
         label = f"shape/{evidence.primary_shape}"
         guess = CategoryGuess(
             label=label,
@@ -233,6 +243,9 @@ def classify_shape(values: Mapping[str, float], *, facts: SharedAudioFacts) -> S
     )
     measured_fx_tail = max(
         measured_number(facts, "fx_impact_score"),
+        measured_number(facts, "fx_boom_score"),
+        measured_number(facts, "fx_slam_score"),
+        measured_number(facts, "fx_sub_hit_score"),
         measured_number(facts, "fx_reverse_score"),
         measured_number(facts, "fx_whoosh_sweep_score"),
         measured_number(facts, "fx_riser_build_score"),
@@ -563,6 +576,17 @@ def classify_shape(values: Mapping[str, float], *, facts: SharedAudioFacts) -> S
         measured_fx_motion,
         measured_transition,
     )
+    synthetic_alert_values = [
+        measured_number(facts, "tonal_alert_siren_score"),
+        measured_number(facts, "fx_siren_score"),
+        measured_number(facts, "fx_alarm_score"),
+        measured_number(facts, "fx_boom_score"),
+        measured_number(facts, "fx_sub_hit_score"),
+        measured_number(facts, "fx_impact_score"),
+        measured_number(facts, "fx_slam_score"),
+    ]
+    synthetic_alert_fx_pressure = max(synthetic_alert_values)
+    synthetic_alert_fx_cluster = average(*sorted(synthetic_alert_values, reverse=True)[:3])
     fx_motion_design = max(
         measured_fx_motion,
         measured_transition,
@@ -652,6 +676,7 @@ def classify_shape(values: Mapping[str, float], *, facts: SharedAudioFacts) -> S
     clean_bass_shape_evidence = bool(
         low_total >= 0.42
         and pitch_conf >= 0.58
+        and (f0_voiced >= 0.28 or bass_identity_source >= 0.60)
         and max(sustained_tonal, non_event_tonal, pitched) >= 0.62
         and flatness <= 0.24
         and noise_wash <= 0.46
@@ -728,6 +753,22 @@ def classify_shape(values: Mapping[str, float], *, facts: SharedAudioFacts) -> S
         and not strong_directional_fx_motion
         and directional_fx_motion < 0.58
     )
+    synthetic_alert_fx_body = bool(
+        duration >= 1.20
+        and synthetic_alert_fx_pressure >= 0.54
+        and synthetic_alert_fx_cluster >= 0.49
+        and max(
+            scores["hybrid_fx_motion"],
+            scores[DESIGNED_TONAL_FX_SHAPE],
+            scores["siren_alarm_tone"],
+            scores["impact_with_tail"],
+        )
+        >= 0.50
+        and max(percussive, drumlike) <= 0.14
+        and f0_voiced <= 0.38
+        and not source_safe_voiced_phrase_body
+        and not real_drum_material_body
+    )
     designed_low_fx_body = bool(
         scores[DESIGNED_LOW_FX_SHAPE] >= 0.60
         and fx_low_design >= 0.56
@@ -756,8 +797,28 @@ def classify_shape(values: Mapping[str, float], *, facts: SharedAudioFacts) -> S
             max(plucked_authority, keys_authority, synth_source) >= 0.72
             and noise_wash <= 0.34
             and max(measured_fx_motion, measured_transition) < 0.42
+            and synthetic_alert_fx_pressure < 0.56
         )
     )
+    if synthetic_alert_fx_body:
+        synthetic_alert_floor = min(
+            0.94,
+            max(
+                scores[DESIGNED_TONAL_FX_SHAPE],
+                scores["hybrid_fx_motion"] + 0.08,
+                scores["siren_alarm_tone"] + 0.12,
+                synthetic_alert_fx_pressure + 0.12,
+            ),
+        )
+        scores[DESIGNED_TONAL_FX_SHAPE] = max(scores[DESIGNED_TONAL_FX_SHAPE], synthetic_alert_floor)
+        scores["hybrid_fx_motion"] = max(scores["hybrid_fx_motion"], min(0.93, synthetic_alert_floor - 0.02))
+        scores["siren_alarm_tone"] = max(scores["siren_alarm_tone"], min(0.92, synthetic_alert_floor - 0.04))
+        scores["bass_phrase"] = min(scores["bass_phrase"], synthetic_alert_floor - 0.03)
+        scores[PITCHED_REPETITION_PHRASE] = min(
+            scores[PITCHED_REPETITION_PHRASE],
+            synthetic_alert_floor - 0.04,
+        )
+        scores["repeated_phrase_loop"] = min(scores["repeated_phrase_loop"], synthetic_alert_floor - 0.05)
     if designed_low_fx_body:
         designed_low_floor = min(0.94, max(scores[DESIGNED_LOW_FX_SHAPE], fx_low_design + 0.08))
         scores[DESIGNED_LOW_FX_SHAPE] = max(scores[DESIGNED_LOW_FX_SHAPE], designed_low_floor)
@@ -832,6 +893,22 @@ def classify_shape(values: Mapping[str, float], *, facts: SharedAudioFacts) -> S
         and onset_count <= 8.0
         and not clean_bass_shape_evidence
     )
+    weak_loop_periodicity = max(
+        evidence_number(facts, "role_loop_score"),
+        v(values, "loop_onset_periodicity"),
+        v(values, "loop_pulse_clarity"),
+        v(values, "librosa_loop_confidence"),
+    )
+    impact_tail_fx_body = bool(
+        measured_fx_tail >= 0.52
+        and tail >= 0.24
+        and onset_count <= 12.0
+        and f0_voiced <= 0.25
+        and weak_loop_periodicity <= 0.36
+        and not clean_bass_shape_evidence
+        and not repeated_percussive_drum_loop_body
+        and not repeated_noisy_drum_loop_body
+    )
     motion_texture_body = bool(
         max(measured_fx_motion, measured_transition, measured_fx_tail) >= 0.38
         and max(noise_wash, measured_texture) >= 0.42
@@ -901,6 +978,16 @@ def classify_shape(values: Mapping[str, float], *, facts: SharedAudioFacts) -> S
         scores["hit_with_tail"] = max(scores["hit_with_tail"], min(0.90, tail_shape_floor - 0.03))
         scores["bass_phrase"] = min(scores["bass_phrase"], tail_shape_floor - 0.02)
         scores[PITCHED_REPETITION_PHRASE] = min(scores[PITCHED_REPETITION_PHRASE], tail_shape_floor - 0.03)
+    if impact_tail_fx_body:
+        impact_tail_floor = min(0.94, max(scores["impact_with_tail"], measured_fx_tail + 0.18))
+        scores["impact_with_tail"] = max(scores["impact_with_tail"], impact_tail_floor)
+        scores["hit_with_tail"] = max(scores["hit_with_tail"], min(0.90, impact_tail_floor - 0.03))
+        scores["bass_phrase"] = min(scores["bass_phrase"], impact_tail_floor - 0.02)
+        scores[PITCHED_REPETITION_PHRASE] = min(
+            scores[PITCHED_REPETITION_PHRASE],
+            impact_tail_floor - 0.03,
+        )
+        scores["repeated_phrase_loop"] = min(scores["repeated_phrase_loop"], impact_tail_floor - 0.04)
     if motion_texture_body:
         motion_shape_floor = min(
             0.93, max(scores["hybrid_fx_motion"], measured_fx_tail + 0.08, measured_transition + 0.10)
@@ -1127,6 +1214,60 @@ def shape_memory_fields(match: ShapeMemoryMatch) -> dict[str, Any]:
     }
 
 
+def apply_voter_memory(
+    evidence: ShapeEvidence,
+    *,
+    facts: SharedAudioFacts,
+) -> ShapeEvidence:
+    """Return shape evidence adjusted by learned voter-role memory."""
+    if evidence.primary_shape == "broken_or_tiny":
+        return evidence
+    memory = facts.evidence.get("learned_voter_memory", {}) if isinstance(facts.evidence, dict) else {}
+    if not isinstance(memory, Mapping) or not bool(memory.get("enabled")):
+        return evidence
+    memory_fields = voter_memory_shape_fields(memory)
+    if not bool(memory.get("matched")):
+        return replace(evidence, **memory_fields)
+    target_shape = str(memory.get("shape", ""))
+    confidence = clamp01(v(memory, "confidence", 0.0))
+    if not target_shape or confidence < 0.72:
+        return replace(evidence, **memory_fields)
+
+    scores = {str(name): float(score) for name, score in evidence.shape_scores}
+    current = float(scores.get(target_shape, 0.0))
+    teacher_score = max(current, min(0.95, confidence + 0.02))
+    scores[target_shape] = teacher_score
+    sorted_scores = sorted(scores.items(), key=lambda item: item[1], reverse=True)
+    primary, primary_score = sorted_scores[0]
+    secondary = sorted_scores[1][0] if len(sorted_scores) > 1 else evidence.secondary_shape
+    reason = (
+        f"{evidence.reason}; learned_voter_memory_shape={target_shape} "
+        f"role={memory.get('role', '')} confidence={confidence:.2f}"
+    )
+    return replace(
+        evidence,
+        primary_shape=primary,
+        secondary_shape=secondary,
+        confidence=round(clamp01(primary_score), 6),
+        shape_scores=[(name, round(clamp01(score), 6)) for name, score in sorted_scores],
+        reason=reason,
+        **memory_fields,
+    )
+
+
+def voter_memory_shape_fields(memory: Mapping[str, Any]) -> dict[str, Any]:
+    """Return ``ShapeEvidence`` keyword fields for voter-memory diagnostics."""
+    return {
+        "learned_voter_memory_enabled": bool(memory.get("enabled")),
+        "learned_voter_memory_matched": bool(memory.get("matched")),
+        "learned_voter_memory_shape": str(memory.get("shape", "")),
+        "learned_voter_memory_role": str(memory.get("role", "")),
+        "learned_voter_memory_confidence": v(memory, "confidence", 0.0),
+        "learned_voter_memory_match_kind": str(memory.get("match_kind", "none")),
+        "learned_voter_memory_policy": str(memory.get("policy", "")),
+    }
+
+
 def v(values: Mapping[str, float], name: str, default: float = 0.0) -> float:
     try:
         return float(values.get(name, default) or default)
@@ -1199,11 +1340,6 @@ def inverse_ramp(number: float, good_at_or_below: float, bad_at_or_above: float)
     if bad_at_or_above <= good_at_or_below:
         return 0.0
     return clamp01((float(bad_at_or_above) - float(number)) / (float(bad_at_or_above) - float(good_at_or_below)))
-
-
-def average(*parts: float) -> float:
-    usable = [clamp01(part) for part in parts]
-    return sum(usable) / len(usable) if usable else 0.0
 
 
 def shape_compatible_tops(primary_shape: str) -> list[str]:

@@ -21,6 +21,8 @@ PYTHON ?= python3
 VENV_DIR ?= .venv_phase4
 VENV_PYTHON := $(VENV_DIR)/bin/python
 VENV_PIP := $(VENV_PYTHON) -m pip
+PYTHON_BYTECODE_CACHE ?= $(PROJECT_ROOT)/_reports/python_pycache
+export PYTHONPYCACHEPREFIX := $(PYTHON_BYTECODE_CACHE)
 PIP_INSTALL_FLAGS ?=
 PYTEST_ARGS ?= -q
 QUALITY_REPORT_ARGS ?=
@@ -30,6 +32,7 @@ BUNDLE_OUTPUT_DIR ?= _reports/bundles
 AI_BASE ?= HEAD
 
 .PHONY: help bootstrap init venv upgrade-pip install install-all install-runtime install-quality install-dev \
+        ensure-quality \
         doctor check-tools audit-source-names pycompile test test-one test-coverage test-coverage-html \
         lint format format-check type-check docstyle quality qa ci quality-report quality-report-full \
         quality-report-coverage quality-gate-report quality-baseline quality-strict \
@@ -48,6 +51,7 @@ help:
 	@echo "  make install-runtime           Install runtime deps from requirements.txt."
 	@echo "  make install-quality           Install pytest/coverage/ruff/mypy/pydocstyle deps."
 	@echo "  make install-dev               Install full dev stack from requirements-dev.txt."
+	@echo "  make ensure-quality            Fast import-only check that the quality deps are already installed."
 	@echo "  make doctor                    Verify required developer tools from the venv."
 	@echo ""
 	@echo "AI changed-files quality gate:"
@@ -95,6 +99,7 @@ help:
 	@echo "  PYTHON=$(PYTHON)"
 	@echo "  VENV_DIR=$(VENV_DIR)"
 	@echo "  AI_BASE=$(AI_BASE)"
+	@echo "  PYTHONPYCACHEPREFIX=$(PYTHONPYCACHEPREFIX)"
 	@echo "  PIP_INSTALL_FLAGS=$(PIP_INSTALL_FLAGS)"
 	@echo "  BUNDLE_NAME=$(BUNDLE_NAME)"
 	@echo "  BUNDLE_OUTPUT_DIR=$(BUNDLE_OUTPUT_DIR)"
@@ -122,6 +127,9 @@ install-quality: upgrade-pip
 install-dev: upgrade-pip
 	$(VENV_PIP) install $(PIP_INSTALL_FLAGS) -r requirements-dev.txt
 
+ensure-quality: venv
+	"$(VENV_PYTHON)" tools/check_dev_environment.py --project-root "$(PROJECT_ROOT)" --quick --quiet
+
 check-tools: doctor
 
 doctor:
@@ -133,68 +141,68 @@ audit-source-names:
 pycompile:
 	"$(VENV_PYTHON)" -m compileall -q src tests tools Aaron_Sound_Sorter.py
 
-test: install-quality
+test: ensure-quality
 	"$(VENV_PYTHON)" -m pytest $(PYTEST_ARGS)
 
-test-one: install-quality
+test-one: ensure-quality
 	@test -n "$(TEST)" || (echo "Usage: make test-one TEST='tests/path.py::test_name'" && exit 2)
 	"$(VENV_PYTHON)" -m pytest -q "$(TEST)"
 
-test-coverage: install-quality
+test-coverage: ensure-quality
 	mkdir -p _reports/quality
 	"$(VENV_PYTHON)" -m pytest --cov=src/aaron_sound_sorter --cov-report=term-missing --cov-report=xml:_reports/quality/coverage.xml $(PYTEST_ARGS)
 
-test-coverage-html: install-quality
+test-coverage-html: ensure-quality
 	mkdir -p _reports/quality
 	"$(VENV_PYTHON)" -m pytest --cov=src/aaron_sound_sorter --cov-report=term-missing --cov-report=html:_reports/quality/htmlcov $(PYTEST_ARGS)
 
-lint: install-quality
+lint: ensure-quality
 	"$(VENV_PYTHON)" -m ruff check src tests tools
 
-format: install-quality
+format: ensure-quality
 	"$(VENV_PYTHON)" -m ruff format src tests tools
 
-format-check: install-quality
+format-check: ensure-quality
 	"$(VENV_PYTHON)" -m ruff format --check src tests tools
 
-type-check: install-quality
+type-check: ensure-quality
 	"$(VENV_PYTHON)" -m mypy src/aaron_sound_sorter
 
-docstyle: install-quality
+docstyle: ensure-quality
 	"$(VENV_PYTHON)" -m pydocstyle src/aaron_sound_sorter
 
-quality: install-quality audit-source-names pycompile lint format-check type-check docstyle test
+quality: ensure-quality audit-source-names pycompile lint format-check type-check docstyle test
 
 qa: quality
 
 ci: bootstrap quality test-coverage
 
-quality-report: clean-generated install-quality
+quality-report: clean-generated ensure-quality
 	"$(VENV_PYTHON)" tools/pro_quality_report.py --project-root "$(PROJECT_ROOT)" --report-only $(QUALITY_REPORT_ARGS)
 
-quality-report-full: clean-generated install-quality
+quality-report-full: clean-generated ensure-quality
 	"$(VENV_PYTHON)" tools/pro_quality_report.py --project-root "$(PROJECT_ROOT)" --with-pytest --report-only $(QUALITY_REPORT_ARGS)
 
-quality-report-coverage: clean-generated install-quality
+quality-report-coverage: clean-generated ensure-quality
 	"$(VENV_PYTHON)" tools/pro_quality_report.py --project-root "$(PROJECT_ROOT)" --with-pytest --with-coverage --report-only $(QUALITY_REPORT_ARGS)
 
-quality-gate-report: clean-generated install-quality
+quality-gate-report: clean-generated ensure-quality
 	"$(VENV_PYTHON)" tools/pro_quality_report.py --project-root "$(PROJECT_ROOT)" $(QUALITY_REPORT_ARGS)
 
 quality-baseline: quality-report
 
 quality-strict: quality
 
-ai-preflight: clean-generated install-quality
+ai-preflight: clean-generated ensure-quality
 	"$(VENV_PYTHON)" tools/ai_quality_gate.py --project-root "$(PROJECT_ROOT)" --base "$(AI_BASE)" preflight
 
 ai-changed-files:
 	"$(VENV_PYTHON)" tools/ai_quality_gate.py --project-root "$(PROJECT_ROOT)" --base "$(AI_BASE)" list
 
-ai-fix: clean-generated install-quality
+ai-fix: clean-generated ensure-quality
 	"$(VENV_PYTHON)" tools/ai_quality_gate.py --project-root "$(PROJECT_ROOT)" --base "$(AI_BASE)" fix
 
-ai-check: clean-generated install-quality
+ai-check: clean-generated ensure-quality
 	"$(VENV_PYTHON)" tools/ai_quality_gate.py --project-root "$(PROJECT_ROOT)" --base "$(AI_BASE)" check
 
 ai-test: test-one
@@ -228,6 +236,7 @@ clean-generated:
 	find . -name '.mypy_cache' -type d -prune -exec rm -rf {} +
 	find . -name '.ruff_cache' -type d -prune -exec rm -rf {} +
 	find . -name '*.pyc' -type f -delete
+	rm -rf "$(PYTHON_BYTECODE_CACHE)"
 	rm -f .coverage
 
 clean: clean-generated

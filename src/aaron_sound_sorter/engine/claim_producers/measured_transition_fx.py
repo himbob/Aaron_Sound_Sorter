@@ -120,16 +120,25 @@ class MeasuredTransitionFxClaimProducer:
             and not self._facts_support_measured_transition_owner(facts)
             and not self._facts_support_shape_only_transition_rehome(facts, raw)
             and not self._facts_support_strong_designed_motion_fx(facts)
+            and not self._facts_support_measured_impact_tail_body(facts, raw)
+            and not self._facts_support_learned_or_brain_fx_role_owner(facts)
         ):
             return None
         designed_shape_body = self._facts_support_measured_designed_fx_body(facts, raw)
         branch = self._measured_physics_fx_role_branch(facts)
-        use_branch_folder = bool(branch and not (shape in DESIGNED_FX_SHAPES and designed_shape_body))
+        use_branch_folder = bool(
+            branch
+            and (
+                self._facts_support_learned_or_brain_fx_role_owner(facts)
+                or not (shape in DESIGNED_FX_SHAPES and designed_shape_body)
+            )
+        )
         if (
             not use_branch_folder
             and self._parent_music_loop_release_should_block_transition(raw, facts)
             and not designed_shape_body
             and not self._facts_support_measured_transition_owner(facts)
+            and not self._facts_support_measured_impact_tail_body(facts, raw)
         ):
             return None
         if use_branch_folder:
@@ -159,6 +168,9 @@ class MeasuredTransitionFxClaimProducer:
             elif shape == "hybrid_fx_motion":
                 folder_path = self._hybrid_motion_fx_folder(facts)
                 reason_tail = "ShapeVoter measured high-confidence hybrid FX motion"
+            elif shape == "impact_with_tail":
+                folder_path = "FX/Impacts and Hits/Generic Impact/Long FX"
+                reason_tail = "ShapeVoter measured impact-tail body with FX impact support"
             else:
                 folder_path = "FX/Hybrid Designed FX"
                 reason_tail = "ShapeVoter measured designed tonal/formant FX decoy"
@@ -293,6 +305,99 @@ class MeasuredTransitionFxClaimProducer:
             return False
         return True
 
+    def _facts_support_measured_impact_tail_body(
+        self,
+        facts: SharedAudioFacts | None,
+        raw: ConsensusClaim,
+    ) -> bool:
+        """Return True for FX impact tails that are being mistaken for music loops.
+
+        The audio body must look like an impact or boom with a tail, not a
+        clean loop: low voiced-frame coverage, weak loop periodicity, and
+        moderate impact/boom/slam/sub-hit physics.  A nearby internal FX-impact
+        candidate is also required unless the raw candidate is already FX or
+        review.  This lets learned/brain evidence authorize the claim without
+        using source filenames.
+        """
+        if facts is None:
+            return False
+        shape = _shape_vote_from_facts(facts)
+        if shape not in {"impact_with_tail", "hit_with_tail"}:
+            return False
+        shape_confidence = _shape_confidence_from_facts(facts)
+        if shape_confidence < 0.70:
+            return False
+        impact_support = max(
+            self._subpanel_score(facts, "fx_impact_score"),
+            self._subpanel_score(facts, "fx_boom_score"),
+            self._subpanel_score(facts, "fx_slam_score"),
+            self._subpanel_score(facts, "fx_sub_hit_score"),
+            self._shape_score(facts, "impact_with_tail"),
+        )
+        if impact_support < 0.50:
+            return False
+        if self._facts_support_short_drum_hit_over_impact_fx(facts, raw):
+            return False
+        weak_loop_periodicity = max(
+            self._shape_number(facts, "loop_onset_periodicity"),
+            self._shape_number(facts, "loop_pulse_clarity"),
+        )
+        if weak_loop_periodicity > 0.42:
+            return False
+        f0_voiced = self._shape_number(facts, "f0_voiced_ratio")
+        if f0_voiced > 0.35:
+            return False
+        if self._facts_support_true_voice_role(facts):
+            return False
+        if self._facts_support_clean_instrument_loop_over_designed_fx(facts, raw):
+            return False
+        if shape_confidence >= 0.74 and impact_support >= 0.56 and weak_loop_periodicity <= 0.36 and f0_voiced <= 0.25:
+            return True
+        has_fx_impact_candidate = self._shared_candidate_has_top_family(
+            raw,
+            ("impact", "boom", "slam", "sub hit"),
+            top_family="FX",
+            max_score=64.0,
+            max_brain_rank=10,
+            max_physics_rank=64,
+        )
+        return bool(raw.family in {"FX", "_TO_REVIEW"} or has_fx_impact_candidate)
+
+    def _facts_support_short_drum_hit_over_impact_fx(
+        self,
+        facts: SharedAudioFacts | None,
+        raw: ConsensusClaim,
+    ) -> bool:
+        """Return True when a short drum hit explains impact-like shape better."""
+        if facts is None or raw.family != "Drums":
+            return False
+        drum_source = max(
+            self._subpanel_score(facts, "drum_hit_score"),
+            self._subpanel_score(facts, "drum_kick_source_score"),
+            self._subpanel_score(facts, "drum_snare_source_score"),
+            self._subpanel_score(facts, "drum_clap_source_score"),
+            self._subpanel_score(facts, "drum_tom_conga_source_score"),
+            self._subpanel_score(facts, "drum_cymbal_source_score"),
+        )
+        one_shot = max(
+            self._subpanel_score(facts, "role_one_shot_score"),
+            self._shape_score(facts, "single_hit"),
+            self._shape_score(facts, "hit_with_tail"),
+        )
+        fx_motion = max(
+            self._subpanel_score(facts, "fx_motion_score"),
+            self._subpanel_score(facts, "fx_transition_authority_score"),
+            self._subpanel_score(facts, "fx_riser_build_score"),
+            self._subpanel_score(facts, "fx_drop_downlifter_score"),
+            self._subpanel_score(facts, "fx_whoosh_sweep_score"),
+            self._subpanel_score(facts, "fx_reverse_score"),
+        )
+        noisy_air = self._subpanel_score(facts, "physics_subpanel_noisy_air")
+        clean_tone = self._subpanel_score(facts, "physics_subpanel_clean_tone")
+        return bool(
+            drum_source >= 0.66 and one_shot >= 0.70 and fx_motion <= 0.40 and (noisy_air <= 0.48 or clean_tone >= 0.45)
+        )
+
     def _facts_support_measured_transition_fx(
         self,
         facts: SharedAudioFacts | None,
@@ -303,12 +408,17 @@ class MeasuredTransitionFxClaimProducer:
             return False
         if self._facts_support_rhythmic_drum_loop_over_transition(facts):
             return False
+        if self._facts_support_clean_bass_loop_owner_over_fx(facts):
+            return False
         measured_transition_body = self._facts_support_measured_transition_body(facts)
         measured_designed_body = self._facts_support_measured_designed_fx_body(facts, raw)
         measured_fx_decoy_body = self._facts_support_measured_fx_decoy_shape_body(facts, raw)
-        if self._facts_support_protected_loop_owner_over_fx(facts):
+        measured_impact_tail_body = self._facts_support_measured_impact_tail_body(facts, raw)
+        if self._facts_support_protected_loop_owner_over_fx(facts) and not measured_impact_tail_body:
             return False
-        if raw.family == "Drums" and not (measured_transition_body or measured_designed_body or measured_fx_decoy_body):
+        if raw.family == "Drums" and not (
+            measured_transition_body or measured_designed_body or measured_fx_decoy_body or measured_impact_tail_body
+        ):
             return False
 
         branch = self._measured_physics_fx_role_branch(facts)
@@ -319,6 +429,8 @@ class MeasuredTransitionFxClaimProducer:
             if raw.family == "FX" and branch not in MOTION_BRANCHES:
                 return False
             if raw.family in {"FX", "_TO_REVIEW"}:
+                return True
+            if self._facts_support_learned_or_brain_fx_role_owner(facts):
                 return True
             return self._shared_candidate_has_top_family(
                 raw,
@@ -363,6 +475,10 @@ class MeasuredTransitionFxClaimProducer:
                 return False
             if raw.family in {"FX", "_TO_REVIEW", "Drums", "Instruments"}:
                 return True
+        if measured_impact_tail_body:
+            if self._facts_support_true_voice_role(facts):
+                return False
+            return True
         if shape not in {
             "transition_riser",
             "transition_downlifter",
@@ -771,6 +887,21 @@ class MeasuredTransitionFxClaimProducer:
                 )
                 >= 0.46
             )
+            slow_swell_tail_body = bool(
+                self._shape_number(facts, "tail_ratio") >= 0.70
+                and self._shape_number(facts, "attack_rise_time_norm") >= 0.08
+                and self._shape_number(facts, "temporal_centroid_ratio") >= 0.34
+                and self._shape_number(facts, "onset_count") <= 3.0
+                and max(
+                    self._shape_score(facts, "designed_low_fx"),
+                    self._shape_score(facts, "transition_riser"),
+                    self._shape_score(facts, "transition_drop"),
+                    self._shape_score(facts, "reverse_swell"),
+                    self._shape_score(facts, "whoosh_sweep"),
+                )
+                >= 0.68
+                and max(fx_motion, fx_low, fx_tonal) >= 0.54
+            )
             short_directional_stutter = bool(
                 self._shape_number(facts, "duration_sec") <= 1.25
                 and abs(self._shape_signed_number(facts, "centroid_slope_norm")) >= 0.12
@@ -795,7 +926,13 @@ class MeasuredTransitionFxClaimProducer:
                 >= 0.62
                 and self._shape_number(facts, "spectral_flatness_mean") >= 0.32
             )
-            return bool(low_body or motion_tail_body or short_directional_stutter or long_glitch_formant_loop)
+            return bool(
+                low_body
+                or motion_tail_body
+                or slow_swell_tail_body
+                or short_directional_stutter
+                or long_glitch_formant_loop
+            )
         if shape == "designed_motion_fx_loop":
             return bool(
                 fx_motion >= 0.46
@@ -1008,6 +1145,15 @@ class MeasuredTransitionFxClaimProducer:
         whoosh = max(self._subpanel_score(facts, "fx_whoosh_sweep_score"), self._shape_score(facts, "whoosh_sweep"))
         if reverse >= 0.72 and abs(slope) < 0.10:
             return "FX/Structural and Transitional FX/Reverses and Tails/Generic Reverse/Long FX"
+        slow_swell_riser = bool(
+            riser >= 0.70
+            and self._shape_number(facts, "attack_rise_time_norm") >= 0.08
+            and self._shape_number(facts, "temporal_centroid_ratio") >= 0.34
+            and slope >= -0.04
+            and drop <= riser + 0.10
+        )
+        if slow_swell_riser:
+            return "FX/Structural and Transitional FX/Risers and Builds/Generic Riser/Long FX"
         if slope >= 0.04 and max(riser, whoosh) >= 0.58:
             return "FX/Structural and Transitional FX/Risers and Builds/Generic Riser/Long FX"
         if slope <= -0.04 and max(drop, whoosh) >= 0.58:
@@ -1220,6 +1366,78 @@ class MeasuredTransitionFxClaimProducer:
         if top_family == "FX" and top_confidence >= 0.60 and strength >= 0.60:
             return branch
         return ""
+
+    def _facts_support_learned_or_brain_fx_role_owner(self, facts: SharedAudioFacts | None) -> bool:
+        """Return True when brain top-family and physics role both own FX.
+
+        This is intentionally broader than exact-leaf overlap.  Designed FX
+        labels are heterogeneous, so Brain may say Impact while Physics says
+        Siren/Alarm.  When both lanes agree on top-family FX and the physics
+        layer has a trusted synthetic/role branch, the arbiter may choose a
+        broad FX owner instead of releasing a weak Instrument leaf.
+        """
+        if facts is None or not isinstance(getattr(facts, "evidence", None), dict):
+            return False
+        layer = facts.evidence.get("physics_layer_decision")
+        if not isinstance(layer, dict):
+            return False
+        if str(layer.get("physics_layer_top_family") or "") != "FX":
+            return False
+        if self._safe_float(layer.get("physics_layer_top_confidence"), 0.0) < 0.60:
+            return False
+        branch = str(layer.get("physics_layer_branch") or "")
+        if branch not in TRUSTED_FX_BRANCHES:
+            return False
+        trusted_body = bool(
+            layer.get("fx_synthetic_alert_fx_body")
+            or layer.get("fx_role_allows_fx")
+            or self._safe_float(layer.get("fx_role_strength"), 0.0) >= 0.66
+        )
+        if not trusted_body:
+            return False
+        return self._brain_ensemble_top_family(facts) == "FX"
+
+    def _facts_support_clean_bass_loop_owner_over_fx(self, facts: SharedAudioFacts | None) -> bool:
+        """Return True when measured bass-loop ownership should block FX."""
+        if facts is None or not isinstance(getattr(facts, "evidence", None), dict):
+            return False
+        brain_label = self._brain_ensemble_top_label(facts).lower()
+        if not brain_label.startswith("instruments/bass/"):
+            return False
+        roles = facts.evidence.get("measured_roles", {})
+        role_owner = max(
+            role_strength(roles, "bass_loop") if isinstance(roles, dict) else 0.0,
+            role_strength(roles, "pitched_music_loop") if isinstance(roles, dict) else 0.0,
+            role_strength(roles, "low_rhythmic_drum_loop") if isinstance(roles, dict) else 0.0,
+        )
+        low_body = max(
+            self._shape_number(facts, "low_event_ratio"),
+            _feature_number_from_facts(facts, "low_total"),
+        )
+        pitch_confidence = max(
+            self._shape_number(facts, "pitch_confidence"),
+            _feature_number_from_facts(facts, "pitch_confidence"),
+        )
+        return bool(role_owner >= 0.62 and low_body >= 0.70 and pitch_confidence >= 0.70)
+
+    @staticmethod
+    def _brain_ensemble_top_family(facts: SharedAudioFacts) -> str:
+        """Return the Brain ensemble top family from diagnostic evidence."""
+        folder_path = MeasuredTransitionFxClaimProducer._brain_ensemble_top_label(facts)
+        return folder_path.split("/", 1)[0] if folder_path else ""
+
+    @staticmethod
+    def _brain_ensemble_top_label(facts: SharedAudioFacts) -> str:
+        """Return the Brain ensemble top label from diagnostic evidence."""
+        evidence = facts.evidence if isinstance(getattr(facts, "evidence", None), dict) else {}
+        vote = evidence.get("brain_ensemble_vote_1")
+        if isinstance(vote, dict):
+            folder_path = str(vote.get("folder_path") or vote.get("label") or "")
+            if folder_path:
+                return folder_path
+            top = str(vote.get("top_family") or "")
+            return top
+        return str(vote or "")
 
     def _facts_support_clean_tonal_blip_as_instrument_or_bell(self, facts: SharedAudioFacts | None) -> bool:
         """Return True when a short tonal blip lacks real FX motion evidence."""

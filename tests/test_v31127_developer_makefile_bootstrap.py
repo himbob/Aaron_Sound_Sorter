@@ -19,6 +19,7 @@ def test_makefile_has_company_style_bootstrap_and_quality_targets() -> None:
         "install-quality:",
         "install-dev:",
         "install-all:",
+        "ensure-quality:",
         "doctor:",
         "audit-source-names:",
         "pycompile:",
@@ -41,11 +42,14 @@ def test_makefile_has_company_style_bootstrap_and_quality_targets() -> None:
     assert not missing_targets
 
 
-def test_makefile_installs_dependencies_before_quality_targets() -> None:
-    """Quality and test targets should install the declared tool stack first."""
+def test_makefile_uses_fast_quality_checks_for_repeat_test_runs() -> None:
+    """Repeat test and quality targets should verify deps without reinstalling them."""
     makefile_text = (PROJECT_ROOT / "Makefile").read_text(encoding="utf-8")
     for target_name in ["test", "test-coverage", "lint", "format-check", "type-check", "docstyle"]:
-        assert f"{target_name}: install-quality" in makefile_text
+        assert f"{target_name}: ensure-quality" in makefile_text
+    assert "install-quality: upgrade-pip" in makefile_text
+    assert "PYTHONPYCACHEPREFIX" in makefile_text
+    assert "_reports/python_pycache" in makefile_text
     assert "bootstrap: install-dev doctor" in makefile_text
     assert "install-all: install-dev" in makefile_text
 
@@ -88,3 +92,5 @@ def test_check_dev_environment_lists_required_quality_modules() -> None:
     checker_text = (PROJECT_ROOT / "tools" / "check_dev_environment.py").read_text(encoding="utf-8")
     for module_name in ["pytest", "pytest_cov", "coverage", "ruff", "mypy", "pydocstyle"]:
         assert module_name in checker_text
+    assert "--quick" in checker_text
+    assert "--quiet" in checker_text

@@ -6,6 +6,8 @@
 brains:
   full: stage4_folder_brain.json
   user_memory: stage4_folder_brain_user_memory.json
+  physics_memory: stage4_physics_memory_brain.json
+  voter_memory: stage4_voter_memory_brain.json
   shape_starter_memory: stage4_shape_memory_starter_brain.json
   shape_memory: stage4_shape_memory_brain.json
   baby:

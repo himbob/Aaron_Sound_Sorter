@@ -789,7 +789,20 @@ class ProfileInstrumentClaimMixin:
             return None
         if self._facts_have_strong_human_voice_identity(facts) and not synth_lead_like_body:
             return None
+        if (
+            shape_name == "solo_phrase"
+            and not synth_lead_like_body
+            and not self._facts_support_decisive_synth_source_body(facts)
+        ):
+            return None
         if self._facts_support_clean_designed_tonal_keys_loop(facts):
+            return None
+        if (
+            raw_is_synth_like_plucked_false_positive
+            and shape_name == "solo_phrase"
+            and not synth_lead_like_body
+            and not self._facts_support_decisive_synth_source_body(facts)
+        ):
             return None
 
         shared_synth = self.best_shared_candidate(
@@ -816,6 +829,13 @@ class ProfileInstrumentClaimMixin:
                 return None
         shared_score = shared_synth[0] if shared_synth is not None else 9999.0
         brain_rank = int(getattr(best_guess, "rank", 999)) if best_guess is not None else 999
+        if raw_is_synth and self._facts_support_crowded_non_synth_instrument_loop(
+            raw=raw,
+            facts=facts,
+            raw_score=raw_score,
+            shared_synth_score=shared_score,
+        ):
+            return None
         if raw_is_synth and role_name in {"pitched_reed_or_instrument_loop", "pitched_reed_or_instrument_phrase"}:
             reed_shared = self.best_shared_candidate(
                 raw,
@@ -928,6 +948,102 @@ class ProfileInstrumentClaimMixin:
             strength=max(0.89, min(0.97, 1.03 - 0.03 * max(0, brain_rank - 1))),
             is_real_candidate=True,
         )
+
+    def _facts_support_crowded_non_synth_instrument_loop(
+        self,
+        *,
+        raw: ConsensusClaim,
+        facts: SharedAudioFacts | None,
+        raw_score: float,
+        shared_synth_score: float,
+    ) -> bool:
+        """Return True when a Synth loop claim is only one crowded sibling.
+
+        This keeps broad/mixed instrument loops from being narrowed to Synth
+        when Physics and shared overlap are actually pointing at Keys, Plucked
+        Strings, Reed/Winds, or Mixed Musical Loops.  A decisive measured Synth
+        body still wins.
+        """
+        if facts is None or not isinstance(getattr(facts, "evidence", None), dict):
+            return False
+        if self._facts_support_decisive_synth_source_body(facts):
+            return False
+        shape_name = _shape_vote_from_facts(facts)
+        if shape_name not in {"bass_phrase", "pitched_repetition_phrase", "mixed_instrument_loop"}:
+            return False
+        physics_top = self._physics_top_path_from_facts(facts)
+        non_synth_fragments = (
+            KEYS_FRAGMENTS
+            + STRING_GUITAR_FRAGMENTS
+            + REED_FRAGMENTS
+            + ("mixed musical loops", "multi instrument", "instrument loops")
+        )
+        if physics_top and not _path_has_any(_norm_path(physics_top), non_synth_fragments):
+            return False
+        close_non_synth_count = 0
+        mixed_or_reed_close = False
+        for row in raw.shared_candidates:
+            path = _norm_path(str(row.get("folder_path") or row.get("label") or ""))
+            if not path.startswith("instruments/") or _path_has_any(path, SYNTH_FRAGMENTS):
+                continue
+            if not _path_has_any(path, non_synth_fragments):
+                continue
+            score = _safe_float(row.get("combined_rank_score"))
+            if score <= 0.0:
+                score = 9999.0
+            if score <= raw_score + 10.0 and score <= shared_synth_score + 8.0:
+                close_non_synth_count += 1
+            if _path_has_any(path, ("mixed musical loops", "multi instrument") + REED_FRAGMENTS) and score <= (
+                raw_score + 8.0
+            ):
+                mixed_or_reed_close = True
+        return bool(close_non_synth_count >= 2 or mixed_or_reed_close)
+
+    @staticmethod
+    def _physics_top_path_from_facts(facts: SharedAudioFacts) -> str:
+        """Return the compact Physics top path from fact evidence."""
+        evidence = facts.evidence if isinstance(getattr(facts, "evidence", None), dict) else {}
+        digest = evidence.get("physics_vote_result")
+        if isinstance(digest, dict):
+            guesses = digest.get("top_guesses", [])
+            if isinstance(guesses, list) and guesses and isinstance(guesses[0], dict):
+                return str(guesses[0].get("folder_path") or guesses[0].get("label") or "")
+        compact = evidence.get("physics_vote_1")
+        if isinstance(compact, dict):
+            return str(compact.get("folder_path") or compact.get("label") or "")
+        return str(compact or "")
+
+    def _facts_support_decisive_synth_source_body(self, facts: SharedAudioFacts | None) -> bool:
+        """Return True when synth panels clearly beat sibling instrument panels."""
+        synth_score = max(
+            self._score_from_facts(facts, "synth_tonal_source_score"),
+            self._score_from_facts(facts, "synth_lead_score"),
+            self._score_from_facts(facts, "synth_pad_score"),
+            self._score_from_facts(facts, "synth_chord_score"),
+            self._score_from_facts(facts, "synth_pluck_score"),
+            self._score_from_facts(facts, "synth_arp_score"),
+            self._score_from_facts(facts, "instrument_panel_Synth_synth_pad"),
+            self._score_from_facts(facts, "instrument_panel_Synth_synth_chord"),
+            self._score_from_facts(facts, "instrument_panel_Synth_synth_lead"),
+        )
+        sibling_score = max(
+            self._score_from_facts(facts, "struck_keys_score"),
+            self._score_from_facts(facts, "keys_tonal_decay_score"),
+            self._score_from_facts(facts, "plucked_string_score"),
+            self._score_from_facts(facts, "guitar_acoustic_score"),
+            self._score_from_facts(facts, "guitar_electric_score"),
+            self._score_from_facts(facts, "woodwind_sax_score"),
+            self._score_from_facts(facts, "reed_wind_score"),
+            self._score_from_facts(facts, "voice_score"),
+            self._score_from_facts(facts, "human_spoken_voice_score"),
+            self._score_from_facts(facts, "voice_choir_score"),
+            self._score_from_facts(facts, "bass_synth_score"),
+            self._score_from_facts(facts, "bass_sub_score"),
+            self._score_from_facts(facts, "bass_electric_score"),
+            self._score_from_facts(facts, "mallet_bell_score"),
+            self._score_from_facts(facts, "drum_hit_score"),
+        )
+        return bool(synth_score >= 0.74 or (synth_score >= 0.60 and synth_score >= sibling_score + 0.16))
 
     def measured_synth_lead_claim(
         self,
@@ -1201,6 +1317,12 @@ class ProfileInstrumentClaimMixin:
         if self._raw_voice_has_primary_product_brain_support(
             raw=raw, brain_result=brain_result
         ) and not self._full_brain_top_is_non_voice_instrument(facts):
+            return None
+        if self._raw_voice_has_rank_one_brain_and_body_support(
+            raw=raw,
+            brain_result=brain_result,
+            facts=facts,
+        ):
             return None
         if not self._measured_has_stable_or_staggered_music_body(facts):
             return None
@@ -2465,7 +2587,82 @@ class ProfileInstrumentClaimMixin:
             raw_score = float(raw.raw_candidate_score or 9999.0)
         except Exception:
             raw_score = 9999.0
-        return bool(raw_score <= 10.0)
+        try:
+            support = float(top_guess.evidence.get("support", top_guess.evidence.get("ensemble_support", 0.0)) or 0.0)
+        except Exception:
+            support = 0.0
+        try:
+            confidence = float(getattr(top_guess, "confidence", 0.0) or 0.0)
+        except Exception:
+            confidence = 0.0
+        try:
+            score = float(getattr(top_guess, "score", 9999.0) or 9999.0)
+        except Exception:
+            score = 9999.0
+        decisive_top_voice = bool(confidence >= 0.72 and (support >= 2.20 or score <= 0.65))
+        return bool(raw_score <= 10.0 or (raw_score <= 16.0 and decisive_top_voice))
+
+    def _raw_voice_has_rank_one_brain_and_body_support(
+        self,
+        *,
+        raw: ConsensusClaim,
+        brain_result: VoterResult,
+        facts: SharedAudioFacts | None,
+    ) -> bool:
+        """Return True when a raw Voice claim has rank-one brain/body support.
+
+        This is a source-name-blind protection for processed vocal loops whose
+        measured role looks like a generic pitched or designed tonal phrase.
+        The product brain must rank Voice first, and measured voice/formant body
+        evidence must be present without hard drum or transition-FX proof.
+        """
+        if not brain_result.guesses:
+            return False
+        top_guess = brain_result.guesses[0]
+        top_path = _norm_path(str(top_guess.folder_path or top_guess.label or ""))
+        if not _path_has_any(top_path, VOICE_FRAGMENTS):
+            return False
+        try:
+            support = float(top_guess.evidence.get("support", top_guess.evidence.get("ensemble_support", 0.0)) or 0.0)
+        except Exception:
+            support = 0.0
+        try:
+            confidence = float(getattr(top_guess, "confidence", 0.0) or 0.0)
+        except Exception:
+            confidence = 0.0
+        try:
+            score = float(getattr(top_guess, "score", 9999.0) or 9999.0)
+        except Exception:
+            score = 9999.0
+        if confidence < 0.72 or (support < 2.20 and score > 0.65):
+            return False
+        try:
+            raw_score = float(raw.raw_candidate_score or 9999.0)
+        except Exception:
+            raw_score = 9999.0
+        if raw_score > 16.0:
+            return False
+        voice_body = max(
+            self._score_from_facts(facts, "voice_score"),
+            self._score_from_facts(facts, "human_spoken_voice_score"),
+            self._score_from_facts(facts, "human_breath_mouth_score"),
+            self._score_from_facts(facts, "voice_choir_score"),
+            self._score_from_facts(facts, "fx_formant_score"),
+        )
+        hard_drum = max(
+            self._score_from_facts(facts, "drum_hit_score"),
+            self._score_from_facts(facts, "drum_loop_source_score"),
+            self._score_from_facts(facts, "drum_kick_source_score"),
+            self._score_from_facts(facts, "drum_snare_source_score"),
+            self._score_from_facts(facts, "drum_clap_source_score"),
+        )
+        transition_fx = max(
+            self._score_from_facts(facts, "fx_motion_score"),
+            self._score_from_facts(facts, "fx_transition_authority_score"),
+            self._score_from_facts(facts, "fx_riser_build_score"),
+            self._score_from_facts(facts, "fx_whoosh_sweep_score"),
+        )
+        return bool(voice_body >= 0.42 and hard_drum <= 0.58 and transition_fx <= 0.62)
 
     @staticmethod
     def _int_from_row(value: object) -> int | None:
@@ -2803,6 +3000,11 @@ class ProfileInstrumentClaimMixin:
             return None
         if self._facts_support_clean_designed_tonal_keys_loop(facts):
             return None
+        if self._processed_voice_candidate_blocks_mixed_loop(
+            brain_result=brain_result,
+            facts=facts,
+        ):
+            return None
 
         best_guess = self.best_brain_guess(
             brain_result,
@@ -3102,6 +3304,50 @@ class ProfileInstrumentClaimMixin:
             or _feature_number_from_facts(facts, "compound_music_prefer_broad_loop") >= 0.50
         )
 
+    def _processed_voice_candidate_blocks_mixed_loop(
+        self,
+        *,
+        brain_result: VoterResult,
+        facts: SharedAudioFacts | None,
+    ) -> bool:
+        """Return True when measured spoken-voice evidence should own the source."""
+        voice_guess = self.best_brain_guess(
+            brain_result,
+            fragments=("voice", "vocal", "choir", "spoken"),
+            max_rank=4,
+            include_top={"Instruments"},
+        )
+        if voice_guess is None:
+            return False
+        human_spoken = self._score_from_facts(facts, "human_spoken_voice_score")
+        voice_panel = max(
+            human_spoken,
+            self._score_from_facts(facts, "voice_score"),
+            self._score_from_facts(facts, "human_breath_mouth_score"),
+            self._score_from_facts(facts, "voice_choir_score"),
+        )
+        drum_panel = max(
+            self._score_from_facts(facts, "drum_hit_score"),
+            self._score_from_facts(facts, "drum_loop_source_score"),
+            self._score_from_facts(facts, "drum_snare_source_score"),
+            self._score_from_facts(facts, "drum_cymbal_source_score"),
+        )
+        fx_transition = max(
+            self._score_from_facts(facts, "fx_motion_score"),
+            self._score_from_facts(facts, "fx_transition_authority_score"),
+            self._score_from_facts(facts, "fx_riser_build_score"),
+            self._score_from_facts(facts, "fx_whoosh_sweep_score"),
+        )
+        return bool(
+            human_spoken >= 0.74
+            and voice_panel >= 0.66
+            and _shape_metric_from_facts(facts, "pitched_event_ratio") >= 0.54
+            and _shape_metric_from_facts(facts, "percussive_event_ratio") <= 0.45
+            and _shape_metric_from_facts(facts, "drumlike_frame_ratio") <= 0.45
+            and drum_panel <= 0.58
+            and fx_transition <= 0.62
+        )
+
     def bass_claim(
         self,
         *,
@@ -3112,14 +3358,16 @@ class ProfileInstrumentClaimMixin:
         shape_confidence: float,
         raw_path: str,
         raw_score: float,
+        facts: SharedAudioFacts | None = None,
     ) -> ConsensusClaim | None:
         """Return a bass-loop claim from a real BrainVoter bass candidate."""
-        role_supports_bass = bool(role_name == "bass_loop" and shape_name == "bass_phrase" and shape_confidence >= 0.80)
-        raw_is_generic = raw.final_top in {"FX", "Instruments"} and not _path_has_any(
-            raw_path,
-            BASS_FRAGMENTS,
+        role_supports_bass = bool(
+            (role_name == "bass_loop" and shape_name == "bass_phrase" and shape_confidence >= 0.80)
+            or self._facts_support_measured_bass_loop_body(
+                facts, shape_name=shape_name, shape_confidence=shape_confidence
+            )
         )
-        if not role_supports_bass or not raw_is_generic:
+        if not role_supports_bass:
             return None
         best_guess = self.best_brain_guess(
             brain_result,
@@ -3128,6 +3376,8 @@ class ProfileInstrumentClaimMixin:
             include_top={"Instruments"},
         )
         if best_guess is None:
+            return None
+        if not self._bass_claim_may_override_raw_path(raw=raw, raw_path=raw_path, best_guess_rank=best_guess.rank):
             return None
         return claim_from_category_guess(
             guess=best_guess,
@@ -3143,3 +3393,59 @@ class ProfileInstrumentClaimMixin:
             can_override=True,
             strength=max(0.88, min(0.96, 1.02 - 0.03 * max(0, best_guess.rank - 1))),
         )
+
+    def _bass_claim_may_override_raw_path(
+        self,
+        *,
+        raw: ConsensusClaim,
+        raw_path: str,
+        best_guess_rank: int,
+    ) -> bool:
+        """Return True when a bass witness can safely refine the raw winner."""
+        if _path_has_any(raw_path, BASS_FRAGMENTS):
+            return False
+        if raw.final_top != "Instruments":
+            return True
+        if raw_path in {"instruments/instrument loops/loops", "instruments/instrument loops"}:
+            return True
+        return int(best_guess_rank) <= 1
+
+    def _facts_support_measured_bass_loop_body(
+        self,
+        facts: SharedAudioFacts | None,
+        *,
+        shape_name: str,
+        shape_confidence: float,
+    ) -> bool:
+        """Return True when measured low/pitch evidence supports a bass loop."""
+        if facts is None:
+            return False
+        if shape_name not in {"bass_phrase", "solo_phrase", "pitched_phrase", "pitched_repetition_phrase"}:
+            return False
+        if shape_confidence < 0.70:
+            return False
+        roles = facts.evidence.get("measured_roles", {}) if isinstance(getattr(facts, "evidence", None), dict) else {}
+        nested_roles = roles.get("evidence", {}) if isinstance(roles, dict) else {}
+        role_owner = max(
+            _safe_float(roles.get("bass_loop")) if isinstance(roles, dict) else 0.0,
+            _safe_float(roles.get("pitched_music_loop")) if isinstance(roles, dict) else 0.0,
+            _safe_float(roles.get("low_rhythmic_drum_loop")) if isinstance(roles, dict) else 0.0,
+            _safe_float(nested_roles.get("bass_loop")) if isinstance(nested_roles, dict) else 0.0,
+            _safe_float(nested_roles.get("pitched_music_loop")) if isinstance(nested_roles, dict) else 0.0,
+            _safe_float(nested_roles.get("low_rhythmic_drum_loop")) if isinstance(nested_roles, dict) else 0.0,
+        )
+        low_body = max(
+            _feature_number_from_facts(facts, "low_total"),
+            _shape_metric_from_facts(facts, "low_event_ratio"),
+        )
+        pitch_confidence = max(
+            _feature_number_from_facts(facts, "pitch_confidence"),
+            _shape_metric_from_facts(facts, "pitch_confidence"),
+        )
+        drum_body = max(
+            self._score_from_facts(facts, "drum_hit_score"),
+            self._score_from_facts(facts, "drum_loop_source_score"),
+            _shape_metric_from_facts(facts, "drumlike_frame_ratio"),
+            _shape_metric_from_facts(facts, "percussive_event_ratio"),
+        )
+        return bool(role_owner >= 0.62 and low_body >= 0.70 and pitch_confidence >= 0.70 and drum_body <= 0.46)

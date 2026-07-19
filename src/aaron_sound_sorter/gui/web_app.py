@@ -20,8 +20,10 @@ from pathlib import Path
 from typing import Any, BinaryIO, Callable
 from urllib.parse import parse_qs, urlparse
 
+from aaron_audio_intelligence.physics_memory_brain import PHYSICS_MEMORY_BRAIN_NAME
 from aaron_audio_intelligence.shape_memory_brain import SHAPE_MEMORY_BRAIN_NAME, SHAPE_STARTER_MEMORY_BRAIN_NAME
 from aaron_audio_intelligence.user_memory_brain import USER_MEMORY_BRAIN_NAME
+from aaron_audio_intelligence.voter_memory_brain import VOTER_MEMORY_BRAIN_NAME
 from aaron_sound_sorter.gui.incremental_brain_update import (
     IncrementalBrainUpdater,
     corrections_from_import_manifest,
@@ -82,6 +84,7 @@ class BrainTrainingJob:
     message: str = "Queued"
     corrected_count: int = 0
     staged_count: int = 0
+    reused_existing_count: int = 0
     trainable_count: int = 0
     skipped_count: int = 0
     returncode: int | None = None
@@ -234,7 +237,8 @@ class SorterRequestHandler(BaseHTTPRequestHandler):
         if parsed.path == "/api/dialog":
             query = parse_qs(parsed.query)
             kind = query.get("kind", ["file"])[0]
-            self.send_json({"path": choose_path_with_osascript(kind)})
+            current_path = query.get("current", [""])[0]
+            self.send_json({"path": choose_path_with_osascript(kind, current_path=current_path)})
             return
         self.send_error(HTTPStatus.NOT_FOUND, "Not found")
 
@@ -592,9 +596,16 @@ def create_brain_training_job(import_summary: TrainingImportSummary) -> BrainTra
     return BrainTrainingJob(
         job_id=uuid.uuid4().hex,
         status="running",
-        message=f"Imported {trainable_count} trainable correction(s). Updating active brains incrementally...",
-        corrected_count=import_summary.staged_count + import_summary.skipped_count,
+        message=(
+            f"Imported {trainable_count} trainable correction(s) "
+            f"({import_summary.staged_count} copied, {import_summary.reused_existing_count} already in training). "
+            "Updating active brains incrementally..."
+        ),
+        corrected_count=import_summary.staged_count
+        + import_summary.reused_existing_count
+        + import_summary.skipped_count,
         staged_count=import_summary.staged_count,
+        reused_existing_count=import_summary.reused_existing_count,
         trainable_count=trainable_count,
         skipped_count=import_summary.skipped_count,
         training_root=str(import_summary.training_root),
@@ -722,6 +733,7 @@ def training_job_to_payload(job: BrainTrainingJob) -> dict[str, Any]:
         "message": job.message,
         "corrected_count": job.corrected_count,
         "staged_count": job.staged_count,
+        "reused_existing_count": job.reused_existing_count,
         "trainable_count": job.trainable_count,
         "skipped_count": job.skipped_count,
         "returncode": job.returncode,
@@ -787,6 +799,8 @@ def active_gui_brain_file_names() -> list[str]:
         "stage4_folder_brain_spread_baby.json",
         "stage4_folder_brain_outlier_baby.json",
         USER_MEMORY_BRAIN_NAME,
+        PHYSICS_MEMORY_BRAIN_NAME,
+        VOTER_MEMORY_BRAIN_NAME,
         SHAPE_STARTER_MEMORY_BRAIN_NAME,
         SHAPE_MEMORY_BRAIN_NAME,
         "stage4_folder_brain_harmonic_core_baby.json",
@@ -898,20 +912,52 @@ def apply_overrides(session: SortPreviewSession, rows_payload: Any) -> None:
             session.rows[index].approved_folder = approved
 
 
-def choose_path_with_osascript(kind: str) -> str:
+def choose_path_with_osascript(kind: str, current_path: str = "") -> str:
     """Open a native macOS chooser and return the selected path when possible."""
     if os.name != "posix" or not Path("/usr/bin/osascript").exists():
         return ""
-    script_by_kind = {
-        "folder": 'POSIX path of (choose folder with prompt "Choose sample folder")',
-        "destination": 'POSIX path of (choose folder with prompt "Choose destination folder")',
-        "brain": 'POSIX path of (choose file with prompt "Choose brain JSON")',
-        "file": 'POSIX path of (choose file with prompt "Choose ZIP or audio file")',
-    }
-    script = script_by_kind.get(kind, script_by_kind["file"])
+    script = """
+on run argv
+    set chooserKind to item 1 of argv
+    set defaultPath to item 2 of argv
+    set defaultLocation to missing value
+    if defaultPath is not "" then
+        try
+            set defaultLocation to POSIX file defaultPath
+        end try
+    end if
+
+    if chooserKind is "folder" then
+        if defaultLocation is missing value then
+            return POSIX path of (choose folder with prompt "Choose the exact sample folder to sort")
+        end if
+        return POSIX path of (choose folder with prompt "Choose the exact sample folder to sort" default location defaultLocation)
+    end if
+
+    if chooserKind is "destination" then
+        if defaultLocation is missing value then
+            return POSIX path of (choose folder with prompt "Choose the exact destination folder")
+        end if
+        return POSIX path of (choose folder with prompt "Choose the exact destination folder" default location defaultLocation)
+    end if
+
+    if chooserKind is "brain" then
+        if defaultLocation is missing value then
+            return POSIX path of (choose file with prompt "Choose brain JSON")
+        end if
+        return POSIX path of (choose file with prompt "Choose brain JSON" default location defaultLocation)
+    end if
+
+    if defaultLocation is missing value then
+        return POSIX path of (choose file with prompt "Choose ZIP or audio file")
+    end if
+    return POSIX path of (choose file with prompt "Choose ZIP or audio file" default location defaultLocation)
+end run
+"""
+    initial_path = chooser_default_location(kind, current_path)
     try:
         completed = subprocess.run(
-            ["/usr/bin/osascript", "-e", script],
+            ["/usr/bin/osascript", "-e", script, kind, initial_path],
             check=False,
             capture_output=True,
             text=True,
@@ -922,6 +968,26 @@ def choose_path_with_osascript(kind: str) -> str:
     if completed.returncode != 0:
         return ""
     return completed.stdout.strip()
+
+
+def chooser_default_location(kind: str, current_path: str) -> str:
+    """Return a safe default location for the native macOS chooser."""
+    raw_path = str(current_path or "").strip()
+    if not raw_path:
+        return ""
+    try:
+        path = Path(raw_path).expanduser()
+        if kind in {"folder", "destination"}:
+            if path.is_file():
+                path = path.parent
+            return str(path.resolve()) if path.exists() else ""
+        if path.is_dir():
+            return str(path.resolve())
+        if path.parent.exists():
+            return str(path.parent.resolve())
+    except Exception:
+        return ""
+    return ""
 
 
 def browser_preview_audio_path(source_audio_path: Path, run_dir: Path) -> Path:
@@ -1096,15 +1162,22 @@ def render_index_html(*, brain_config_path: str, brain_summary: str) -> str:
       --changed: #fff3bf;
       --changed-line: #d49a1d;
       --ok: #1f6f43;
+      --details-pane-width: clamp(340px, 30vw, 560px);
     }}
     * {{ box-sizing: border-box; }}
+    html {{ scrollbar-gutter: stable; }}
     body {{
       margin: 0;
+      padding-bottom: 86px;
       background: var(--bg);
       color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }}
     body.busy, body.busy button, body.busy input {{ cursor: progress; }}
+    body.resizing-pane {{
+      cursor: col-resize;
+      user-select: none;
+    }}
       header {{
         padding: 18px 22px 10px;
         border-bottom: 1px solid var(--line);
@@ -1116,6 +1189,7 @@ def render_index_html(*, brain_config_path: str, brain_summary: str) -> str:
         width: min(1920px, 100%);
         margin: 0 auto;
         padding: 16px 22px 22px;
+        overflow-x: auto;
       }}
       .app-toolbar {{
         position: sticky;
@@ -1136,21 +1210,36 @@ def render_index_html(*, brain_config_path: str, brain_summary: str) -> str:
         font-weight: 750;
         white-space: nowrap;
       }}
-      .queue-scroll-slider {{
-        width: 100%;
-        min-width: 140px;
-        accent-color: var(--accent);
-      }}
-      .queue-scroll-control {{
-        display: grid;
-        grid-template-columns: auto minmax(180px, 1fr) auto;
-        gap: 10px;
-        align-items: center;
-        margin: 0 0 10px;
-        padding: 8px 10px;
+      .queue-scrollbar {{
+        height: 16px;
+        margin: 0 0 8px;
+        overflow-x: auto;
+        overflow-y: hidden;
         border: 1px solid #e7e1d7;
-        border-radius: 8px;
-        background: #fbfaf7;
+        border-radius: 999px;
+        background: #f7f4ed;
+      }}
+      .queue-scrollbar[hidden] {{
+        display: none;
+      }}
+      .queue-scrollbar-spacer {{
+        width: 100%;
+        min-width: 100%;
+        height: 1px;
+      }}
+      .queue-scrollbar::-webkit-scrollbar,
+      .table-wrap::-webkit-scrollbar {{
+        height: 12px;
+      }}
+      .queue-scrollbar::-webkit-scrollbar-thumb,
+      .table-wrap::-webkit-scrollbar-thumb {{
+        background: #b7afa3;
+        border: 3px solid #f7f4ed;
+        border-radius: 999px;
+      }}
+      .queue-scrollbar::-webkit-scrollbar-track,
+      .table-wrap::-webkit-scrollbar-track {{
+        background: #eee9df;
       }}
       .toolbar-actions {{
         display: flex;
@@ -1339,18 +1428,52 @@ def render_index_html(*, brain_config_path: str, brain_summary: str) -> str:
         display: none;
       }}
       .workspace-body {{
+        position: relative;
         display: grid;
-        grid-template-columns: minmax(520px, 1fr) minmax(320px, 430px);
-        gap: 14px;
+        grid-template-columns: minmax(520px, 1fr) 14px minmax(320px, var(--details-pane-width));
+        gap: 0;
         min-height: 390px;
         padding: 14px;
         align-items: start;
+        transition: grid-template-columns 170ms ease;
       }}
       .workspace-body.details-collapsed {{
         grid-template-columns: minmax(520px, 1fr);
       }}
+      .workspace-body.details-collapsed > .pane-resizer,
+      .workspace-body.details-collapsed > #detailsPanel {{
+        display: none;
+      }}
       .workspace-body.queue-collapsed {{
         grid-template-columns: minmax(320px, 1fr);
+      }}
+      .workspace-body.queue-collapsed > #queuePanel,
+      .workspace-body.queue-collapsed > .pane-resizer {{
+        display: none;
+      }}
+      .details-reveal-button {{
+        position: absolute;
+        top: 14px;
+        right: 14px;
+        display: none;
+        min-height: 34px;
+        width: 34px;
+        padding: 0;
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--accent) 10%, white);
+        color: var(--accent-dark);
+        box-shadow: 0 8px 22px rgba(31, 35, 41, 0.12);
+      }}
+      .workspace-body.details-collapsed > .details-reveal-button {{
+        display: inline-grid;
+        place-items: center;
+      }}
+      .details-reveal-icon {{
+        width: 9px;
+        height: 9px;
+        border-right: 2px solid currentColor;
+        border-bottom: 2px solid currentColor;
+        transform: rotate(135deg);
       }}
       .subpanel {{
         min-width: 0;
@@ -1361,6 +1484,40 @@ def render_index_html(*, brain_config_path: str, brain_summary: str) -> str:
         background: #fff;
         padding: 12px;
         min-width: 0;
+      }}
+      #detailsPanel {{
+        transition:
+          opacity 160ms ease,
+          transform 160ms ease;
+      }}
+      .pane-resizer {{
+        position: relative;
+        align-self: stretch;
+        min-height: 220px;
+        cursor: col-resize;
+        touch-action: none;
+      }}
+      .pane-resizer::before {{
+        content: "";
+        position: absolute;
+        top: 8px;
+        bottom: 8px;
+        left: 6px;
+        width: 2px;
+        border-radius: 999px;
+        background: #ddd6ca;
+        transition:
+          background 140ms ease,
+          box-shadow 140ms ease;
+      }}
+      .pane-resizer:hover::before,
+      .pane-resizer:focus-visible::before,
+      .workspace-body.resizing > .pane-resizer::before {{
+        background: var(--accent);
+        box-shadow: 0 0 0 4px rgba(35, 87, 165, 0.12);
+      }}
+      .pane-resizer:focus-visible {{
+        outline: 0;
       }}
       .subpanel-frame > .panel-header[data-collapsible-header] {{
         margin: -4px -4px 10px;
@@ -1376,7 +1533,8 @@ def render_index_html(*, brain_config_path: str, brain_summary: str) -> str:
         overflow: auto;
         border: 1px solid var(--line);
         border-radius: 6px;
-        max-height: min(68vh, 780px);
+        max-height: min(70vh, 820px);
+        scrollbar-gutter: stable;
       }}
       table {{
         width: max(100%, 1120px);
@@ -1437,6 +1595,7 @@ def render_index_html(*, brain_config_path: str, brain_summary: str) -> str:
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
         font-size: 12px;
         line-height: 1.42;
+        max-height: min(54vh, 660px);
       }}
       .category-hints {{
         margin-top: 8px;
@@ -1504,6 +1663,36 @@ def render_index_html(*, brain_config_path: str, brain_summary: str) -> str:
       color: var(--muted);
       font-size: 13px;
       min-height: 22px;
+    }}
+    .sticky-action-dock {{
+      position: fixed;
+      left: 50%;
+      bottom: 14px;
+      z-index: 18;
+      display: flex;
+      width: min(1040px, calc(100vw - 28px));
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 9px 10px;
+      border: 1px solid rgba(139, 126, 106, 0.32);
+      border-radius: 14px;
+      background: rgba(251, 250, 247, 0.94);
+      box-shadow: 0 16px 44px rgba(31, 35, 41, 0.14);
+      transform: translateX(-50%);
+      backdrop-filter: blur(12px);
+    }}
+    .sticky-action-group {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+    }}
+    .sticky-action-status {{
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
     }}
     .progress-area {{
       margin-top: 10px;
@@ -1626,6 +1815,9 @@ def render_index_html(*, brain_config_path: str, brain_summary: str) -> str:
         .workspace-body.queue-collapsed {{
           grid-template-columns: 1fr;
         }}
+        .workspace-body > .pane-resizer {{
+          display: none;
+        }}
         .row, .export-grid, .teach-grid {{ grid-template-columns: 1fr; }}
         .row button, .export-grid button, .teach-grid button {{ width: 100%; }}
         .panel-toggle, .toolbar-icon-button {{
@@ -1640,7 +1832,16 @@ def render_index_html(*, brain_config_path: str, brain_summary: str) -> str:
           grid-template-columns: 1fr auto;
           padding: 10px 12px;
         }}
-        .queue-scroll-control {{ grid-template-columns: 1fr; }}
+        .sticky-action-dock {{
+          align-items: stretch;
+          flex-direction: column;
+        }}
+        .sticky-action-group {{
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          width: 100%;
+        }}
+        .sticky-action-group button {{ width: 100%; }}
         table {{ width: max(100%, 980px); }}
       }}
     </style>
@@ -1717,17 +1918,15 @@ def render_index_html(*, brain_config_path: str, brain_summary: str) -> str:
             <div class="panel-header" data-collapsible-header>
               <div class="panel-title">
                 <strong>Preview Queue</strong>
-                <span class="small">Use the local slider to move across wide columns.</span>
+                <span class="small">Scroll from the top or bottom of the queue.</span>
               </div>
               <button class="panel-toggle" type="button" data-collapse-target="queue" aria-expanded="true" aria-controls="queuePanelBody" aria-label="Collapse Preview Queue" title="Collapse Preview Queue">
                 <span class="collapse-icon" aria-hidden="true"></span>
               </button>
             </div>
             <div id="queuePanelBody" class="panel-body">
-              <div class="queue-scroll-control" aria-label="Preview queue horizontal scroll">
-                <span class="toolbar-label">Scroll queue</span>
-                <input id="queueScrollSlider" class="queue-scroll-slider" type="range" min="0" max="1000" value="0" disabled aria-label="Scroll preview queue left and right" />
-                <span id="queueScrollText" class="small">No queue yet</span>
+              <div id="queueTopScroll" class="queue-scrollbar queue-scrollbar-top" aria-label="Preview queue horizontal scroll" tabindex="0" hidden>
+                <div id="queueTopScrollSpacer" class="queue-scrollbar-spacer"></div>
               </div>
               <div id="tableWrap" class="table-wrap">
                 <table>
@@ -1745,6 +1944,10 @@ def render_index_html(*, brain_config_path: str, brain_summary: str) -> str:
               </div>
             </div>
           </div>
+          <div id="detailsResizeHandle" class="pane-resizer" role="separator" aria-orientation="vertical" aria-label="Resize selected file panel" tabindex="0"></div>
+          <button id="detailsRevealButton" class="details-reveal-button" type="button" data-collapse-target="details" aria-expanded="false" aria-controls="detailsPanelBody" aria-label="Expand Selected File" title="Expand Selected File">
+            <span class="details-reveal-icon" aria-hidden="true"></span>
+          </button>
           <aside id="detailsPanel" class="subpanel subpanel-frame" data-panel-id="details">
             <div class="panel-header" data-collapsible-header>
               <div class="panel-title"><strong>Selected File</strong></div>
@@ -1755,7 +1958,7 @@ def render_index_html(*, brain_config_path: str, brain_summary: str) -> str:
             <div id="detailsPanelBody" class="panel-body">
               <div class="audio-box">
                 <label for="audioPlayer">Listen</label>
-                <audio id="audioPlayer" controls preload="none"></audio>
+                <audio id="audioPlayer" controls preload="metadata"></audio>
               </div>
               <div id="details" class="details" style="margin-top:8px;">No file selected.</div>
               <div id="categoryHints" class="category-hints" hidden></div>
@@ -1826,6 +2029,17 @@ def render_index_html(*, brain_config_path: str, brain_summary: str) -> str:
     <div id="status" class="status">Ready.</div>
   </main>
 
+  <div id="stickyActionDock" class="sticky-action-dock" role="region" aria-label="Always visible sort actions">
+    <span id="stickyActionStatus" class="sticky-action-status">No preview loaded</span>
+    <div class="sticky-action-group">
+      <button id="quickExportButton" class="primary" type="button" disabled>Export Approved Sort</button>
+      <button id="quickTrainCorrectionsButton" class="primary" type="button" disabled>Train Brains</button>
+      <button id="quickOpenSortedButton" type="button" disabled>Open Sorted</button>
+      <button id="quickOpenReportButton" type="button" disabled>Open Report</button>
+      <button id="quickOpenTrainingReportButton" type="button" disabled>Open Training</button>
+    </div>
+  </div>
+
   <div id="categoryModal" class="modal-backdrop" hidden>
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="categoryModalTitle">
       <div class="modal-head">
@@ -1866,7 +2080,8 @@ const state = {{
   lastTrainingReportPath: "",
   trainingJobId: "",
   exportJobId: "",
-  livePreviewJobId: ""
+  livePreviewJobId: "",
+  queueScrollSyncing: false
 }};
 const MAX_JOB_POLL_FAILURES = 40;
 const PREVIEW_POLL_MS = 900;
@@ -1899,9 +2114,18 @@ const trainingStatus = document.getElementById("trainingStatus");
   const trainingCount = document.getElementById("trainingCount");
   const trainingBar = document.getElementById("trainingBar");
   const tableWrap = document.getElementById("tableWrap");
-  const queueScrollSlider = document.getElementById("queueScrollSlider");
-  const queueScrollText = document.getElementById("queueScrollText");
+  const queueTopScroll = document.getElementById("queueTopScroll");
+  const queueTopScrollSpacer = document.getElementById("queueTopScrollSpacer");
   const workspaceBody = document.getElementById("workspaceBody");
+  const detailsPanel = document.getElementById("detailsPanel");
+  const detailsResizeHandle = document.getElementById("detailsResizeHandle");
+  const exportButton = document.getElementById("exportButton");
+  const quickExportButton = document.getElementById("quickExportButton");
+  const quickTrainCorrectionsButton = document.getElementById("quickTrainCorrectionsButton");
+  const quickOpenSortedButton = document.getElementById("quickOpenSortedButton");
+  const quickOpenReportButton = document.getElementById("quickOpenReportButton");
+  const quickOpenTrainingReportButton = document.getElementById("quickOpenTrainingReportButton");
+  const stickyActionStatus = document.getElementById("stickyActionStatus");
 
   function setStatus(text, isWarn=false) {{
     statusEl.textContent = text;
@@ -1930,7 +2154,7 @@ const trainingStatus = document.getElementById("trainingStatus");
       button.setAttribute("title", label);
     }});
     updateWorkspacePanelState();
-    updateQueueScrollSlider();
+    updateQueueScrollbars();
   }}
 
   function togglePanel(panelId) {{
@@ -1950,35 +2174,108 @@ const trainingStatus = document.getElementById("trainingStatus");
   }}
 
   function shouldIgnoreHeaderClick(event) {{
-    return Boolean(event.target.closest("button, a, input, select, textarea, label"));
+    const eventTarget = event.target instanceof Element ? event.target : null;
+    return Boolean(eventTarget?.closest("button, a, input, select, textarea, label"));
   }}
 
-  function updateQueueScrollSlider() {{
-    if (!tableWrap || !queueScrollSlider || !queueScrollText) return;
+  function updateQueueScrollbars() {{
+    if (!tableWrap || !queueTopScroll || !queueTopScrollSpacer) return;
+    const queueIsCollapsed = Boolean(panelElement("queue")?.classList.contains("collapsed"));
     const maxScroll = Math.max(0, tableWrap.scrollWidth - tableWrap.clientWidth);
-    queueScrollSlider.disabled = maxScroll <= 0 || Boolean(panelElement("queue")?.classList.contains("collapsed"));
-    if (queueScrollSlider.disabled) {{
-      queueScrollSlider.value = "0";
-      queueScrollText.textContent = state.rows.length ? "Queue fits on screen" : "No queue yet";
-      return;
+    queueTopScroll.hidden = queueIsCollapsed || maxScroll <= 0;
+    queueTopScrollSpacer.style.width = `${{Math.max(tableWrap.scrollWidth, tableWrap.clientWidth)}}px`;
+    if (state.queueScrollSyncing) return;
+    state.queueScrollSyncing = true;
+    queueTopScroll.scrollLeft = tableWrap.scrollLeft;
+    window.requestAnimationFrame(() => {{
+      state.queueScrollSyncing = false;
+    }});
+  }}
+
+  function syncQueueScrollbars(source, target) {{
+    if (!source || !target || state.queueScrollSyncing) return;
+    state.queueScrollSyncing = true;
+    target.scrollLeft = source.scrollLeft;
+    window.requestAnimationFrame(() => {{
+      state.queueScrollSyncing = false;
+      updateQueueScrollbars();
+    }});
+  }}
+
+  function clampDetailsPaneWidth(width) {{
+    const viewportLimit = Math.max(320, window.innerWidth - 520);
+    return Math.max(300, Math.min(Number(width || 0), Math.min(780, viewportLimit)));
+  }}
+
+  function setDetailsPaneWidth(width, persist=true) {{
+    const nextWidth = clampDetailsPaneWidth(width);
+    document.documentElement.style.setProperty("--details-pane-width", `${{nextWidth}}px`);
+    if (persist) localStorage.setItem("aaronDetailsPaneWidth", String(nextWidth));
+  }}
+
+  function restoreDetailsPaneWidth() {{
+    const savedWidth = Number(localStorage.getItem("aaronDetailsPaneWidth") || 0);
+    if (savedWidth > 0) setDetailsPaneWidth(savedWidth, false);
+  }}
+
+  function initDetailsResizer() {{
+    if (!detailsResizeHandle || !detailsPanel) return;
+    let startX = 0;
+    let startWidth = 0;
+    let activePointerId = null;
+    function endResize() {{
+      if (activePointerId === null) return;
+      activePointerId = null;
+      document.body.classList.remove("resizing-pane");
+      workspaceBody.classList.remove("resizing");
+      setDetailsPaneWidth(detailsPanel.getBoundingClientRect().width, true);
+      updateQueueScrollbars();
     }}
-    const percent = Math.round((tableWrap.scrollLeft / maxScroll) * 100);
-    queueScrollSlider.value = String(Math.round((tableWrap.scrollLeft / maxScroll) * 1000));
-    queueScrollText.textContent = `${{percent}}% across queue`;
+    detailsResizeHandle.addEventListener("pointerdown", event => {{
+      if (panelElement("details")?.classList.contains("collapsed")) return;
+      activePointerId = event.pointerId;
+      startX = event.clientX;
+      startWidth = detailsPanel.getBoundingClientRect().width;
+      detailsResizeHandle.setPointerCapture(event.pointerId);
+      document.body.classList.add("resizing-pane");
+      workspaceBody.classList.add("resizing");
+      event.preventDefault();
+    }});
+    detailsResizeHandle.addEventListener("pointermove", event => {{
+      if (activePointerId !== event.pointerId) return;
+      setDetailsPaneWidth(startWidth + startX - event.clientX, false);
+      updateQueueScrollbars();
+    }});
+    detailsResizeHandle.addEventListener("pointerup", endResize);
+    detailsResizeHandle.addEventListener("pointercancel", endResize);
+    detailsResizeHandle.addEventListener("keydown", event => {{
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      const delta = event.key === "ArrowLeft" ? 32 : -32;
+      setDetailsPaneWidth(detailsPanel.getBoundingClientRect().width + delta, true);
+      updateQueueScrollbars();
+      event.preventDefault();
+    }});
   }}
 
-  function scrollQueueFromSlider() {{
-    if (!tableWrap || !queueScrollSlider) return;
-    const maxScroll = Math.max(0, tableWrap.scrollWidth - tableWrap.clientWidth);
-    tableWrap.scrollLeft = maxScroll * (Number(queueScrollSlider.value || 0) / 1000);
-    updateQueueScrollSlider();
+  function syncStickyActionDock() {{
+    if (!stickyActionStatus) return;
+    const correctedCount = correctionRows().length;
+    const rowText = state.rows.length ? `${{state.rows.length}} files loaded` : "No preview loaded";
+    const correctionText = correctedCount ? ` · ${{correctedCount}} staged` : "";
+    stickyActionStatus.textContent = `${{rowText}}${{correctionText}}`;
+    quickExportButton.disabled = exportButton.disabled;
+    quickTrainCorrectionsButton.disabled = trainCorrectionsButton.disabled;
+    quickOpenSortedButton.disabled = openSortedButton.disabled;
+    quickOpenReportButton.disabled = openReportButton.disabled;
+    quickOpenTrainingReportButton.disabled = openTrainingReportButton.disabled;
   }}
 
 function setBusy(isBusy) {{
   document.body.classList.toggle("busy", isBusy);
   document.getElementById("previewButton").disabled = isBusy;
-  document.getElementById("exportButton").disabled = isBusy;
+  exportButton.disabled = isBusy || !state.sessionId;
   trainCorrectionsButton.disabled = isBusy || correctionRows().length === 0 || !state.sessionId || Boolean(state.trainingJobId) || Boolean(state.exportJobId);
+  syncStickyActionDock();
 }}
 
 async function jsonFetch(url, options={{}}) {{
@@ -2004,6 +2301,7 @@ function retryLongJobPoll(kind, retryCount, retryCallback) {{
     state.trainingJobId = "";
     state.exportJobId = "";
     trainCorrectionsButton.disabled = correctionRows().length === 0 || !state.sessionId;
+    syncStickyActionDock();
     return;
   }}
   setStatus(`${{kind}} is still running; retrying status check (${{retryCount + 1}}/${{MAX_JOB_POLL_FAILURES}})...`, true);
@@ -2012,9 +2310,16 @@ function retryLongJobPoll(kind, retryCount, retryCallback) {{
 
 async function choosePath(kind, targetId) {{
   setStatus("Opening native chooser...");
-  const payload = await jsonFetch(`/api/dialog?kind=${{encodeURIComponent(kind)}}`);
+  const target = document.getElementById(targetId);
+  const current = target ? target.value.trim() : "";
+  const payload = await jsonFetch(
+    `/api/dialog?kind=${{encodeURIComponent(kind)}}&current=${{encodeURIComponent(current)}}`
+  );
   if (payload.path) document.getElementById(targetId).value = payload.path;
-  setStatus(payload.path ? "Path selected." : "No path selected.");
+  const selectedMessage = kind === "folder"
+    ? `Selected exact folder: ${{payload.path}}. Preview scans this folder recursively.`
+    : `Selected path: ${{payload.path}}`;
+  setStatus(payload.path ? selectedMessage : "No path selected.");
 }}
 
 function resetProgress() {{
@@ -2049,6 +2354,40 @@ function rowStableKey(row) {{
   return String(row?.row_id || row?.source_path || row?.display_name || row?.index || "");
 }}
 
+function rowAudioUrl(row) {{
+  if (!row) return "";
+  if (state.sessionId) return `/api/audio/${{encodeURIComponent(state.sessionId)}}/${{row.index}}`;
+  if (state.livePreviewJobId) return `/api/job-audio/${{encodeURIComponent(state.livePreviewJobId)}}/${{row.index}}`;
+  return "";
+}}
+
+function audioIsActivelyPlaying() {{
+  return Boolean(audioPlayer.currentTime > 0 && !audioPlayer.paused && !audioPlayer.ended);
+}}
+
+function clearAudioSource() {{
+  audioPlayer.removeAttribute("src");
+  audioPlayer.dataset.sourceUrl = "";
+  audioPlayer.dataset.rowKey = "";
+  audioPlayer.load();
+}}
+
+function setAudioSourceForRow(row) {{
+  const nextSource = rowAudioUrl(row);
+  const nextRowKey = rowStableKey(row);
+  if (!nextSource) {{
+    if (audioPlayer.dataset.sourceUrl) clearAudioSource();
+    return;
+  }}
+  const currentSource = audioPlayer.dataset.sourceUrl || "";
+  const currentRowKey = audioPlayer.dataset.rowKey || "";
+  if (currentRowKey === nextRowKey && (currentSource === nextSource || audioIsActivelyPlaying())) return;
+  audioPlayer.dataset.sourceUrl = nextSource;
+  audioPlayer.dataset.rowKey = nextRowKey;
+  audioPlayer.src = nextSource;
+  audioPlayer.load();
+}}
+
 function correctedFolderMap(rows) {{
   const edits = new Map();
   rows.forEach(row => {{
@@ -2078,7 +2417,7 @@ function mergeLivePreviewRows(partialRows) {{
     state.selectedIndex = selectedIndex >= 0 ? selectedIndex : Math.min(state.selectedIndex, state.rows.length - 1);
   }}
   renderRows();
-  if (state.selectedIndex >= 0 && state.rows[state.selectedIndex]) selectRow(state.selectedIndex);
+  if (state.selectedIndex >= 0 && state.rows[state.selectedIndex]) refreshSelectedRowDetails();
 }}
 
 async function startPreview() {{
@@ -2091,8 +2430,7 @@ async function startPreview() {{
     detailsEl.textContent = "Preview running...";
     categoryHints.hidden = true;
     categoryHints.innerHTML = "";
-    audioPlayer.removeAttribute("src");
-  audioPlayer.load();
+    clearAudioSource();
   rowCountEl.textContent = "0 files";
   state.rows = [];
   state.labels = [];
@@ -2107,7 +2445,7 @@ async function startPreview() {{
     openReportButton.disabled = true;
     openSortedButton.disabled = true;
     openTrainingReportButton.disabled = true;
-    updateQueueScrollSlider();
+    updateQueueScrollbars();
     trainingStatus.hidden = true;
     trainingBar.style.width = "0%";
   updateCorrectionNotice();
@@ -2167,6 +2505,7 @@ async function loadSession(sessionId) {{
   }}
   openReportButton.disabled = !state.lastReportPath;
   openTrainingReportButton.disabled = true;
+  exportButton.disabled = !state.sessionId;
   trainingStatus.hidden = true;
   const labels = document.getElementById("labelOptions");
   labels.innerHTML = "";
@@ -2176,21 +2515,23 @@ async function loadSession(sessionId) {{
     labels.appendChild(option);
   }});
     renderRows();
+    if (state.selectedIndex >= 0 && state.rows[state.selectedIndex]) refreshSelectedRowDetails();
     updateCorrectionNotice();
-    window.requestAnimationFrame(updateQueueScrollSlider);
+    window.requestAnimationFrame(updateQueueScrollbars);
     setStatus(`Preview ready: ${{state.rows.length}} files. Run folder: ${{session.run_dir}}`);
+    syncStickyActionDock();
   }}
 
 function renderRows() {{
-  rowsEl.innerHTML = "";
   rowCountEl.textContent = `${{state.rows.length}} files`;
+  const fragment = document.createDocumentFragment();
   state.rows.forEach((row, index) => {{
     const tr = document.createElement("tr");
     const classes = [];
     if (index === state.selectedIndex) classes.push("selected");
     if (rowIsCorrected(row)) classes.push("corrected");
     tr.className = classes.join(" ");
-    tr.addEventListener("click", () => selectRow(index));
+    tr.dataset.rowIndex = String(index);
     tr.innerHTML = `
       <td class="play"><button class="compact" type="button" data-play-index="${{index}}">Play</button></td>
       <td>${{escapeHtml(row.display_name)}}</td>
@@ -2204,23 +2545,12 @@ function renderRows() {{
       <td>${{escapeHtml(row.proposed_folder)}}</td>
       <td>${{escapeHtml(row.consensus_status)}}</td>
     `;
-    rowsEl.appendChild(tr);
+    fragment.appendChild(tr);
   }});
-  rowsEl.querySelectorAll("button[data-category-index]").forEach(button => {{
-    button.addEventListener("click", event => {{
-      event.stopPropagation();
-      openCategoryChooser(Number(event.target.dataset.categoryIndex));
-    }});
-  }});
-  rowsEl.querySelectorAll("button[data-play-index]").forEach(button => {{
-    button.addEventListener("click", event => {{
-      event.stopPropagation();
-      playRow(Number(event.target.dataset.playIndex));
-    }});
-    }});
+    rowsEl.replaceChildren(fragment);
     updateCorrectionNotice();
     if (state.rows.length && state.selectedIndex < 0) selectRow(0);
-    window.requestAnimationFrame(updateQueueScrollSlider);
+    window.requestAnimationFrame(updateQueueScrollbars);
   }}
 
 function normalizeFolder(value) {{
@@ -2257,19 +2587,19 @@ function updateCorrectionNotice() {{
   correctionNotice.hidden = correctedCount === 0;
   correctionCount.textContent = correctedCount === 1 ? "1 correction staged." : `${{correctedCount}} corrections staged.`;
   trainCorrectionsButton.disabled = correctedCount === 0 || !state.sessionId || Boolean(state.trainingJobId);
+  syncStickyActionDock();
 }}
 
 function selectRow(index) {{
   state.selectedIndex = index;
+  refreshSelectedRowDetails();
+}}
+
+function refreshSelectedRowDetails() {{
+  const index = state.selectedIndex;
   const row = state.rows[index];
-  if (state.sessionId) {{
-    audioPlayer.src = `/api/audio/${{state.sessionId}}/${{row.index}}`;
-  }} else if (state.livePreviewJobId) {{
-    audioPlayer.src = `/api/job-audio/${{state.livePreviewJobId}}/${{row.index}}`;
-  }} else {{
-    audioPlayer.removeAttribute("src");
-  }}
-  audioPlayer.load();
+  if (!row) return;
+  setAudioSourceForRow(row);
     detailsEl.textContent = [
     `File: ${{row.display_name}}`,
     "",
@@ -2379,9 +2709,37 @@ function selectRow(index) {{
     }});
   }}
 
+  function waitForAudioReady(player) {{
+    if (player.readyState >= 2) return Promise.resolve();
+    return new Promise((resolve, reject) => {{
+      const timeout = window.setTimeout(() => {{
+        cleanup();
+        reject(new Error("Audio preview is still loading. Press the audio control once it appears ready."));
+      }}, 3500);
+      function cleanup() {{
+        window.clearTimeout(timeout);
+        player.removeEventListener("canplay", onReady);
+        player.removeEventListener("loadedmetadata", onReady);
+        player.removeEventListener("error", onError);
+      }}
+      function onReady() {{
+        cleanup();
+        resolve();
+      }}
+      function onError() {{
+        cleanup();
+        reject(new Error("Audio preview could not be loaded for this file."));
+      }}
+      player.addEventListener("canplay", onReady, {{ once: true }});
+      player.addEventListener("loadedmetadata", onReady, {{ once: true }});
+      player.addEventListener("error", onError, {{ once: true }});
+    }});
+  }}
+
   async function playRow(index) {{
     selectRow(index);
   try {{
+    await waitForAudioReady(audioPlayer);
     await audioPlayer.play();
     setStatus(`Playing ${{state.rows[index].display_name}}`);
   }} catch (error) {{
@@ -2532,6 +2890,7 @@ async function trainBrainsFromCorrections() {{
     return;
   }}
   trainCorrectionsButton.disabled = true;
+  syncStickyActionDock();
   trainingStatus.hidden = false;
   trainingText.textContent = "Staging corrections into the training tree...";
   trainingCount.textContent = `${{correctionRows().length}} correction(s)`;
@@ -2548,11 +2907,13 @@ async function trainBrainsFromCorrections() {{
     state.trainingJobId = payload.job_id || "";
     state.lastTrainingReportPath = payload.report_dir || "";
     openTrainingReportButton.disabled = !state.lastTrainingReportPath;
+    syncStickyActionDock();
     updateTrainingStatus(payload);
     if (state.trainingJobId) pollTrainingJob(state.trainingJobId);
   }} catch (error) {{
     state.trainingJobId = "";
     trainCorrectionsButton.disabled = correctionRows().length === 0 || !state.sessionId;
+    syncStickyActionDock();
     setStatus(error.message, true);
   }}
 }}
@@ -2607,12 +2968,14 @@ async function pollExportJob(jobId, retryCount=0) {{
     const errors = job.errors && job.errors.length ? ` Errors: ${{job.errors.join("; ")}}` : "";
     setStatus(`Exported ${{job.exported_count}} files to ${{job.sorted_root}}.${{errors}}`, Boolean(errors));
     setBusy(false);
+    syncStickyActionDock();
     return;
   }}
   if (job.status === "error") {{
     state.exportJobId = "";
     setStatus(job.error || job.message || "Export failed.", true);
     setBusy(false);
+    syncStickyActionDock();
     return;
   }}
   setStatus(`${{job.message || "Export is running..."}}${{heartbeat > 20 ? ` · last update ${{heartbeat}}s ago` : ""}}`);
@@ -2622,12 +2985,19 @@ async function pollExportJob(jobId, retryCount=0) {{
 function updateTrainingStatus(job) {{
   trainingStatus.hidden = false;
   trainingText.textContent = job.message || "Updating brains...";
-  trainingCount.textContent = `${{Number(job.trainable_count || 0)}} trainable, ${{Number(job.skipped_count || 0)}} skipped`;
+  const trainable = Number(job.trainable_count || 0);
+  const reused = Number(job.reused_existing_count || 0);
+  const skipped = Number(job.skipped_count || 0);
+  const pieces = [`${{trainable}} trainable`];
+  if (reused) pieces.push(`${{reused}} already in training`);
+  pieces.push(`${{skipped}} skipped`);
+  trainingCount.textContent = pieces.join(", ");
   if (job.status === "done") {{
     trainingBar.style.width = "100%";
     state.trainingJobId = "";
     trainCorrectionsButton.disabled = correctionRows().length === 0 || !state.sessionId;
     setStatus(job.message || "Brain update complete.");
+    syncStickyActionDock();
     return;
   }}
   if (job.status === "error") {{
@@ -2635,6 +3005,7 @@ function updateTrainingStatus(job) {{
     state.trainingJobId = "";
     trainCorrectionsButton.disabled = correctionRows().length === 0 || !state.sessionId;
     setStatus(job.message || "Brain update failed.", true);
+    syncStickyActionDock();
     return;
   }}
   trainingBar.style.width = "55%";
@@ -2653,6 +3024,7 @@ async function pollTrainingJob(jobId, retryCount=0) {{
   if (job.report_dir) {{
     state.lastTrainingReportPath = job.report_dir;
     openTrainingReportButton.disabled = false;
+    syncStickyActionDock();
   }}
   updateTrainingStatus(job);
   if (job.status === "running" || job.status === "queued") {{
@@ -2687,14 +3059,37 @@ document.getElementById("previewButton").addEventListener("click", () => startPr
   setBusy(false);
   setStatus(error.message, true);
 }}));
-document.getElementById("exportButton").addEventListener("click", () => exportApproved().catch(error => setStatus(error.message, true)));
+exportButton.addEventListener("click", () => exportApproved().catch(error => setStatus(error.message, true)));
 trainCorrectionsButton.addEventListener("click", () => trainBrainsFromCorrections().catch(error => setStatus(error.message, true)));
 openSortedButton.addEventListener("click", () => revealPath(state.lastSortedPath).catch(error => setStatus(error.message, true)));
 openReportButton.addEventListener("click", () => revealPath(state.lastReportPath).catch(error => setStatus(error.message, true)));
 openTrainingReportButton.addEventListener("click", () => revealPath(state.lastTrainingReportPath).catch(error => setStatus(error.message, true)));
+quickExportButton.addEventListener("click", () => exportButton.click());
+quickTrainCorrectionsButton.addEventListener("click", () => trainCorrectionsButton.click());
+quickOpenSortedButton.addEventListener("click", () => openSortedButton.click());
+quickOpenReportButton.addEventListener("click", () => openReportButton.click());
+quickOpenTrainingReportButton.addEventListener("click", () => openTrainingReportButton.click());
 document.getElementById("closeCategoryModal").addEventListener("click", () => closeCategoryChooser());
 document.getElementById("applyCategoryButton").addEventListener("click", () => applyApprovedCategory());
   document.getElementById("resetApprovedButton").addEventListener("click", () => resetApprovedCategory());
+  rowsEl.addEventListener("click", event => {{
+    const eventTarget = event.target instanceof Element ? event.target : null;
+    if (!eventTarget) return;
+    const categoryButton = eventTarget.closest("button[data-category-index]");
+    if (categoryButton) {{
+      event.stopPropagation();
+      openCategoryChooser(Number(categoryButton.dataset.categoryIndex));
+      return;
+    }}
+    const playButton = eventTarget.closest("button[data-play-index]");
+    if (playButton) {{
+      event.stopPropagation();
+      playRow(Number(playButton.dataset.playIndex));
+      return;
+    }}
+    const rowElement = eventTarget.closest("tr[data-row-index]");
+    if (rowElement) selectRow(Number(rowElement.dataset.rowIndex));
+  }});
   document.querySelectorAll("[data-collapse-target]").forEach(button => {{
     button.addEventListener("click", () => togglePanel(button.dataset.collapseTarget));
   }});
@@ -2707,9 +3102,13 @@ document.getElementById("applyCategoryButton").addEventListener("click", () => a
   }});
   document.getElementById("collapseAllPanels").addEventListener("click", () => setAllPanelsCollapsed(true));
   document.getElementById("expandAllPanels").addEventListener("click", () => setAllPanelsCollapsed(false));
-  queueScrollSlider.addEventListener("input", () => scrollQueueFromSlider());
-  tableWrap.addEventListener("scroll", () => updateQueueScrollSlider());
-  window.addEventListener("resize", () => updateQueueScrollSlider());
+  queueTopScroll.addEventListener("scroll", () => syncQueueScrollbars(queueTopScroll, tableWrap));
+  tableWrap.addEventListener("scroll", () => syncQueueScrollbars(tableWrap, queueTopScroll));
+  window.addEventListener("resize", () => updateQueueScrollbars());
+  restoreDetailsPaneWidth();
+  initDetailsResizer();
+  updateQueueScrollbars();
+  syncStickyActionDock();
   categorySearch.addEventListener("input", () => renderCategoryTree());
 customCategory.addEventListener("input", () => {{
   state.selectedCategory = customCategory.value;

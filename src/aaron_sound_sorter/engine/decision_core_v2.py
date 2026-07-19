@@ -20,6 +20,9 @@ from aaron_sound_sorter.engine.claim_producers.broad_bucket_claims import BroadB
 from aaron_sound_sorter.engine.claim_producers.candidate_conflicts import CandidateConflictClaimProducer
 from aaron_sound_sorter.engine.claim_producers.final_eligibility import FinalEligibilityClaimProducer
 from aaron_sound_sorter.engine.claim_producers.instrument_loop_safety import InstrumentLoopSafetyClaimProducer
+from aaron_sound_sorter.engine.claim_producers.learned_owner_authority import (
+    LearnedOwnerAuthorityClaimProducer,
+)
 from aaron_sound_sorter.engine.claim_producers.measured_final_guards import MeasuredFinalGuardClaimProducer
 from aaron_sound_sorter.engine.claim_producers.profile_candidates import ProfileCandidateClaimProducer
 from aaron_sound_sorter.engine.claim_producers.protocols import ClaimProducer
@@ -41,6 +44,7 @@ class DecisionCoreV2:
     ) -> None:
         self.raw_consensus = raw_consensus or ConsensusRunner()
         self.arbiter = arbiter or FamilyClaimArbiter()
+        self.learned_owner_claim_producer = LearnedOwnerAuthorityClaimProducer()
         self.baby_recall_claim_producer = BabyRecallClaimProducer()
         self.profile_candidate_claim_producer = ProfileCandidateClaimProducer()
         self.measured_bucket_claim_producer = BroadBucketClaimProducer(self)
@@ -133,6 +137,7 @@ class DecisionCoreV2:
     def _ordered_claim_producers(self) -> tuple[ClaimProducer, ...]:
         """Return claim producers in the legacy arbitration order."""
         return (
+            self.learned_owner_claim_producer,
             self.profile_candidate_claim_producer,
             self.baby_recall_claim_producer,
             self.measured_bucket_claim_producer,

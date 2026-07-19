@@ -11,7 +11,10 @@ from aaron_sound_sorter.domain.facts import fingerprint_array
 from aaron_sound_sorter.domain.models import AudioPhysics, SharedAudioFacts, VoterResult
 from aaron_sound_sorter.domain.policies import BrainVoterPolicy, ConsensusPolicy
 from aaron_sound_sorter.voters.base import Voter
-from aaron_sound_sorter.voters.human_override_recall import human_override_recall_match
+from aaron_sound_sorter.voters.human_override_recall import (
+    human_override_recall_allowed_by_memory,
+    human_override_recall_match,
+)
 from aaron_sound_sorter.voters.scoring_tools import (
     centroid_distance,
     feature_weights,
@@ -97,6 +100,7 @@ class BrainVoter(Voter):
         """
         vector = fingerprint_array(physics.fingerprint)
         weights = feature_weights(brain)
+        folder_map, _top_map = label_maps(brain)
         pending_rows: list[dict[str, Any]] = []
         fallback_vectors: dict[str, np.ndarray] = {}
         for label in labels:
@@ -118,13 +122,17 @@ class BrainVoter(Voter):
                 feature_weight_vector=weights,
             )
             human_override_evidence = human_override.evidence()
-            if human_override.matched:
+            folder_path = str(folder_map.get(label, label))
+            human_override_allowed = human_override_recall_allowed_by_memory(folder_path, facts)
+            if human_override.matched and human_override_allowed:
                 score = min(float(score), float(human_override.ranking_score))
                 raw_distance = min(float(raw_distance), float(human_override.nearest_distance))
                 if human_override.exact_match:
                     mode = "human_override_fingerprint_teacher_match"
                 else:
                     mode = f"human_override_{human_override.match_kind}_match"
+            elif human_override.matched:
+                human_override_evidence["human_override_suppressed_by_learned_memory_conflict"] = True
             if use_vectorized_fallback and not np.isfinite(float(score)):
                 fallback_vectors[label] = weighted_vector
             pending_rows.append(

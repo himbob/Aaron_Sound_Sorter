@@ -105,11 +105,14 @@ def run_version_command(version_command: tuple[str, ...], project_root: Path) ->
     return output[0] if output else f"exit code {completed.returncode}"
 
 
-def check_required_tools(project_root: Path) -> int:
+def check_required_tools(project_root: Path, *, quick: bool = False, quiet: bool = False) -> int:
     """Print required tool status and return a process exit code.
 
     Args:
         project_root: Project checkout root.
+        quick: When true, check only import availability and skip slower
+            subprocess version commands.
+        quiet: When true, print only missing-tool guidance.
 
     Returns:
         ``0`` when every required tool is installed, otherwise ``1``.
@@ -126,13 +129,20 @@ def check_required_tools(project_root: Path) -> int:
     missing_tools: list[str] = []
     for required_tool in REQUIRED_TOOLS:
         if module_is_available(required_tool.module_name):
-            version_text = run_version_command(required_tool.version_command, project_root)
-            print(f"PASS {required_tool.display_name}: {version_text}")
+            if not quiet:
+                if quick:
+                    print(f"PASS {required_tool.display_name}: installed")
+                else:
+                    version_text = run_version_command(required_tool.version_command, project_root)
+                    print(f"PASS {required_tool.display_name}: {version_text}")
         else:
             missing_tools.append(required_tool.display_name)
-            print(f"MISSING {required_tool.display_name}: module {required_tool.module_name!r} is not importable")
+            if not quiet:
+                print(f"MISSING {required_tool.display_name}: module {required_tool.module_name!r} is not importable")
 
     if missing_tools:
+        if quiet:
+            print("Missing developer tools: " + ", ".join(missing_tools))
         print("")
         print("Run this to install missing developer tools:")
         print("  make install-dev")
@@ -160,8 +170,10 @@ def main(argv: Iterable[str] | None = None) -> int:
     """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project-root", default=".", help="Project checkout root")
+    parser.add_argument("--quick", action="store_true", help="Skip slower tool version subprocess checks")
+    parser.add_argument("--quiet", action="store_true", help="Print only missing-tool guidance")
     args = parser.parse_args(list(argv) if argv is not None else None)
-    return check_required_tools(Path(args.project_root).expanduser().resolve())
+    return check_required_tools(Path(args.project_root).expanduser().resolve(), quick=args.quick, quiet=args.quiet)
 
 
 if __name__ == "__main__":

@@ -52,6 +52,10 @@ class PhysicsTopFamilyLayer:
         fx_allows = bool(fx_evidence.get("fx_role_allows_fx"))
         fx_action = safe_float(fx_evidence.get("fx_action_strength", 0.0), 0.0)
         fx_conflict = safe_float(fx_evidence.get("fx_role_conflict_strength", 0.0), 0.0)
+        fx_branch_strength = safe_float(
+            fx_evidence.get("fx_branch_selected_confidence", fx_confidence),
+            fx_confidence,
+        )
         tonal_non_drum_penalty = safe_float(
             drum_evidence.get("drum_anchor_tonal_non_drum_hit_penalty", 0.0),
             0.0,
@@ -166,6 +170,7 @@ class PhysicsTopFamilyLayer:
                 "ReverseSwell",
                 "GlitchStutter",
                 "BlipBeep",
+                "SirenAlarm",
             }
             and (
                 fx_confidence >= 0.78
@@ -186,6 +191,15 @@ class PhysicsTopFamilyLayer:
             )
             and not (instrument_anchor >= 0.72 and fx_action < 0.78)
         )
+        strong_synthetic_alert_fx = bool(
+            fx_branch == "SirenAlarm"
+            and bool(fx_evidence.get("fx_synthetic_alert_fx_body"))
+            and fx_branch_strength >= 0.74
+            and fx_confidence >= 0.56
+            and safe_float(fx_evidence.get("fx_synthetic_alert_pressure", 0.0), 0.0) >= 0.54
+            and fx_conflict < 0.62
+            and drum_anchor < 0.66
+        )
         strong_measured_texture_fx = bool(
             fx_branch in {"TextureAmbience", "MachineMechanical", "DesignedNoiseHybrid", "HumanCreatureFX"}
             and shape_name in {"texture_bed", "noise_texture", "static_bed", "mechanical_motion", "hybrid_fx_motion"}
@@ -200,7 +214,12 @@ class PhysicsTopFamilyLayer:
                 and drum_anchor >= 0.84
             )
         )
-        if strong_measured_impact_fx or strong_measured_transition_fx or strong_measured_texture_fx:
+        if (
+            strong_measured_impact_fx
+            or strong_measured_transition_fx
+            or strong_measured_texture_fx
+            or strong_synthetic_alert_fx
+        ):
             return (
                 "FX",
                 fx_confidence,
@@ -208,7 +227,9 @@ class PhysicsTopFamilyLayer:
                     **drum_evidence,
                     **instrument_evidence,
                     **fx_evidence,
-                    "physics_top_layer_source": "fx_role_layer",
+                    "physics_top_layer_source": (
+                        "synthetic_alert_fx_role_layer" if strong_synthetic_alert_fx else "fx_role_layer"
+                    ),
                     "physics_top_layer_fx_branch": fx_branch,
                     "physics_top_layer_fx_branch_confidence": round(float(fx_confidence), 6),
                     "physics_top_layer_drum_anchor": round(float(drum_anchor), 6),
@@ -483,6 +504,7 @@ class PhysicsTopFamilyLayer:
             and not clean_low_bass_phrase
             and not tonal_instrument_loop_veto
             and not tonal_arp_loop_decoy
+            and not bool(fx_evidence.get("fx_synthetic_alert_fx_body"))
             and (
                 event_low >= 0.60
                 or number(shape, "high_event_ratio", 0.0) >= 0.55
@@ -537,10 +559,6 @@ class PhysicsTopFamilyLayer:
                     "physics_top_layer_instrument_anchor": round(float(instrument_anchor), 6),
                 },
             )
-        fx_branch_strength = safe_float(
-            fx_evidence.get("fx_branch_selected_confidence", fx_confidence),
-            fx_confidence,
-        )
         strong_clean_mid_blip_tone = bool(
             fx_branch == "BlipBeep"
             and fx_allows

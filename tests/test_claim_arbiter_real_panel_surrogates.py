@@ -1271,6 +1271,72 @@ def test_weak_review_releases_when_raw_and_physics_are_already_drums() -> None:
     assert final.consensus_status == "final_weak_review_measured_drums_release"
 
 
+def test_weak_review_does_not_promote_measured_one_shot_to_drum_loops() -> None:
+    """A struck one-shot can be released to Drums without becoming a loop."""
+    raw = raw_claim(
+        "Drums/Rims and Sticks/Rimshot/One Shots",
+        [
+            shared_row("Drums/Rims and Sticks/Rimshot/One Shots", 8.0),
+            shared_row("Drums/Hi Hats/Generic Hat/One Shots", 9.0),
+        ],
+        score=8.0,
+    )
+    measured = SharedAudioFacts(
+        is_broken_or_tiny=False,
+        is_loop_like=False,
+        is_single_event_like=True,
+        is_short_hit_like=True,
+        is_long=False,
+        evidence={
+            "duration_sec": 1.64,
+            "shape_vote": {
+                "primary_shape": "texture_bed",
+                "confidence": 0.91,
+                "onset_count": 3.0,
+                "drumlike_frame_ratio": 0.93,
+            },
+            "measured_roles": {"percussive_one_shot": 0.84, "primary_roles": ["percussive_one_shot"]},
+            "physics_vote_result": {
+                "top_guesses": [
+                    {
+                        "label": "Drums/Hi Hats/Closed Hat/One Shots",
+                        "folder_path": "Drums/Hi Hats/Closed Hat/One Shots",
+                        "top_family": "Drums",
+                    }
+                ]
+            },
+            "physics_subpanels": {
+                "flat": {
+                    "compact_struck_tonal_percussion_score": 0.90,
+                    "drum_hit_score": 0.94,
+                    "drum_loop_source_score": 0.59,
+                    "drum_rim_stick_source_score": 0.99,
+                    "drum_closed_hat_source_score": 0.99,
+                    "onset_percussive_onset_score": 1.0,
+                    "role_one_shot_score": 0.83,
+                    "role_loop_score": 0.34,
+                    "struck_wood_score": 0.94,
+                }
+            },
+        },
+    )
+    review = review_claim(
+        label="_TO_REVIEW/Measured Role Conflict",
+        reason="synthetic shape conflict review",
+        source="measured_shape_conflict_review",
+        shared=raw.shared_candidates,
+        winner=raw,
+        strength=0.92,
+    )
+    core = DecisionCoreV2()
+
+    final = core.arbiter.adjudicate(raw_claim=raw, consensus_claims=[], eligibility_claims=[review], facts=measured)
+
+    assert final.folder_path == "Drums/Rims and Sticks/Rimshot/One Shots"
+    assert "Drum Loops" not in final.folder_path
+    assert final.consensus_status == "final_weak_review_measured_drums_release"
+
+
 def test_pitched_tonal_phrase_blocks_weak_measured_drums_release() -> None:
     """A weak cymbal-like physics top must not release a tonal phrase into Drums."""
     shared = [
@@ -1339,3 +1405,197 @@ def test_pitched_tonal_phrase_blocks_weak_measured_drums_release() -> None:
 
     assert final.folder_path == "Instruments/Instrument Loops/Loops"
     assert final.consensus_status != "final_weak_review_measured_drums_release"
+
+
+def test_fx_motion_shape_blocks_weak_measured_drums_release() -> None:
+    """A transition/noise FX motion shape must not be released into drum loops."""
+    shared = [
+        shared_row("Drums/Drum Loops/Loops", 9.0),
+        shared_row("FX/Structural and Transitional FX/Risers and Builds/Long Riser/Long FX", 16.0),
+    ]
+    raw = raw_claim("Drums/Drum Loops/Loops", shared, score=9.0)
+    measured = SharedAudioFacts(
+        is_broken_or_tiny=False,
+        is_loop_like=True,
+        is_single_event_like=False,
+        is_short_hit_like=False,
+        is_long=True,
+        evidence={
+            "shape_vote": {
+                "primary_shape": "hybrid_fx_motion",
+                "confidence": 0.88,
+                "shape_scores": [
+                    ["hybrid_fx_motion", 0.88],
+                    ["transition_riser", 0.74],
+                    ["beat_loop", 0.41],
+                ],
+                "drumlike_frame_ratio": 0.42,
+                "percussive_event_ratio": 0.36,
+                "pitched_event_ratio": 0.20,
+            },
+            "measured_roles": {
+                "percussive_drum_loop": 0.44,
+                "low_rhythmic_drum_loop": 0.18,
+                "bright_drum_loop": 0.46,
+            },
+            "physics_vote_result": {
+                "top_guesses": [
+                    {
+                        "label": "Drums/Cymbals/Crash Cymbal/Loops",
+                        "folder_path": "Drums/Cymbals/Crash Cymbal/Loops",
+                        "top_family": "Drums",
+                    }
+                ]
+            },
+            "physics_subpanels": {
+                "flat": {
+                    "drum_loop_source_score": 0.48,
+                    "drum_hit_score": 0.22,
+                    "drum_cymbal_source_score": 0.68,
+                    "fx_motion_score": 0.82,
+                    "fx_transition_authority_score": 0.77,
+                    "fx_riser_build_score": 0.74,
+                }
+            },
+        },
+    )
+    review = review_claim(
+        label="_TO_REVIEW/Measured Role Conflict",
+        reason="synthetic weak consensus review",
+        source="weak_voter_consensus",
+        shared=raw.shared_candidates,
+        winner=raw,
+        strength=1.0,
+    )
+    core = DecisionCoreV2()
+
+    final = core.arbiter.adjudicate(raw_claim=raw, consensus_claims=[], eligibility_claims=[review], facts=measured)
+
+    assert final.folder_path != "Drums/Drum Loops/Loops"
+    assert final.consensus_status != "final_weak_review_measured_drums_release"
+
+
+def test_designed_low_fx_shape_blocks_weak_measured_drums_release() -> None:
+    """A designed low FX body must not be released into cymbal one-shots."""
+    shared = [
+        shared_row("Drums/Cymbals/Crash Cymbal/One Shots", 7.0),
+        shared_row("FX/Structural and Transitional FX/Risers and Builds/Long Riser/Long FX", 11.0),
+    ]
+    raw = raw_claim("Drums/Cymbals/Crash Cymbal/One Shots", shared, score=7.0)
+    measured = SharedAudioFacts(
+        is_broken_or_tiny=False,
+        is_loop_like=True,
+        is_single_event_like=False,
+        is_short_hit_like=False,
+        is_long=True,
+        evidence={
+            "shape_vote": {
+                "primary_shape": "designed_low_fx",
+                "confidence": 0.94,
+                "shape_scores": [
+                    ["designed_low_fx", 0.94],
+                    ["hybrid_fx_motion", 0.60],
+                    ["beat_loop", 0.42],
+                ],
+                "drumlike_frame_ratio": 0.50,
+                "percussive_event_ratio": 0.38,
+            },
+            "measured_roles": {
+                "percussive_drum_loop": 0.32,
+                "low_rhythmic_drum_loop": 0.22,
+                "bright_drum_loop": 0.40,
+            },
+            "physics_vote_result": {
+                "top_guesses": [
+                    {
+                        "label": "Drums/Cymbals/Crash Cymbal/One Shots",
+                        "folder_path": "Drums/Cymbals/Crash Cymbal/One Shots",
+                        "top_family": "Drums",
+                    }
+                ]
+            },
+            "physics_subpanels": {
+                "flat": {
+                    "drum_loop_source_score": 0.42,
+                    "drum_hit_score": 0.36,
+                    "drum_cymbal_source_score": 0.70,
+                    "low_designed_fx_score": 0.82,
+                }
+            },
+        },
+    )
+    review = review_claim(
+        label="_TO_REVIEW/Measured Role Conflict",
+        reason="synthetic weak consensus review",
+        source="weak_voter_consensus",
+        shared=raw.shared_candidates,
+        winner=raw,
+        strength=1.0,
+    )
+    core = DecisionCoreV2()
+
+    final = core.arbiter.adjudicate(raw_claim=raw, consensus_claims=[], eligibility_claims=[review], facts=measured)
+
+    assert not final.folder_path.startswith("Drums/Cymbals/")
+    assert final.consensus_status != "final_weak_review_measured_drums_release"
+
+
+def test_designed_low_fx_human_bucket_does_not_rehome_to_instrument_voice() -> None:
+    """A formant-ish designed FX body must not become Instruments/Voice."""
+    shared = [
+        shared_row("FX/Human and Voice FX/Mouth Sounds/One Shots", 4.0, {"voiced_one_shot": 0.60}),
+        shared_row("FX/Structural and Transitional FX/Risers and Builds/Long Riser/Long FX", 7.0),
+    ]
+    raw = raw_claim("FX/Human and Voice FX/Mouth Sounds/One Shots", shared, score=4.0)
+    measured = SharedAudioFacts(
+        is_broken_or_tiny=False,
+        is_loop_like=True,
+        is_single_event_like=False,
+        is_short_hit_like=False,
+        is_long=True,
+        evidence={
+            "shape_vote": {
+                "primary_shape": "designed_low_fx",
+                "confidence": 0.94,
+                "shape_scores": [
+                    ["designed_low_fx", 0.94],
+                    ["transition_riser", 0.75],
+                    ["texture_bed", 0.89],
+                ],
+                "f0_voiced_ratio": 0.70,
+                "percussive_event_ratio": 0.38,
+                "drumlike_frame_ratio": 0.35,
+                "onset_count": 1.0,
+            },
+            "measured_roles": {
+                "voiced_one_shot": 0.58,
+                "vocal_one_shot": 0.12,
+                "vocal_phrase": 0.0,
+                "vocal_music_phrase": 0.0,
+            },
+            "direct_body_view": {
+                "available": True,
+                "measured_roles": {
+                    "voiced_one_shot": 0.58,
+                    "vocal_one_shot": 0.12,
+                    "vocal_phrase": 0.0,
+                    "vocal_music_phrase": 0.0,
+                },
+            },
+            "physics_subpanels": {
+                "flat": {
+                    "human_breath_mouth_score": 0.84,
+                    "human_spoken_voice_score": 0.20,
+                    "low_designed_fx_score": 0.82,
+                    "fx_motion_score": 0.76,
+                    "fx_transition_authority_score": 0.72,
+                }
+            },
+        },
+    )
+    core = DecisionCoreV2()
+
+    final = core.arbiter.adjudicate(raw_claim=raw, consensus_claims=[], eligibility_claims=[], facts=measured)
+
+    assert not final.folder_path.startswith("Instruments/Voice")
+    assert final.consensus_status != "true_voice_instrument_rehome"

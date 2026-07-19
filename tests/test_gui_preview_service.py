@@ -9,6 +9,7 @@ from aaron_sound_sorter.gui.preview_service import (
     SortPreviewService,
     TrainingCorrectionImporter,
     correction_evidence,
+    gui_worker_count,
     load_available_labels,
     load_simple_yaml_mapping,
     training_slot_path,
@@ -159,7 +160,7 @@ def test_training_correction_importer_copies_corrected_audio_to_training_slot(tm
     assert summary.correction_evidence_path.exists()
 
 
-def test_training_correction_importer_skips_duplicate_audio_in_same_slot(tmp_path: Path) -> None:
+def test_training_correction_importer_reuses_duplicate_audio_in_same_slot(tmp_path: Path) -> None:
     source = _audio_file(tmp_path, "koto.wav")
     existing_slot = tmp_path / "training" / "locked_curated_v1" / "Instruments" / "Plucked Strings" / "Koto" / "_LOOPS"
     existing_slot.mkdir(parents=True)
@@ -171,8 +172,9 @@ def test_training_correction_importer_skips_duplicate_audio_in_same_slot(tmp_pat
     summary = TrainingCorrectionImporter(project_root=tmp_path).import_session(session)
 
     assert summary.staged_count == 0
-    assert summary.skipped_count == 1
-    assert summary.errors == ["00001: koto.wav: matching audio is already staged in this training slot"]
+    assert summary.reused_existing_count == 1
+    assert summary.skipped_count == 0
+    assert summary.errors == []
     assert not (existing_slot / "koto.wav").exists()
 
 
@@ -279,6 +281,8 @@ def test_gui_brain_config_loads_full_and_baby_brain_paths(tmp_path: Path) -> Non
     assert brain_config.full_brain_path == tmp_path / "brains" / "full.json"
     assert brain_config.core_baby_brain_path == tmp_path / "brains" / "core.json"
     assert brain_config.user_memory_brain_path == tmp_path / "stage4_folder_brain_user_memory.json"
+    assert brain_config.voter_memory_brain_path == tmp_path / "stage4_voter_memory_brain.json"
+    assert brain_config.physics_memory_brain_path == tmp_path / "stage4_physics_memory_brain.json"
     assert brain_config.shape_starter_memory_brain_path == tmp_path / "stage4_shape_memory_starter_brain.json"
     assert brain_config.shape_memory_brain_path == tmp_path / "stage4_shape_memory_brain.json"
     assert brain_config.harmonic_outlier_baby_brain_path == tmp_path / "brains" / "harmonic_outlier.json"
@@ -297,3 +301,16 @@ def test_simple_yaml_loader_reads_nested_boolean_config(tmp_path: Path) -> None:
 
     assert loaded["brains"]["full"] == "full.json"
     assert loaded["options"]["use_baby_brains_in_sort"] is False
+
+
+def test_gui_worker_count_uses_faster_desktop_default(monkeypatch) -> None:
+    monkeypatch.delenv("AARON_GUI_SORT_WORKERS", raising=False)
+    monkeypatch.setattr("aaron_sound_sorter.gui.preview_service.os.cpu_count", lambda: 12)
+
+    assert gui_worker_count() == 10
+
+
+def test_gui_worker_count_allows_environment_override(monkeypatch) -> None:
+    monkeypatch.setenv("AARON_GUI_SORT_WORKERS", "3")
+
+    assert gui_worker_count() == 3

@@ -18,13 +18,34 @@ from typing import Any
 
 import numpy as np
 
+from aaron_audio_intelligence.physics_memory_brain import (
+    PHYSICS_MEMORY_BRAIN_NAME,
+    build_empty_physics_memory_brain,
+    ensure_physics_memory_payload,
+    is_physics_memory_brain,
+    physics_memory_target_for_label,
+    refresh_physics_memory_target,
+    update_physics_memory_with_row,
+)
 from aaron_audio_intelligence.shape_memory_brain import (
     SHAPE_MEMORY_BRAIN_NAME,
     build_empty_shape_memory_brain,
+    ensure_shape_memory_payload,
     is_shape_memory_brain,
+    refresh_shape_memory_shape,
+    shape_target_for_label,
     update_shape_memory_with_row,
 )
 from aaron_audio_intelligence.user_memory_brain import USER_MEMORY_BRAIN_NAME, build_empty_user_memory_brain
+from aaron_audio_intelligence.voter_memory_brain import (
+    VOTER_MEMORY_BRAIN_NAME,
+    build_empty_voter_memory_brain,
+    ensure_voter_memory_payload,
+    is_voter_memory_brain,
+    refresh_voter_memory_role,
+    update_voter_memory_with_row,
+    voter_memory_role_for_label,
+)
 from aaron_sound_sorter.brain import (
     compute_category_fact_profiles,
     compute_category_rival_contrast_facts,
@@ -45,13 +66,14 @@ from aaron_sound_sorter.training_labels import (
     top_for_public_label,
 )
 
+# GUI corrections are high-trust but sparse.  Keep them in dedicated memory
+# lanes so a few examples can help nearby sounds without distorting the stable
+# full/core/spread/outlier brains that are rebuilt from curated training data.
 DEFAULT_INCREMENTAL_BRAIN_NAMES = (
-    "stage4_folder_brain.json",
-    "stage4_folder_brain_core_baby.json",
-    "stage4_folder_brain_spread_baby.json",
-    "stage4_folder_brain_outlier_baby.json",
     USER_MEMORY_BRAIN_NAME,
     SHAPE_MEMORY_BRAIN_NAME,
+    VOTER_MEMORY_BRAIN_NAME,
+    PHYSICS_MEMORY_BRAIN_NAME,
 )
 MAX_INCREMENTAL_EXAMPLES_PER_LABEL = 120
 DEFAULT_MAX_CENTROIDS = 6
@@ -59,6 +81,8 @@ DEFAULT_HUMAN_OVERRIDE_EVIDENCE_WEIGHT = 32
 MAX_HUMAN_OVERRIDE_EVIDENCE_WEIGHT = 1200
 DYNAMIC_HUMAN_OVERRIDE_COMPETITOR_MULTIPLIER = 1.25
 DYNAMIC_HUMAN_OVERRIDE_COMPETITOR_CUSHION = 8
+SUPERSEDED_EXAMPLE_HISTORY_LIMIT = 200
+SUPERSEDED_FINGERPRINT_ATOL = 1e-7
 
 
 @dataclass(frozen=True)
@@ -245,6 +269,8 @@ class IncrementalBrainUpdater:
         base_brain = self.repository.load(full_brain_path)
         self._ensure_user_memory_brain_exists(base_brain)
         self._ensure_shape_memory_brain_exists(base_brain)
+        self._ensure_voter_memory_brain_exists(base_brain)
+        self._ensure_physics_memory_brain_exists(base_brain)
 
     def _ensure_user_memory_brain_exists(self, base_brain: dict[str, Any]) -> None:
         """Create the dedicated GUI correction memory brain when configured."""
@@ -261,6 +287,22 @@ class IncrementalBrainUpdater:
         memory_path = self.project_root / SHAPE_MEMORY_BRAIN_NAME
         if not memory_path.exists():
             self.repository.save(memory_path, build_empty_shape_memory_brain(base_brain))
+
+    def _ensure_voter_memory_brain_exists(self, base_brain: dict[str, Any]) -> None:
+        """Create the dedicated voter-role memory brain when configured."""
+        if VOTER_MEMORY_BRAIN_NAME not in self.brain_names:
+            return
+        memory_path = self.project_root / VOTER_MEMORY_BRAIN_NAME
+        if not memory_path.exists():
+            self.repository.save(memory_path, build_empty_voter_memory_brain(base_brain))
+
+    def _ensure_physics_memory_brain_exists(self, base_brain: dict[str, Any]) -> None:
+        """Create the dedicated PhysicsVoter memory brain when configured."""
+        if PHYSICS_MEMORY_BRAIN_NAME not in self.brain_names:
+            return
+        memory_path = self.project_root / PHYSICS_MEMORY_BRAIN_NAME
+        if not memory_path.exists():
+            self.repository.save(memory_path, build_empty_physics_memory_brain(base_brain))
 
     def _read_correction_rows(
         self,
@@ -319,6 +361,8 @@ class IncrementalBrainUpdater:
         warnings: list[str] = []
         weighted_rows: list[MeasuredCorrectionEvidence] = []
         shape_memory_brain = is_shape_memory_brain(brain)
+        voter_memory_brain = is_voter_memory_brain(brain)
+        physics_memory_brain = is_physics_memory_brain(brain)
         for evidence in correction_rows:
             row = evidence.row
             dynamic_weight = dynamic_human_override_weight(
@@ -329,19 +373,33 @@ class IncrementalBrainUpdater:
             weighted_evidence = MeasuredCorrectionEvidence(row=row, evidence_weight=dynamic_weight)
             try:
                 if shape_memory_brain:
+                    target_shape = shape_target_for_label(row.label, row.structure)
+                    supersede_conflicting_shape_examples(brain, row, target_shape)
                     shape = update_shape_memory_with_row(brain, row, evidence_weight=dynamic_weight)
                     if shape:
                         labels_touched.append(shape)
+                elif voter_memory_brain:
+                    target_role = voter_memory_role_for_label(row.label, row.structure)
+                    supersede_conflicting_voter_examples(brain, row, target_role)
+                    role = update_voter_memory_with_row(brain, row, evidence_weight=dynamic_weight)
+                    if role:
+                        labels_touched.append(role)
+                elif physics_memory_brain:
+                    target = physics_memory_target_for_label(row.label, row.structure)
+                    supersede_conflicting_physics_examples(brain, row, target.key)
+                    target = update_physics_memory_with_row(brain, row, evidence_weight=dynamic_weight)
+                    if target:
+                        labels_touched.append(target)
                 else:
+                    supersede_conflicting_label_examples(brain, row)
                     update_brain_label_with_row(brain, row, evidence_weight=dynamic_weight)
-                    update_shape_memory_with_row(brain, row, evidence_weight=dynamic_weight)
                     labels_touched.append(row.label)
                 weighted_rows.append(weighted_evidence)
             except Exception as exc:
                 warnings.append(f"{row.label}: {exc}")
         if weighted_rows:
             annotate_incremental_update(brain, weighted_rows, brain_path.name)
-            if not shape_memory_brain:
+            if not shape_memory_brain and not voter_memory_brain and not physics_memory_brain:
                 recompute_rival_contrast_facts(brain)
             self.repository.save(brain_path, brain)
         label_count_after = len(brain.get("labels", []) if isinstance(brain.get("labels", []), list) else [])
@@ -443,6 +501,297 @@ def append_training_example(
         simple_list.append(source_path)
         del simple_list[:-5]
     return [example for example in examples if isinstance(example, dict)]
+
+
+def supersede_conflicting_label_examples(brain: dict[str, Any], row: FeatureRow) -> list[str]:
+    """Remove same-audio GUI evidence from labels contradicted by ``row``.
+
+    Args:
+        brain: User-memory brain being updated.
+        row: New human-approved correction row.
+
+    Returns:
+        Labels whose same-audio examples were superseded.
+
+    Side Effects:
+        Mutates ``brain`` by deleting matching examples from other labels and
+        refreshing or removing the affected label prototypes.
+    """
+    examples_by_label = ensure_mapping(brain, "training_examples_detailed_by_label")
+    target_label = normalize_public_label(row.label)
+    superseded_labels: list[str] = []
+    for label, examples in list(examples_by_label.items()):
+        label = normalize_public_label(label)
+        if label == target_label or not isinstance(examples, list):
+            continue
+        kept_examples, removed_examples = split_superseded_examples(examples, row)
+        if not removed_examples:
+            continue
+        superseded_labels.append(label)
+        record_superseded_examples(brain, row, old_target=label, removed_examples=removed_examples)
+        if kept_examples:
+            examples_by_label[label] = kept_examples
+            refresh_label_from_remaining_examples(brain, label, kept_examples)
+        else:
+            remove_label_from_incremental_brain(brain, label)
+    return superseded_labels
+
+
+def supersede_conflicting_shape_examples(brain: dict[str, Any], row: FeatureRow, target_shape: str) -> list[str]:
+    """Remove same-audio shape-memory examples outside ``target_shape``."""
+    if not target_shape:
+        return []
+    payload = ensure_shape_memory_payload(brain)
+    removed_targets = supersede_conflicting_payload_examples(
+        brain,
+        payload,
+        row,
+        target_key=target_shape,
+        examples_map_key="shape_examples_by_shape",
+        metadata_keys=(
+            "shape_centroids_by_shape",
+            "shape_counts_by_shape",
+            "shape_effective_weights_by_shape",
+        ),
+    )
+    for shape in removed_targets:
+        if shape in payload.get("shape_examples_by_shape", {}):
+            refresh_shape_memory_shape(payload, shape)
+    refresh_memory_brain_labels(brain, payload.get("shape_examples_by_shape", {}))
+    return removed_targets
+
+
+def supersede_conflicting_voter_examples(brain: dict[str, Any], row: FeatureRow, target_role: str) -> list[str]:
+    """Remove same-audio voter-memory examples outside ``target_role``."""
+    if not target_role:
+        return []
+    payload = ensure_voter_memory_payload(brain)
+    removed_targets = supersede_conflicting_payload_examples(
+        brain,
+        payload,
+        row,
+        target_key=target_role,
+        examples_map_key="examples_by_role",
+        metadata_keys=(
+            "centroids_by_role",
+            "counts_by_role",
+            "effective_weights_by_role",
+        ),
+    )
+    for role in removed_targets:
+        if role in payload.get("examples_by_role", {}):
+            refresh_voter_memory_role(payload, role)
+    refresh_memory_brain_labels(brain, payload.get("examples_by_role", {}))
+    return removed_targets
+
+
+def supersede_conflicting_physics_examples(brain: dict[str, Any], row: FeatureRow, target_key: str) -> list[str]:
+    """Remove same-audio physics-memory examples outside ``target_key``."""
+    if not target_key:
+        return []
+    payload = ensure_physics_memory_payload(brain)
+    removed_targets = supersede_conflicting_payload_examples(
+        brain,
+        payload,
+        row,
+        target_key=target_key,
+        examples_map_key="examples_by_target",
+        metadata_keys=(
+            "centroids_by_target",
+            "counts_by_target",
+            "effective_weights_by_target",
+            "target_metadata",
+        ),
+    )
+    for key in removed_targets:
+        if key in payload.get("examples_by_target", {}):
+            refresh_physics_memory_target(payload, key)
+    refresh_memory_brain_labels(brain, payload.get("examples_by_target", {}))
+    return removed_targets
+
+
+def supersede_conflicting_payload_examples(
+    brain: dict[str, Any],
+    payload: dict[str, Any],
+    row: FeatureRow,
+    *,
+    target_key: str,
+    examples_map_key: str,
+    metadata_keys: tuple[str, ...],
+) -> list[str]:
+    """Remove same-audio examples from non-target memory groups."""
+    examples_by_target = payload.get(examples_map_key)
+    if not isinstance(examples_by_target, dict):
+        return []
+    removed_targets: list[str] = []
+    for existing_key, examples in list(examples_by_target.items()):
+        existing_key = str(existing_key)
+        if existing_key == target_key or not isinstance(examples, list):
+            continue
+        kept_examples, removed_examples = split_superseded_examples(examples, row)
+        if not removed_examples:
+            continue
+        removed_targets.append(existing_key)
+        record_superseded_examples(brain, row, old_target=existing_key, removed_examples=removed_examples)
+        if kept_examples:
+            examples_by_target[existing_key] = kept_examples
+        else:
+            remove_payload_target(payload, examples_map_key, existing_key, metadata_keys)
+    return removed_targets
+
+
+def split_superseded_examples(
+    examples: list[Any],
+    row: FeatureRow,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Split examples into kept and superseded rows for the new correction."""
+    kept_examples: list[dict[str, Any]] = []
+    removed_examples: list[dict[str, Any]] = []
+    for example in examples:
+        if not isinstance(example, dict):
+            continue
+        if example_matches_correction_audio(example, row):
+            removed_examples.append(example)
+        else:
+            kept_examples.append(example)
+    return kept_examples, removed_examples
+
+
+def example_matches_correction_audio(example: dict[str, Any], row: FeatureRow) -> bool:
+    """Return true when a stored example is the same audio as ``row``."""
+    if str(example.get("source_path", "")) == str(row.path):
+        return True
+    existing_vector = example_fingerprint(example)
+    new_vector = pad_fingerprint(np.asarray(row.fingerprint, dtype=np.float32))
+    if existing_vector.size != FP_SIZE or new_vector.size != FP_SIZE:
+        return False
+    return bool(np.allclose(existing_vector, new_vector, atol=SUPERSEDED_FINGERPRINT_ATOL, rtol=0.0))
+
+
+def record_superseded_examples(
+    brain: dict[str, Any],
+    row: FeatureRow,
+    *,
+    old_target: str,
+    removed_examples: list[dict[str, Any]],
+) -> None:
+    """Record same-audio evidence replaced by a newer human correction."""
+    history = brain.setdefault("incremental_gui_supersession_history", [])
+    if not isinstance(history, list):
+        history = []
+        brain["incremental_gui_supersession_history"] = history
+    history.append(
+        {
+            "superseded_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "new_label": str(row.label),
+            "old_target": str(old_target),
+            "new_source_path": str(row.path),
+            "removed_example_count": len(removed_examples),
+            "removed_labels": sorted(
+                {
+                    str(example.get("approved_label") or example.get("group_key") or example.get("source_path") or "")
+                    for example in removed_examples
+                }
+            ),
+            "policy": "new_gui_correction_supersedes_same_audio_conflicting_memory",
+        }
+    )
+    del history[:-SUPERSEDED_EXAMPLE_HISTORY_LIMIT]
+
+
+def refresh_label_from_remaining_examples(
+    brain: dict[str, Any],
+    label: str,
+    examples: list[dict[str, Any]],
+) -> None:
+    """Refresh one user-memory label after conflicting examples were removed."""
+    raw_vectors = weighted_example_fingerprints(examples)
+    raw_vectors = [vector for vector in raw_vectors if vector.size == FP_SIZE]
+    if not raw_vectors:
+        remove_label_from_incremental_brain(brain, label)
+        return
+    normalized_vectors = normalized_vectors_for_label(brain, label, raw_vectors)
+    update_label_models(brain, label, normalized_vectors)
+    row = feature_row_from_example(label, examples[0])
+    update_label_counts_and_reliability(
+        brain,
+        label,
+        row,
+        effective_label_count=len(raw_vectors),
+        unique_label_count=count_unique_examples(examples),
+    )
+    update_label_fact_profile(brain, label, examples)
+    simple_examples = ensure_mapping(brain, "examples_by_label")
+    simple_examples[label] = [str(example.get("source_path", "")) for example in examples if example.get("source_path")]
+
+
+def feature_row_from_example(label: str, example: dict[str, Any]) -> FeatureRow:
+    """Return a minimal feature row from a stored user-memory example."""
+    return FeatureRow(
+        path=str(example.get("source_path", "")),
+        group_key=str(example.get("group_key", label) or label),
+        label=label,
+        top=str(example.get("top", "") or top_for_public_label(label)),
+        structure=str(example.get("structure", "") or label_default_structure(label)),
+        duration_sec=float(example.get("duration_sec", 0.0) or 0.0),
+        fingerprint=example_fingerprint(example).astype(float).tolist(),
+        read_status="ok",
+        source_pack=str(example.get("source_pack", "") or ""),
+    )
+
+
+def remove_label_from_incremental_brain(brain: dict[str, Any], label: str) -> None:
+    """Remove a label and its derived memory metadata from a user-memory brain."""
+    labels = [str(value) for value in brain.get("labels", []) if str(value) and str(value) != label]
+    brain["labels"] = sorted(labels)
+    for key in (
+        "training_examples_detailed_by_label",
+        "examples_by_label",
+        "top_by_label",
+        "structure_by_label",
+        "counts",
+        "effective_counts",
+        "raw_counts",
+        "centroids",
+        "exemplars_by_label",
+        "anchors_by_label",
+        "centroid_counts",
+        "label_models_by_label",
+        "label_reliability_by_label",
+        "effective_training_balance_by_label",
+        "category_fact_profiles",
+        "label_intra_spread_by_label",
+    ):
+        mapping = brain.get(key)
+        if isinstance(mapping, dict):
+            mapping.pop(label, None)
+
+
+def remove_payload_target(
+    payload: dict[str, Any],
+    examples_map_key: str,
+    target_key: str,
+    metadata_keys: tuple[str, ...],
+) -> None:
+    """Remove a memory target from a payload and its derived metadata maps."""
+    mapping = payload.get(examples_map_key)
+    if isinstance(mapping, dict):
+        mapping.pop(target_key, None)
+    for key in metadata_keys:
+        value = payload.get(key)
+        if isinstance(value, dict):
+            value.pop(target_key, None)
+
+
+def refresh_memory_brain_labels(brain: dict[str, Any], examples_by_target: object) -> None:
+    """Keep dedicated memory brain labels aligned to non-empty targets."""
+    if not isinstance(examples_by_target, dict):
+        return
+    brain["labels"] = sorted(
+        str(key)
+        for key, examples in examples_by_target.items()
+        if str(key) and isinstance(examples, list) and bool(examples)
+    )
 
 
 def training_example_from_row(row: FeatureRow) -> dict[str, Any]:

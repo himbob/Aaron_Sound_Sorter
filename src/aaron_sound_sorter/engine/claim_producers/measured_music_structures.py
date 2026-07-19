@@ -231,7 +231,7 @@ class MeasuredMusicStructureClaimProducer:
         path = _norm_path(raw.folder_path or raw.label)
         if raw.family == "Instruments" and "voice" in path:
             return None
-        if self._facts_support_true_voice_role(facts):
+        if self._facts_support_true_voice_role(facts) or self._facts_support_voice_instrument_loop(facts):
             return None
         if not self._facts_support_clean_pitched_loop_body(facts):
             return None
@@ -495,6 +495,20 @@ class MeasuredMusicStructureClaimProducer:
             "human_breath_mouth_score",
             "voice_choir_score",
         )
+        human_spoken = self._measured_score(facts, "human_spoken_voice_score")
+        processed_spoken_voice_loop = bool(
+            self._facts_have_internal_voice_candidate(facts, max_rank=4, max_score=1.35)
+            and human_spoken >= 0.74
+            and voice_panel >= 0.66
+            and self._shape_number(facts, "pitched_event_ratio") >= 0.54
+            and self._shape_number(facts, "percussive_event_ratio") <= 0.45
+            and self._shape_number(facts, "drumlike_frame_ratio") <= 0.45
+            and self._measured_score(facts, "drum_loop_source_score") <= 0.45
+            and self._measured_score(facts, "drum_hit_score") <= 0.58
+            and self._measured_score(facts, "fx_motion_score", "fx_transition_authority_score") <= 0.62
+        )
+        if processed_spoken_voice_loop:
+            return True
         return bool(
             (voice_role >= 0.68 or detected_parent in {"vocal_music_phrase", "vocal_phrase", "voiced_one_shot"})
             and voice_panel >= 0.74
@@ -712,6 +726,63 @@ class MeasuredMusicStructureClaimProducer:
             return {}
         roles = facts.evidence.get("measured_roles", {})
         return roles if isinstance(roles, dict) else {}
+
+    def _facts_have_internal_voice_candidate(
+        self,
+        facts: SharedAudioFacts | None,
+        *,
+        max_rank: int,
+        max_score: float,
+    ) -> bool:
+        """Return True when internal voter output exposes an Instruments/Voice candidate."""
+        if facts is None or not isinstance(getattr(facts, "evidence", None), dict):
+            return False
+
+        def row_matches(row: object, fallback_rank: int) -> bool:
+            if not isinstance(row, dict):
+                return False
+            path = str(row.get("folder_path") or row.get("label") or "").lower().replace("\\", "/")
+            if not path.startswith("instruments/voice"):
+                row_top = str(row.get("top_family") or "").lower()
+                if row_top != "instruments" or not any(
+                    fragment in path for fragment in ("voice", "vocal", "choir", "spoken")
+                ):
+                    return False
+            try:
+                rank = int(row.get("rank", fallback_rank) or fallback_rank)
+            except Exception:
+                rank = fallback_rank
+            try:
+                score = float(row.get("score", row.get("combined_rank_score", rank + 1.0)) or rank + 1.0)
+            except Exception:
+                score = float(rank + 1.0)
+            try:
+                confidence = float(row.get("confidence", 0.0) or 0.0)
+            except Exception:
+                confidence = 0.0
+            try:
+                support = float(row.get("support", row.get("ensemble_support", 0.0)) or 0.0)
+            except Exception:
+                support = 0.0
+            return bool(rank <= max_rank and (score <= max_score or confidence >= 0.50 or support >= 1.0))
+
+        for key in (
+            "brain_ensemble_vote_result",
+            "full_brain_vote_result",
+            "core_baby_vote_result",
+            "spread_baby_vote_result",
+            "outlier_baby_vote_result",
+        ):
+            result = facts.evidence.get(key)
+            if not isinstance(result, dict):
+                continue
+            guesses = result.get("top_guesses")
+            if not isinstance(guesses, list):
+                continue
+            for index, guess in enumerate(guesses[:12], start=1):
+                if row_matches(guess, index):
+                    return True
+        return False
 
     def _physics_layer(self, facts: SharedAudioFacts | None) -> dict:
         if facts is None or not isinstance(getattr(facts, "evidence", None), dict):

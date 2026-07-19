@@ -20,6 +20,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
+from aaron_sound_sorter.score_math import average_score
+
 
 @dataclass(frozen=True)
 class CategoryPanelSpec:
@@ -259,6 +261,22 @@ DRUM_CATEGORY_SPECS: tuple[CategoryPanelSpec, ...] = (
         "drum_rim_stick_source_score",
         "one_shot",
         ("generic",),
+    ),
+    CategoryPanelSpec(
+        "Drums",
+        "Drums/Rims and Sticks/Claves and Wood Blocks/One Shots",
+        "drums_rims_and_sticks_claves_and_wood_blocks_one_shots_score",
+        "drum_rim_stick_source_score",
+        "one_shot",
+        ("wood_click",),
+    ),
+    CategoryPanelSpec(
+        "Drums",
+        "Drums/Rims and Sticks/Claves and Wood Blocks/Loops",
+        "drums_rims_and_sticks_claves_and_wood_blocks_loops_score",
+        "drum_rim_stick_source_score",
+        "loop",
+        ("wood_click_loop",),
     ),
     CategoryPanelSpec(
         "Drums",
@@ -1250,6 +1268,20 @@ def modifier_score(modifier: str, values: dict[str, Any], source_scores: dict[st
             + 0.22 * inverse_ramp(tail, 0.02, 0.24)
             + 0.16 * ramp(pitch, 0.12, 0.56)
         ),
+        "wood_click": lambda: clamp01(
+            0.50 * get_score(source_scores, "struck_wood_score")
+            + 0.18 * get_score(source_scores, "compact_struck_tonal_percussion_score")
+            + 0.14 * inverse_ramp(tail, 0.02, 0.32)
+            + 0.10 * ramp(mid + high, 0.24, 0.82)
+            + 0.08 * inverse_ramp(low_total, 0.04, 0.40)
+        ),
+        "wood_click_loop": lambda: clamp01(
+            0.34 * get_score(source_scores, "struck_wood_score")
+            + 0.24 * get_score(source_scores, "role_loop_score")
+            + 0.18 * ramp(event_count, 4.0, 18.0)
+            + 0.14 * ramp(onset_span, 0.28, 0.86)
+            + 0.10 * inverse_ramp(low_total, 0.04, 0.42)
+        ),
         "sidestick": lambda: clamp01(
             0.34 * inverse_ramp(attack, 0.004, 0.06)
             + 0.30 * ramp(mid, 0.28, 0.78)
@@ -1479,7 +1511,7 @@ def build_category_panel_scores(
         base = get_score(scores, spec.base_key)
         role_fit = role_modifier(spec.role, values, scores)
         modifier_values = [modifier_score(modifier, values, scores) for modifier in spec.modifiers]
-        modifier_fit = sum(modifier_values) / len(modifier_values) if modifier_values else 0.62
+        modifier_fit = average_score(*modifier_values) if modifier_values else 0.62
         raw_category_score = clamp01(0.64 * base + 0.22 * role_fit + 0.14 * modifier_fit)
         category_score = calibrate_category_panel_score(spec.score_key, raw_category_score, calibration)
         flat[spec.score_key] = category_score

@@ -11,6 +11,7 @@ from __future__ import annotations
 from aaron_sound_sorter.domain.models import CategoryGuess, SharedAudioFacts, VoterResult
 from aaron_sound_sorter.engine.consensus import ConsensusRunner
 from aaron_sound_sorter.engine.family_claim_arbiter import FamilyClaimArbiter
+from aaron_sound_sorter.engine.family_claims import claim_from_folder_path
 
 
 def guess(path: str, rank: int) -> CategoryGuess:
@@ -168,3 +169,119 @@ def test_concrete_fx_gate_stands_down_for_non_fx_music_loop_shape() -> None:
 
     assert decision.final_top == "_TO_REVIEW"
     assert decision.consensus_status != "concrete_fx_gate_override"
+
+
+def test_concrete_fx_gate_stands_down_for_learned_mixed_instrument_loop_shape() -> None:
+    """A learned mixed-instrument shape blocks even strong concrete-FX overlap."""
+    brain = VoterResult(
+        voter_name="brain",
+        guesses=[
+            guess("FX/Impacts and Hits/Generic Impact/Long FX", 3),
+            guess("Instruments/Synths/Synth Loops/Loops", 4),
+        ],
+    )
+    physics = VoterResult(
+        voter_name="physics",
+        guesses=[
+            guess("FX/Designed Noise FX/Alarm/Long FX", 2),
+            guess("Instruments/Keys/Organ/Loops", 5),
+        ],
+    )
+    facts = SharedAudioFacts(
+        is_broken_or_tiny=False,
+        is_loop_like=True,
+        is_single_event_like=False,
+        is_short_hit_like=False,
+        is_long=True,
+        evidence={
+            "dynamic_role_gate": {
+                "selected_top_families": ["Instruments"],
+                "top_scores": [{"score": 1.0}, {"score": 20.0}],
+                "reason": "decisive_top_family_gap",
+            },
+            "measured_roles": {
+                "pitched_music_loop": 0.98,
+                "detected_parent_role": "pitched_music_loop",
+            },
+            "shape_vote": {"primary_shape": "mixed_instrument_loop", "confidence": 0.96},
+            "learned_shape_memory_matched": True,
+            "learned_shape_memory_shape": "mixed_instrument_loop",
+            "learned_shape_memory_confidence": 0.96,
+            "physics_layer_decision": {
+                "fx_role_allows_fx": True,
+                "fx_role_strength": 0.84,
+                "fx_role_conflict_strength": 0.45,
+                "physics_layer_top_family": "FX",
+                "physics_layer_branch": "SirenAlarm",
+            },
+        },
+    )
+
+    decision = finalize_consensus(ConsensusRunner(), brain, physics, facts)
+
+    assert decision.consensus_status != "concrete_fx_gate_override"
+    assert decision.final_top in {"Instruments", "_TO_REVIEW"}
+
+
+def test_blocked_transition_fx_release_stands_down_for_learned_mixed_instrument_loop_shape() -> None:
+    """The later blocked-FX release must honor learned mixed-instrument shape."""
+    raw = claim_from_folder_path(
+        folder_path="FX/Impacts and Hits/Generic Impact/Long FX",
+        source="strong_consensus",
+        reason="synthetic raw FX overlap",
+        shared=[],
+        raw_candidate_score=16.0,
+        brain_rank=3,
+        physics_rank=13,
+        shared_winner="FX/Impacts and Hits/Generic Impact/Long FX",
+        can_override=False,
+        strength=0.0,
+        is_real_candidate=True,
+    )
+    blocked = claim_from_folder_path(
+        folder_path="Instruments/Instrument Loops/Loops",
+        source="role_sanity_generic_pitched_broad_instrument_loop",
+        reason="synthetic blocked instrument loop",
+        shared=[],
+        raw_candidate_score=9999.0,
+        brain_rank=None,
+        physics_rank=None,
+        shared_winner="Instruments/Instrument Loops/Loops",
+        can_override=True,
+        strength=0.98,
+        is_real_candidate=False,
+    )
+    facts = SharedAudioFacts(
+        is_broken_or_tiny=False,
+        is_loop_like=True,
+        is_single_event_like=False,
+        is_short_hit_like=False,
+        is_long=True,
+        evidence={
+            "measured_roles": {
+                "pitched_music_loop": 0.98,
+                "detected_parent_role": "pitched_music_loop",
+            },
+            "shape_vote": {"primary_shape": "mixed_instrument_loop", "confidence": 0.96},
+            "learned_shape_memory_matched": True,
+            "learned_shape_memory_shape": "mixed_instrument_loop",
+            "learned_shape_memory_confidence": 0.96,
+            "physics_layer_decision": {
+                "fx_role_allows_fx": True,
+                "fx_role_strength": 0.84,
+                "fx_role_conflict_strength": 0.45,
+                "physics_layer_top_family": "FX",
+                "physics_layer_branch": "SirenAlarm",
+            },
+        },
+    )
+
+    decision = FamilyClaimArbiter().adjudicate(
+        raw_claim=raw,
+        consensus_claims=[blocked],
+        eligibility_claims=[],
+        facts=facts,
+    )
+
+    assert decision.consensus_status != "final_blocked_transition_fx_release_invariant"
+    assert decision.final_top == "_TO_REVIEW"

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from aaron_sound_sorter.domain.models import SharedAudioFacts
+from aaron_sound_sorter.score_math import average_score
+from aaron_sound_sorter.voters.physics_fx_layer import PhysicsFXRoleLayer
 from aaron_sound_sorter.voters.physics_layer_types import PhysicsLayerDecision
 from aaron_sound_sorter.voters.physics_layers import LayeredPhysicsScorer
 
@@ -27,6 +29,12 @@ def facts(
         },
         feature_values_by_name=values or {},
     )
+
+
+def test_average_score_is_zero_safe_and_clamped() -> None:
+    assert average_score() == 0.0
+    assert average_score(0.25, 0.75) == 0.5
+    assert average_score(-1.0, 0.5, 2.0) == 0.5
 
 
 def test_layered_physics_promotes_clean_bass_branch() -> None:
@@ -146,6 +154,44 @@ def test_layered_physics_detects_articulated_rap_voice_texture() -> None:
     assert decision.top_family == "Instruments"
     assert decision.branch == "Voice"
     assert decision.evidence["instrument_rap_voice_texture"] >= 0.59
+
+
+def test_physics_memory_exact_teacher_anchors_trained_voice_label() -> None:
+    scorer = LayeredPhysicsScorer()
+    decision = PhysicsLayerDecision(
+        top_family="FX",
+        top_confidence=0.82,
+        branch="HumanCreatureFX",
+        branch_confidence=0.80,
+        leaf_strategy="profile_leaf_with_branch_safeguard",
+        evidence={
+            "learned_physics_memory": {
+                "matched": True,
+                "top_family": "Instruments",
+                "branch": "Voice",
+                "label": "Instruments/Voice/Vocal Loops/Loops",
+                "confidence": 0.96,
+                "match_kind": "fingerprint",
+            }
+        },
+    )
+
+    learned_decision = scorer.apply_physics_memory_decision(decision)
+    voice_score, voice_evidence = scorer.apply("Instruments/Voice/Vocal Loops/Loops", 2.20, learned_decision)
+    fx_score, fx_evidence = scorer.apply("FX/Human and Voice FX/Spoken Voice/Long FX", 0.32, learned_decision)
+
+    assert learned_decision.top_family == "Instruments"
+    assert learned_decision.branch == "Voice"
+    assert voice_score <= 0.02
+    assert fx_score > voice_score + 0.50
+    assert any(
+        reason.startswith("learned_physics_memory_exact_teacher:Voice")
+        for reason in voice_evidence["physics_layer_adjustment_reasons"]
+    )
+    assert any(
+        reason.startswith("learned_physics_memory_family_conflict:Voice")
+        for reason in fx_evidence["physics_layer_adjustment_reasons"]
+    )
 
 
 def test_layered_physics_lifts_wet_woodwind_branch_sax_candidate() -> None:
@@ -1094,6 +1140,76 @@ def test_human_voice_signal_blocks_animal_fx_leaf_boost() -> None:
     assert any(
         "fx_HumanCreatureFX_branch_target" in reason for reason in human_evidence["physics_layer_adjustment_reasons"]
     )
+
+
+def test_designed_low_fx_formant_decoy_does_not_select_human_creature_branch() -> None:
+    layer = PhysicsFXRoleLayer()
+    sample_facts = facts(
+        {
+            "primary_shape": "designed_low_fx",
+            "confidence": 0.94,
+            "shape_scores": [
+                ["designed_low_fx", 0.94],
+                ["transition_riser", 0.75],
+                ["transition_drop", 0.75],
+                ["texture_bed", 0.89],
+            ],
+            "onset_count": 1.0,
+            "attack_rise_time_norm": 0.19,
+            "temporal_centroid_ratio": 0.48,
+            "tail_ratio": 0.94,
+            "f0_voiced_ratio": 0.70,
+            "pitch_confidence": 0.24,
+            "percussive_event_ratio": 0.38,
+            "drumlike_frame_ratio": 0.35,
+        },
+        roles={
+            "voiced_one_shot": 0.58,
+            "vocal_one_shot": 0.12,
+            "vocal_phrase": 0.0,
+            "vocal_music_phrase": 0.0,
+        },
+        values={
+            "log_transient_count": 0.6931471805599453,
+            "attack_rise_time_norm": 0.19,
+            "temporal_centroid_ratio": 0.48,
+            "tail_energy_ratio": 0.94,
+            "spectral_flatness_mean": 0.42,
+            "spectral_entropy_mean": 0.70,
+            "spectral_flux_mean": 0.20,
+            "spectral_flux_variance": 0.012,
+            "centroid_slope_norm": 0.03,
+            "f0_voiced_ratio": 0.70,
+            "pitch_confidence": 0.24,
+            "formant_like_peak_spacing": 0.70,
+            "harmonic_energy_ratio": 0.18,
+            "body_noise_ratio": 0.48,
+            "tail_noise_ratio": 0.54,
+            "presence_ratio_2000_8000hz": 0.20,
+            "air_ratio_gt_8000hz": 0.18,
+            "stereo_width": 0.64,
+        },
+    )
+    sample_facts.evidence["physics_subpanels"] = {
+        "flat": {
+            "human_breath_mouth_score": 0.84,
+            "human_spoken_voice_score": 0.20,
+            "fx_motion_score": 0.76,
+            "fx_transition_authority_score": 0.72,
+            "low_designed_fx_score": 0.82,
+        }
+    }
+    sample_facts.evidence["first_arrival_telemetry"] = {
+        "formant_stability_score": 0.58,
+        "stochastic_modulation_coherence": 0.64,
+        "formant_center_std_hz": 520.0,
+    }
+
+    branch, _, evidence = layer.decide(sample_facts, drum_anchor=0.30, instrument_anchor=0.12)
+
+    assert evidence["fx_designed_formant_decoy_guard"] is True
+    assert evidence["fx_branch_HumanCreatureFX"] <= 0.66
+    assert branch != "HumanCreatureFX"
 
 
 def test_layered_physics_hybrid_motion_loop_can_be_transition_fx() -> None:

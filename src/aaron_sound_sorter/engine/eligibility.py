@@ -919,6 +919,7 @@ def infer_parent_eligibility(facts: SharedAudioFacts) -> EligibilityDecision:
         and max(event_count, _num(shape_vote.get("onset_count"), 0.0)) >= 8.0
         and _num(shape_vote.get("pulse_regularity"), _fact_score("pulse_regularity")) <= 0.16
         and max(
+            _shape_score("designed_low_fx"),
             _shape_score("designed_tonal_fx"),
             _shape_score("designed_motion_fx_loop"),
             _shape_score("glitch_stutter"),
@@ -1163,6 +1164,26 @@ def infer_parent_eligibility(facts: SharedAudioFacts) -> EligibilityDecision:
         and _num(feature_values.get("log_crest"), 0.0) >= 1.45
         and _num(feature_values.get("attack_rise_time_norm"), attack_rise) <= 0.18
         and _num(feature_values.get("temporal_centroid_ratio"), temporal_centroid) <= 0.28
+    )
+    short_designed_tonal_fx_hit = (
+        duration <= 1.10
+        and event_count <= 4.0
+        and primary_shape in {"solo_phrase", "ui_blip", "designed_tonal_fx", "siren_alarm_tone"}
+        and max(_shape_score("ui_blip"), _shape_score("designed_tonal_fx"), _fact_score("fx_blip_beep_score")) >= 0.78
+        and max(_fact_score("physics_subpanel_clean_tone"), _fact_score("clean_tone_score")) >= 0.76
+        and _fact_score("onset_pitched_onset_score") >= 0.72
+        and _fact_score("onset_pitched_onset_score") >= _fact_score("onset_percussive_onset_score") + 0.14
+        and max(
+            _fact_score("drum_hit_score"),
+            _fact_score("drum_kick_source_score"),
+            _fact_score("drum_snare_source_score"),
+            _fact_score("drum_clap_source_score"),
+            _fact_score("drum_tom_conga_source_score"),
+            _fact_score("drum_rim_stick_source_score"),
+            _fact_score("drum_cymbal_source_score"),
+            _fact_score("drum_metallic_percussion_source_score"),
+        )
+        <= 0.54
     )
     human_voice_source_score = max(
         _fact_score("voice_score"),
@@ -1544,6 +1565,36 @@ def infer_parent_eligibility(facts: SharedAudioFacts) -> EligibilityDecision:
             ),
             broad_folder_path="Instruments/Synths/Synth Lead/One Shots",
             reason="measured short tonal synth phrase; drum, voice, animal, foley, and transition leaves are not eligible",
+        )
+    if short_designed_tonal_fx_hit and not strong_vocal_identity:
+        return EligibilityDecision(
+            role_name="short_designed_tonal_fx_hit",
+            confidence=max(0.78, shape_confidence, _fact_score("fx_blip_beep_score")),
+            allowed_top_families=("FX", "_TO_REVIEW"),
+            blocked_path_fragments=(
+                "Drums",
+                "Percussion",
+                "Kick",
+                "Tom",
+                "Snare",
+                "Clap",
+                "Rim",
+                "Stick",
+                "Instruments",
+                "Voice",
+                "Human",
+                "Animals",
+                "Dog",
+                "Bird",
+                "Cat",
+                "Long FX",
+                "Loops",
+            ),
+            broad_folder_path="FX/Designed Noise FX/Beep/One Shots",
+            reason=(
+                "measured short designed tonal FX hit; clean blip/beep body and "
+                "pitched onset beat weak drum-source evidence"
+            ),
         )
     if (clean_short_pitched_tonal_hit or clean_tonal_stab_voice_decoy) and not strong_vocal_identity:
         return EligibilityDecision(

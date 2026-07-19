@@ -157,6 +157,7 @@ class DrumFxRescueMixin:
             return False
 
         motion_shape = max(
+            self._shape_score(context, "designed_low_fx"),
             self._shape_score(context, "whoosh_sweep"),
             self._shape_score(context, "designed_motion_fx_loop"),
             self._shape_score(context, "hybrid_fx_motion"),
@@ -169,12 +170,15 @@ class DrumFxRescueMixin:
             self._fact_score(context, "fx_glitch_stutter_score"),
             self._fact_score(context, "fx_radio_electrical_score"),
             self._fact_score(context, "fx_whoosh_sweep_score"),
+            self._fact_score(context, "fx_riser_build_score"),
+            self._fact_score(context, "fx_drop_downlifter_score"),
             self._fact_score(context, "fx_motion_score"),
             self._fact_score(context, "fx_transition_authority_score"),
             self._fact_score(context, "fx_reverse_score"),
             self._fact_score(context, "fx_siren_score"),
             self._fact_score(context, "fx_alarm_score"),
             self._fact_score(context, "fx_formant_score"),
+            self._fact_score(context, "low_designed_fx_score"),
         )
         slope = abs(_shape_metric_from_facts(context.facts, "centroid_slope_norm"))
         tail = _shape_metric_from_facts(context.facts, "tail_ratio")

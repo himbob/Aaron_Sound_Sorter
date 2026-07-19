@@ -266,6 +266,7 @@ class FinalDrumLoopClaimProducer:
         if shape not in {"top_loop", "beat_loop", "repeated_phrase_loop"} or shape_confidence < 0.84:
             return False
         designed_shape = max(
+            self._shape_score(facts, "designed_low_fx"),
             self._shape_score(facts, "designed_tonal_fx"),
             self._shape_score(facts, "designed_motion_fx_loop"),
             self._shape_score(facts, "glitch_stutter"),

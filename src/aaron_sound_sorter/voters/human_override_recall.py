@@ -201,6 +201,49 @@ def human_override_recall_match(
     )
 
 
+def human_override_recall_allowed_by_memory(
+    candidate_folder_path: str,
+    facts: Any,
+    *,
+    confidence_gate: float = 0.86,
+) -> bool:
+    """Return whether legacy per-label recall may affect this candidate.
+
+    Args:
+        candidate_folder_path: Internal candidate folder being scored.
+        facts: SharedAudioFacts-like object carrying learned memory evidence.
+        confidence_gate: Minimum learned-memory confidence required to suppress
+            a conflicting legacy per-label override.
+
+    Returns:
+        ``False`` when newer voter/physics memory strongly owns a different top
+        family from this candidate; otherwise ``True``.
+
+    Important Constraints:
+        This is source-name blind. It compares internal learned-memory targets
+        against internal candidate labels and never reads producer filenames.
+    """
+    candidate_path = normalized_path(candidate_folder_path)
+    candidate_top = top_family(candidate_path)
+    evidence = getattr(facts, "evidence", {}) if facts is not None else {}
+    if not isinstance(evidence, dict) or not candidate_top:
+        return True
+    for key in ("learned_voter_memory", "learned_physics_memory"):
+        memory = evidence.get(key, {})
+        if not isinstance(memory, dict) or not bool(memory.get("matched")):
+            continue
+        confidence = safe_float(memory.get("confidence"), 0.0)
+        if confidence < confidence_gate:
+            continue
+        target_label = normalized_path(str(memory.get("label", "")))
+        if target_label and target_label == candidate_path:
+            return True
+        target_top = str(memory.get("top_family", ""))
+        if target_top in {"Drums", "Instruments", "FX"} and target_top != candidate_top:
+            return False
+    return True
+
+
 def gui_correction_examples(brain: dict[str, Any], label: str) -> list[dict[str, Any]]:
     """Return detailed training examples created by GUI corrections."""
     examples_by_label = brain.get("training_examples_detailed_by_label", {})
@@ -331,3 +374,22 @@ def safe_int(value: Any) -> int:
         return max(0, int(float(value)))
     except Exception:
         return 0
+
+
+def safe_float(value: Any, default: float = 0.0) -> float:
+    """Return a finite float from loose JSON values."""
+    try:
+        number = float(value)
+    except Exception:
+        return default
+    return number if math.isfinite(number) else default
+
+
+def normalized_path(value: str) -> str:
+    """Return a normalized internal folder path string."""
+    return str(value or "").replace("\\", "/").strip("/")
+
+
+def top_family(folder_path: str) -> str:
+    """Return the top family token from an internal folder path."""
+    return normalized_path(folder_path).split("/", 1)[0]
