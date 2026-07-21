@@ -20,6 +20,9 @@ from aaron_sound_sorter.engine.decision_helpers import (
     _has_drum_loop_structure_support,
     _measured_role_from_facts,
     _norm_path,
+    _organic_percussion_loop_has_identity_conflict,
+    _organic_percussion_loop_has_shape_support,
+    _percussive_loop_pressure_from_facts,
     _shape_confidence_from_facts,
     _shape_metric_from_facts,
     _shape_vote_from_facts,
@@ -65,6 +68,13 @@ class FinalDrumLoopClaimProducer:
             return None
         if not self._facts_support_drum_loop_claim(context):
             return None
+        organic_percussion_strength = _percussive_loop_pressure_from_facts(context.facts)
+        authoritative_organic_percussion_loop = bool(
+            organic_percussion_strength >= 0.58
+            and _organic_percussion_loop_has_shape_support(context.facts)
+            and not _organic_percussion_loop_has_identity_conflict(context.facts, organic_percussion_strength)
+        )
+        claim_strength = 0.99 if authoritative_organic_percussion_loop else 0.94
         return claim_from_folder_path(
             folder_path="Drums/Drum Loops/Loops",
             source="measured_drum_loop_claim",
@@ -78,8 +88,8 @@ class FinalDrumLoopClaimProducer:
             physics_rank=raw.physics_rank,
             shared_winner=raw.shared_winner or raw.folder_path,
             can_override=True,
-            strength=0.94,
-            is_real_candidate=False,
+            strength=max(claim_strength, raw.strength),
+            is_real_candidate=authoritative_organic_percussion_loop,
         )
 
     def _facts_support_drum_loop_claim(self, context: DecisionContext) -> bool:
@@ -124,6 +134,11 @@ class FinalDrumLoopClaimProducer:
         pitch_confidence = self._shape_number(facts, "pitch_confidence")
         candidate_supported = self._has_candidate_support(context, DRUM_LOOP_FRAGMENTS, top_family="Drums")
         drum_family_supported = self._has_candidate_support(context, DRUM_FAMILY_FRAGMENTS, top_family="Drums")
+        layer = self._physics_layer(facts)
+        layer_drum_branch = str(layer.get("drum_branch_selected") or "") if isinstance(layer, dict) else ""
+        layer_drum_confidence = (
+            self._safe_float(layer.get("drum_branch_selected_confidence")) if isinstance(layer, dict) else 0.0
+        )
         bright_hat_or_cymbal_loop_authority = bool(
             shape
             in {
@@ -154,13 +169,20 @@ class FinalDrumLoopClaimProducer:
             )
             < 0.58
         )
-        if not (structure_support or bright_hat_or_cymbal_loop_authority):
-            return False
-        layer = self._physics_layer(facts)
-        layer_drum_branch = str(layer.get("drum_branch_selected") or "") if isinstance(layer, dict) else ""
-        layer_drum_confidence = (
-            self._safe_float(layer.get("drum_branch_selected_confidence")) if isinstance(layer, dict) else 0.0
+        organic_percussion_loop_pressure = _percussive_loop_pressure_from_facts(facts)
+        organic_percussion_loop_authority = bool(
+            organic_percussion_loop_pressure >= 0.58
+            and onset_count >= 8.0
+            and self._shape_number(facts, "true_repetition_score") >= 0.42
+            and _organic_percussion_loop_has_shape_support(facts)
+            and not _organic_percussion_loop_has_identity_conflict(facts, organic_percussion_loop_pressure)
+            and (
+                drum_family_supported
+                or (layer_drum_branch in {"DrumLoop", "ShakerTambourine", "ScrapeGuiro", "TomOrConga"})
+            )
         )
+        if not (structure_support or bright_hat_or_cymbal_loop_authority or organic_percussion_loop_authority):
+            return False
         if candidate_supported or (layer_drum_branch == "DrumLoop" and layer_drum_confidence >= 0.50):
             drum_loop_strength = max(
                 drum_loop_strength,
@@ -212,6 +234,7 @@ class FinalDrumLoopClaimProducer:
             and drum_loop_strength < 0.70
             and not candidate_supported
             and not bright_hat_or_cymbal_loop_authority
+            and not organic_percussion_loop_authority
             and not (layer_drum_branch == "DrumLoop" and layer_drum_confidence >= 0.50)
         )
         if strong_pitched_nonpercussive_loop:
@@ -247,6 +270,7 @@ class FinalDrumLoopClaimProducer:
             and candidate_supported
             or low_confidence_drum_loop
             and (candidate_supported or drum_family_supported)
+            or organic_percussion_loop_authority
             or decisive_measured_role
         )
 

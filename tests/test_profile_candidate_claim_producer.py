@@ -397,6 +397,43 @@ def test_profile_candidate_bass_claim_stands_down_for_crowded_mixed_loop() -> No
     assert all(claim.source != "profile_candidate_bass_claim" for claim in claims)
 
 
+def test_profile_candidate_mixed_loop_stands_down_for_measured_drum_loop() -> None:
+    producer = ProfileCandidateClaimProducer()
+    mixed_path = "Instruments/Mixed Musical Loops/Multi Instrument/Loops"
+    measured = facts_with_shape_metrics(
+        "beat_loop",
+        0.96,
+        role_evidence={
+            "low_rhythmic_drum_loop": 0.64,
+            "pitched_music_loop": 1.0,
+            "bass_loop": 0.96,
+        },
+        shape_metrics={
+            "onset_count": 12.0,
+            "true_repetition_score": 0.58,
+            "low_event_ratio": 0.72,
+            "high_event_ratio": 0.12,
+            "drum_loop_source_score": 0.61,
+        },
+    )
+    context = DecisionContext(
+        raw=raw_claim("Instruments/Keys/Processed Keys/Loops", score=5.0),
+        eligibility=eligibility("pitched_music_loop"),
+        facts=measured,
+        brain_result=VoterResult(
+            voter_name="brain",
+            guesses=[
+                guess(mixed_path, 1),
+                guess("Drums/Drum Loops/Loops", 4),
+            ],
+        ),
+    )
+
+    claims = producer.produce(context)
+
+    assert all(claim.source != "profile_candidate_mixed_musical_loop_claim" for claim in claims)
+
+
 def test_profile_candidate_synth_claim_stands_down_for_crowded_mixed_instrument_loop() -> None:
     producer = ProfileCandidateClaimProducer()
     synth_path = "Instruments/Synths/Synth Arp/Loops"

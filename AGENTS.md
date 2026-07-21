@@ -31,6 +31,38 @@ Follow these rules on every behavior change:
 9. Generated outputs belong under `_reports`, run folders, or explicit output folders, not the project root.
 10. Never write output bundles, cache files, scratch files, or helper artifacts into the project root unless Aaron explicitly asks.
 
+## Brain-first development rules
+
+The project is moving away from static rescue code. Treat trained brains and
+memory lanes as the long-term source of source identity, shape, role, and
+physics ownership.
+
+Use this policy on every classifier change:
+
+1. Prefer a trainable brain, memory lane, or supervised panel over a new static
+   category rule.
+2. Static code may provide lightweight guardrails for catastrophic family
+   mistakes, data plumbing, feature extraction, and review decisions.
+3. Static code must not become a second hidden classifier that overrides strong
+   human-trained memory without a measured family contradiction.
+4. GUI corrections should teach dedicated memory brains first:
+   folder/user memory, voter-role memory, physics memory, and shape memory.
+5. Full/core/spread/outlier brains should be rebuilt from curated training
+   data, not mutated by sparse one-off GUI corrections.
+6. If a trained memory lane matches with high confidence and the measured
+   top-family/body contract is compatible, the memory-owned label should get a
+   real claim before broad fallback buckets such as Instrument Loops.
+7. If memory and measured family/shape strongly disagree, send to review
+   instead of forcing either side.
+8. When fixing a bug, first decide whether it is a training/memory problem,
+   feature problem, shape-brain problem, physics-brain problem, owner-brain
+   problem, or only then a guardrail problem.
+9. Add tests proving trained memory improves related samples, not just the
+   exact file that was corrected.
+10. Do not use source filenames, folder names, or sample-pack paths as training
+    evidence at runtime. Human-approved labels and internal taxonomy labels are
+    allowed as supervised targets.
+
 ## Required AI workflow
 
 Use the Makefile. Do not bypass it with ad hoc shell commands unless a Makefile target is missing.

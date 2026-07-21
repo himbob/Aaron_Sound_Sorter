@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from aaron_sound_sorter.domain.models import SharedAudioFacts
 from aaron_sound_sorter.score_math import average_score
+from aaron_sound_sorter.voters.physics_drum_layer import PhysicsDrumLayer
 from aaron_sound_sorter.voters.physics_fx_layer import PhysicsFXRoleLayer
 from aaron_sound_sorter.voters.physics_layer_types import PhysicsLayerDecision
 from aaron_sound_sorter.voters.physics_layers import LayeredPhysicsScorer
@@ -192,6 +193,149 @@ def test_physics_memory_exact_teacher_anchors_trained_voice_label() -> None:
         reason.startswith("learned_physics_memory_family_conflict:Voice")
         for reason in fx_evidence["physics_layer_adjustment_reasons"]
     )
+
+
+def test_drum_layer_stands_down_for_voiced_formant_phrase_loop_decoy() -> None:
+    sample_facts = facts(
+        {
+            "primary_shape": "mixed_instrument_loop",
+            "confidence": 0.82,
+            "onset_count": 24.0,
+            "pitch_confidence": 0.74,
+            "f0_voiced_ratio": 0.78,
+            "percussive_event_ratio": 0.08,
+            "drumlike_frame_ratio": 0.10,
+            "pitched_event_ratio": 0.90,
+        },
+        roles={"vocal_music_phrase": 0.68, "pitched_music_loop": 0.75},
+        values={
+            "attack_rise_time_norm": 0.05,
+            "temporal_centroid_ratio": 0.24,
+            "log_crest": 1.45,
+            "pitch_confidence": 0.74,
+            "f0_voiced_ratio": 0.78,
+            "harmonic_energy_ratio": 0.52,
+            "loop_percussive_event_ratio": 0.08,
+            "loop_drumlike_frame_ratio": 0.10,
+            "loop_pitched_event_ratio": 0.90,
+            "loop_non_event_tonal_ratio": 0.72,
+            "loop_mean_event_high_ratio": 0.16,
+        },
+    )
+    sample_facts.evidence["physics_subpanels"] = {
+        "flat": {
+            "voice_score": 0.68,
+            "human_spoken_voice_score": 0.72,
+            "voice_choir_score": 0.46,
+            "fx_formant_score": 0.69,
+            "drum_loop_source_score": 0.18,
+            "rhythmic_break_loop_score": 0.21,
+            "drum_hit_score": 0.38,
+            "drum_clap_source_score": 0.74,
+            "drum_metallic_percussion_source_score": 0.68,
+            "role_phrase_score": 0.56,
+            "role_loop_score": 0.52,
+            "role_one_shot_score": 0.05,
+        }
+    }
+
+    branch, strength, evidence = PhysicsDrumLayer().decide(sample_facts)
+    decision = LayeredPhysicsScorer().analyze(sample_facts)
+
+    assert evidence["drum_voiced_phrase_loop_stand_down"] is True
+    assert branch in PhysicsDrumLayer.BRANCHES
+    assert strength <= 0.34
+    assert decision.top_family == "Instruments"
+    assert decision.evidence["physics_top_layer_source"] == "measured_voice_family_protection"
+
+
+def test_layered_physics_promotes_repeated_organic_percussion_loop_parent() -> None:
+    scorer = LayeredPhysicsScorer()
+    sample_facts = facts(
+        {
+            "primary_shape": "hybrid_fx_motion",
+            "confidence": 0.70,
+            "shape_scores": [("beat_loop", 0.62), ("pitched_phrase_shape", 0.67)],
+            "onset_count": 30.0,
+            "true_repetition_score": 0.90,
+            "low_event_ratio": 0.83,
+            "mid_event_ratio": 0.10,
+            "high_event_ratio": 0.07,
+            "pitch_confidence": 0.81,
+            "f0_voiced_ratio": 0.70,
+            "pitched_event_ratio": 0.83,
+            "percussive_event_ratio": 0.07,
+            "drumlike_frame_ratio": 0.02,
+            "sustained_tonal_frame_ratio": 0.88,
+            "non_event_tonal_ratio": 0.89,
+        },
+        roles={
+            "pitched_music_loop": 0.93,
+            "pitched_music_phrase": 0.84,
+            "low_rhythmic_drum_loop": 0.37,
+            "vocal_music_phrase": 0.0,
+            "voiced_one_shot": 0.0,
+        },
+        values={
+            "loop_mean_event_low_ratio": 0.83,
+            "loop_pitched_event_ratio": 0.83,
+            "loop_percussive_event_ratio": 0.07,
+            "loop_drumlike_frame_ratio": 0.02,
+            "loop_sustained_tonal_frame_ratio": 0.88,
+            "loop_non_event_tonal_ratio": 0.89,
+            "pitch_confidence": 0.81,
+            "f0_voiced_ratio": 0.70,
+            "low_peak_frequency_hz": 258.0,
+            "spectral_flatness_mean": 0.40,
+            "spectral_entropy_mean": 0.44,
+        },
+    )
+    sample_facts.evidence["physics_subpanels"] = {
+        "flat": {
+            "voice_score": 0.30,
+            "human_spoken_voice_score": 0.59,
+            "voice_choir_score": 0.47,
+            "fx_formant_score": 0.34,
+            "hand_drum_membrane_score": 0.67,
+            "drum_shaker_tambourine_source_score": 0.53,
+            "drum_guiro_scrape_source_score": 0.38,
+            "drum_tom_conga_source_score": 0.36,
+            "drum_loop_source_score": 0.23,
+            "rhythmic_break_loop_score": 0.51,
+            "drum_hit_score": 0.28,
+            "synth_tonal_source_score": 0.46,
+        }
+    }
+
+    decision = scorer.analyze(sample_facts)
+
+    assert decision.top_family == "Drums"
+    assert decision.branch in {"DrumLoop", "ShakerTambourine", "ScrapeGuiro", "TomOrConga"}
+    assert decision.evidence["physics_top_layer_source"] == "organic_percussion_loop_source_layer"
+
+
+def test_measured_voice_branch_penalizes_non_instrument_candidates() -> None:
+    scorer = LayeredPhysicsScorer()
+    decision = PhysicsLayerDecision(
+        top_family="Instruments",
+        top_confidence=0.70,
+        branch="Voice",
+        branch_confidence=0.59,
+        leaf_strategy="profile_leaf_with_branch_safeguard",
+        evidence={
+            "instrument_subpanel_human_spoken_voice_score": 0.72,
+            "instrument_subpanel_fx_formant_score": 0.69,
+            "instrument_human_voice_texture": 0.72,
+            "instrument_rap_voice_texture": 0.53,
+        },
+    )
+
+    drum_score, drum_evidence = scorer.apply("Drums/Claps Snaps Slaps/Body Slap/Loops", 0.30, decision)
+    voice_score, voice_evidence = scorer.apply("Instruments/Voice/Vocal Loops/Loops", 0.62, decision)
+
+    assert drum_score > voice_score
+    assert "measured_voice_branch_blocks_non_instrument:+0.55" in drum_evidence["physics_layer_adjustment_reasons"]
+    assert "instrument_Voice_branch_target:0.365" in voice_evidence["physics_layer_adjustment_reasons"]
 
 
 def test_layered_physics_lifts_wet_woodwind_branch_sax_candidate() -> None:

@@ -191,6 +191,38 @@ being diluted inside the large historical brain. This is the first step toward
 making more of the system trainable: owner brains, shape brains, role brains,
 and physics-like measured specialist brains.
 
+### Phase 1.6: Brain-First Owner Authority
+
+Status: implemented as the next product increment.
+
+Goal:
+
+Let matched trainable memory own deep labels across Drums, Instruments, and FX
+when measured top-family/body evidence is compatible. Static code remains a
+lightweight safety contract instead of a hidden leaf classifier.
+
+Behavior:
+
+- `LearnedOwnerAuthorityClaimProducer` now emits generic learned-owner claims,
+  not only Voice claims.
+- Voice keeps its compatibility source id, but Koto, Piano, Synth, Sax, FX,
+  Drum, and other trained labels can now become real owner claims too.
+- The memory-owned label is preserved as the deep target.
+- Static code only blocks broad contradictions such as hard Drum body versus
+  clean Instrument memory, or non-Voice memory using Voice body evidence.
+- Broad fallback buckets such as `Instruments/Instrument Loops/Loops` should
+  not erase high-confidence human-trained owner memory.
+
+Design contract:
+
+- Trainable owner memory owns source identity.
+- Shape memory owns shape.
+- Physics memory owns physical branch/top-family calibration.
+- Voter-role memory owns reusable role evidence.
+- The arbiter chooses among legal claims and sends conflicts to review.
+
+See `BRAIN_FIRST_OWNER_CONTRACT_20260720.md`.
+
 ### Phase 2: Read-Only Music Properties
 
 Goal:

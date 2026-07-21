@@ -256,6 +256,79 @@ def test_measured_transition_fx_stands_down_for_brain_owned_clean_bass_loop() ->
     assert claims == []
 
 
+def test_measured_transition_fx_stands_down_for_clean_low_solo_bass_phrase() -> None:
+    """Alert-like FX physics must not steal a clean low bass solo phrase."""
+    raw = _claim(
+        "Instruments/Keys/Processed Keys/Loops",
+        shared=[
+            _shared_row("FX/Designed Noise FX/Alarm/Long FX", 46.0, brain_rank=40, physics_rank=6),
+            _shared_row("Instruments/Bass/Generic Bass/Loops", 60.0, brain_rank=12, physics_rank=18),
+        ],
+    )
+    facts = _facts(
+        "solo_phrase",
+        confidence=0.86,
+        flat={
+            "bass_synth_score": 0.73,
+            "bass_sub_score": 0.58,
+            "drum_loop_source_score": 0.06,
+            "rhythmic_break_loop_score": 0.10,
+            "fx_motion_score": 0.12,
+            "fx_transition_authority_score": 0.19,
+            "fx_riser_build_score": 0.19,
+            "fx_drop_downlifter_score": 0.24,
+            "fx_siren_score": 0.43,
+            "fx_alarm_score": 0.45,
+        },
+        metrics={
+            "shape_scores": [
+                ["solo_phrase", 0.86],
+                ["sustained_pad", 0.78],
+                ["designed_tonal_fx", 0.74],
+                ["hybrid_fx_motion", 0.72],
+                ["bass_phrase", 0.71],
+                ["siren_alarm_tone", 0.70],
+            ],
+            "onset_count": 8.0,
+            "onset_span_ratio": 0.84,
+            "true_repetition_score": 0.66,
+            "low_event_ratio": 0.99,
+            "mid_event_ratio": 0.01,
+            "high_event_ratio": 0.001,
+            "pitch_confidence": 0.93,
+            "pitched_event_ratio": 1.0,
+            "sustained_tonal_frame_ratio": 0.88,
+            "non_event_tonal_ratio": 0.85,
+            "percussive_event_ratio": 0.0,
+            "drumlike_frame_ratio": 0.0,
+            "spectral_flatness_mean": 0.09,
+        },
+    )
+    facts.evidence["brain_ensemble_vote_1"] = {
+        "folder_path": "Instruments/Mixed Musical Loops/Multi Instrument/Loops",
+        "top_family": "Instruments",
+    }
+    facts.evidence["measured_roles"] = {
+        "detected_parent_role": "pitched_music_loop",
+        "pitched_music_loop": 0.82,
+    }
+    facts.evidence["physics_layer_decision"] = {
+        "physics_layer_top_family": "FX",
+        "physics_layer_top_confidence": 0.62,
+        "physics_layer_branch": "SirenAlarm",
+        "physics_layer_branch_confidence": 0.78,
+        "fx_branch_selected": "SirenAlarm",
+        "fx_role_strength": 0.62,
+        "fx_role_conflict_strength": 0.52,
+        "fx_role_allows_fx": True,
+        "fx_synthetic_alert_fx_body": True,
+    }
+
+    claims = MeasuredTransitionFxClaimProducer().produce(DecisionContext(raw, _eligibility(), facts))
+
+    assert claims == []
+
+
 def test_designed_fx_shape_stands_down_for_real_drum_material() -> None:
     """A designed-looking shape must not steal obvious drum material."""
     raw = _claim(

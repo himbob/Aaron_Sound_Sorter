@@ -142,6 +142,33 @@ def test_drum_loop_claim_stands_down_for_clean_synth_loop() -> None:
     assert decision.reason == "drum_loop_claim_conflicts_with_clean_synth_loop"
 
 
+def test_drum_loop_claim_does_not_stand_down_when_drum_loop_body_is_measured() -> None:
+    raw = _claim("Drums/Drum Loops/Loops", source="strong_consensus")
+    claim = _claim("Drums/Drum Loops/Loops", source="strong_consensus")
+    facts = _facts(
+        "beat_loop",
+        1.0,
+        {
+            "pitched_event_ratio": 0.90,
+            "sustained_tonal_frame_ratio": 0.74,
+            "percussive_event_ratio": 0.04,
+            "drumlike_frame_ratio": 0.05,
+            "onset_count": 28.0,
+        },
+        {
+            "synth_tonal_source_score": 0.57,
+            "synth_pad_score": 0.51,
+            "drum_loop_source_score": 0.72,
+            "drum_rim_stick_source_score": 0.45,
+            "drum_hit_score": 0.38,
+        },
+    )
+
+    decision = ClaimBoundaryPolicy().evaluate(raw_claim=raw, claim=claim, facts=facts)
+
+    assert decision.allowed
+
+
 def test_woodwind_leaf_claim_stands_down_for_bright_percussive_loop() -> None:
     raw = _claim("Drums/Drum Loops/Loops", source="strong_consensus")
     claim = _claim("Instruments/Woodwinds/Saxophone/Loops", source="final_measured_sax_loop_invariant")
@@ -429,6 +456,50 @@ def test_raw_drum_loop_winner_stands_down_for_clean_synth_loop() -> None:
 
     assert winner.folder_path == "Instruments/Synths/Synth Loops"
     assert winner.source == "raw_contract_clean_synth_loop_over_drum_loop"
+
+
+def test_raw_drum_loop_winner_does_not_stand_down_when_drum_loop_authority_is_measured() -> None:
+    raw = _claim(
+        "Drums/Drum Loops/Loops",
+        source="strong_consensus",
+        strength=0.96,
+        shared=[
+            {
+                "folder_path": "Drums/Drum Loops/Loops",
+                "label": "Drums/Drum Loops/Loops",
+                "top_family": "Drums",
+                "combined_rank_score": 4.0,
+                "brain_rank": 1,
+                "physics_rank": 2,
+            }
+        ],
+    )
+    facts = _facts(
+        "beat_loop",
+        1.0,
+        {
+            "duration_sec": 11.0,
+            "onset_count": 42.0,
+            "true_repetition_score": 0.91,
+            "pitched_event_ratio": 1.0,
+            "sustained_tonal_frame_ratio": 0.89,
+            "percussive_event_ratio": 0.0,
+            "drumlike_frame_ratio": 0.04,
+        },
+        {
+            "synth_tonal_source_score": 0.52,
+            "synth_chord_score": 0.55,
+            "drum_loop_source_score": 0.72,
+            "drum_shaker_tambourine_source_score": 0.53,
+            "drum_rim_stick_source_score": 0.43,
+            "rhythmic_break_loop_score": 0.25,
+        },
+    )
+
+    winner = FamilyClaimArbiter().pick_winner(raw_claim=raw, claims=[], facts=facts)
+
+    assert winner.folder_path == "Drums/Drum Loops/Loops"
+    assert winner.source != "raw_contract_clean_synth_loop_over_drum_loop"
 
 
 def test_raw_drum_leaf_winner_stands_down_for_clean_tonal_synth_hit() -> None:

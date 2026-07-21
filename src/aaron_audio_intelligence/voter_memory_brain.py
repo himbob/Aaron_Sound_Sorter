@@ -17,10 +17,13 @@ from typing import Any
 import numpy as np
 
 from aaron_audio_intelligence.shape_memory_brain import (
+    PITCH_REGISTER_SENSITIVE_MEMORY_FEATURES,
     example_fingerprint,
     pad_vector,
     safe_int,
+    scaled_vector_distance,
     shape_target_for_label,
+    weighted_normalized_signature_vector,
     weighted_normalized_vector,
 )
 from aaron_sound_sorter.core import FP_SIZE, FeatureRow
@@ -39,6 +42,94 @@ _METADATA_KEYS = (
     "scaler_mean",
     "scaler_std",
 )
+
+SOURCE_OWNER_MEMORY_FEATURES = frozenset(
+    {
+        "log_rolloff85_hz",
+        "log_crest",
+        "spectral_flux_mean",
+        "spectral_flatness_mean",
+        "spectral_entropy_mean",
+        "log_decay_ratio",
+        "stereo_width",
+        "mid_side_ratio",
+        "centroid_slope_norm",
+        "log_transient_count",
+        "sub_bass_ratio_lt_150hz",
+        "bass_ratio_150_500hz",
+        "mid_ratio_500_2000hz",
+        "presence_ratio_2000_8000hz",
+        "air_ratio_gt_8000hz",
+        "zcr_mean",
+        "temporal_centroid_ratio",
+        "onset_interval_regularity",
+        "attack_rise_time_norm",
+        "onset_span_ratio",
+        "event_rate_hz",
+        "tail_energy_ratio",
+        "spectral_flux_variance",
+        "pitch_confidence",
+        "f0_voiced_ratio",
+        "f0_stability_cents",
+        "f0_slope_cents_per_sec",
+        "harmonic_to_noise_ratio",
+        "harmonic_peak_count",
+        "harmonic_energy_ratio",
+        "inharmonicity",
+        "fundamental_dominance_ratio",
+        "overtone_slope",
+        "attack_pitch_confidence",
+        "body_pitch_confidence",
+        "tail_pitch_confidence",
+        "attack_flatness",
+        "body_flatness",
+        "tail_flatness",
+        "attack_entropy",
+        "body_entropy",
+        "tail_entropy",
+        "attack_zcr",
+        "body_zcr",
+        "tail_zcr",
+        "attack_high_ratio",
+        "body_high_ratio",
+        "tail_high_ratio",
+        "attack_low_ratio",
+        "body_low_ratio",
+        "tail_low_ratio",
+        "noise_burst_duration_ms",
+        "high_band_decay_slope",
+        "spectral_centroid_decay_slope",
+        "noise_tail_decay_slope",
+        "attack_noise_ratio",
+        "body_noise_ratio",
+        "tail_noise_ratio",
+        "low_peak_bandwidth_hz",
+        "sub_attack_time_ms",
+        "sub_decay_time_ms",
+        "sub_to_click_offset_ms",
+        "kick_pitch_drop_cents",
+        "sub_sustain_ratio",
+        "spectral_peak_count",
+        "peak_bandwidth_mean_hz",
+        "spectral_peak_stability",
+        "formant_like_peak_spacing",
+        "spectral_envelope_slope",
+        "loop_pitched_event_ratio",
+        "loop_percussive_event_ratio",
+        "loop_noisy_event_ratio",
+        "loop_event_timbre_diversity",
+        "loop_sustained_tonal_frame_ratio",
+        "loop_drumlike_frame_ratio",
+        "loop_tonal_to_percussive_balance",
+        "loop_mean_event_pitch_confidence",
+        "loop_mean_event_noise_ratio",
+        "loop_mean_event_low_ratio",
+        "loop_mean_event_high_ratio",
+        "loop_non_event_tonal_ratio",
+    }
+)
+
+SOURCE_OWNER_MEMORY_PREFIXES = ("mfcc_mu_", "mfcc_std_")
 
 
 @dataclass(frozen=True)
@@ -273,6 +364,14 @@ def voter_memory_match_for_facts(
     query = weighted_normalized_vector(brain, feature_vector)
     if query.size <= 0:
         return no_voter_memory_match()
+    owner_signature_query = weighted_normalized_signature_vector(
+        brain,
+        feature_vector,
+        include_feature_names=SOURCE_OWNER_MEMORY_FEATURES,
+        exclude_feature_names=PITCH_REGISTER_SENSITIVE_MEMORY_FEATURES,
+        include_feature_prefixes=SOURCE_OWNER_MEMORY_PREFIXES,
+        minimum_feature_count=36,
+    )
 
     best_role = ""
     best_label = ""
@@ -281,12 +380,14 @@ def voter_memory_match_for_facts(
     best_distance = float("inf")
     best_count = 0
     best_weight = 0
+    best_match_kind = "teacher_role_cloud"
     for role, examples in examples_by_role.items():
         if not isinstance(examples, list):
             continue
         valid_count = 0
         effective_weight = 0
         nearest = float("inf")
+        nearest_kind = "teacher_role_cloud"
         nearest_example: dict[str, Any] | None = None
         for example in examples:
             if not isinstance(example, dict):
@@ -295,21 +396,38 @@ def voter_memory_match_for_facts(
             if vector.size <= 0:
                 continue
             weighted_example = weighted_normalized_vector(brain, vector)
-            usable = min(query.size, weighted_example.size)
-            if usable <= 0:
-                continue
-            distance = float(np.linalg.norm(query[:usable] - weighted_example[:usable]))
+            distance = scaled_vector_distance(query, weighted_example)
+            owner_signature_example = weighted_normalized_signature_vector(
+                brain,
+                vector,
+                include_feature_names=SOURCE_OWNER_MEMORY_FEATURES,
+                exclude_feature_names=PITCH_REGISTER_SENSITIVE_MEMORY_FEATURES,
+                include_feature_prefixes=SOURCE_OWNER_MEMORY_PREFIXES,
+                minimum_feature_count=36,
+            )
+            signature_distance = scaled_vector_distance(
+                owner_signature_query,
+                owner_signature_example,
+                reference_size=query.size,
+            )
+            if signature_distance < distance:
+                distance = signature_distance
+                candidate_kind = "teacher_role_signature_cloud"
+            else:
+                candidate_kind = "teacher_role_cloud"
             if math.isfinite(distance):
                 valid_count += 1
                 effective_weight = max(effective_weight, safe_int(example.get("human_override_evidence_weight")))
                 if distance < nearest:
                     nearest = distance
+                    nearest_kind = candidate_kind
                     nearest_example = example
         if valid_count > 0 and nearest < best_distance:
             best_role = str(role)
             best_distance = nearest
             best_count = valid_count
             best_weight = effective_weight
+            best_match_kind = nearest_kind
             best_label = str(nearest_example.get("approved_label", "")) if isinstance(nearest_example, dict) else ""
             best_top = str(nearest_example.get("top", "")) if isinstance(nearest_example, dict) else ""
             best_shape = str(nearest_example.get("target_shape", "")) if isinstance(nearest_example, dict) else ""
@@ -322,7 +440,11 @@ def voter_memory_match_for_facts(
     confidence = 0.0
     if matched:
         exact_threshold = min(1.25, max(0.22, 0.22 + math.log1p(max(1, best_weight)) / 11.0))
-        match_kind = "fingerprint" if best_distance <= exact_threshold else "teacher_role_cloud"
+        match_kind = (
+            "fingerprint"
+            if best_match_kind == "teacher_role_cloud" and best_distance <= exact_threshold
+            else best_match_kind
+        )
         distance_ratio = min(1.0, best_distance / max(threshold, 1e-6))
         confidence = min(0.94, max(0.62, 0.94 - 0.25 * distance_ratio + math.log1p(max(1, best_count)) / 32.0))
     return VoterMemoryMatch(

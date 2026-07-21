@@ -7,6 +7,7 @@ from dataclasses import replace
 from aaron_sound_sorter.domain.models import CategoryGuess, SharedAudioFacts, VoterResult
 from aaron_sound_sorter.engine.decision_core_v2 import DecisionCoreV2
 from aaron_sound_sorter.engine.eligibility import EligibilityDecision, infer_parent_eligibility
+from aaron_sound_sorter.engine.family_claim_arbiter import FamilyClaimArbiter
 from aaron_sound_sorter.engine.family_claims import claim_from_folder_path
 
 
@@ -272,6 +273,162 @@ def test_final_sax_invariant_does_not_steal_clean_low_mid_keys_loop() -> None:
     assert final.consensus_status == "strong_consensus"
 
 
+def test_final_voice_invariant_stands_down_for_organic_percussion_loop_pressure() -> None:
+    """A rank-one Voice candidate cannot override repeated hand-percussion evidence."""
+    raw = raw_claim(
+        "Instruments/Mixed Musical Loops/Multi Instrument/Loops",
+        score=5.0,
+        shared=[
+            shared_row("Instruments/Voice/Vocal Loops/Loops", 5.0, brain_rank=1, physics_rank=4),
+            shared_row("Drums/World Percussion/Latin Percussion/Bongo/Loops", 9.0, brain_rank=2, physics_rank=8),
+        ],
+    )
+    measured = facts(
+        "hybrid_fx_motion",
+        0.70,
+        role="pitched_music_loop",
+        role_strengths={
+            "pitched_music_loop": 0.93,
+            "pitched_music_phrase": 0.84,
+            "low_rhythmic_drum_loop": 0.37,
+            "vocal_music_phrase": 0.0,
+            "voiced_one_shot": 0.0,
+        },
+        shape_metrics={
+            "shape_scores": [("pitched_phrase_shape", 0.67), ("beat_loop", 0.62)],
+            "onset_count": 30.0,
+            "true_repetition_score": 0.90,
+            "f0_voiced_ratio": 0.70,
+            "pitched_event_ratio": 0.83,
+            "percussive_event_ratio": 0.07,
+            "drumlike_frame_ratio": 0.02,
+            "low_event_ratio": 0.83,
+        },
+    )
+    measured.evidence["brain_ensemble_vote_result"] = {
+        "top_guesses": [
+            {
+                "folder_path": "Instruments/Voice/Vocal Loops/Loops",
+                "label": "Instruments/Voice/Vocal Loops/Loops",
+                "top_family": "Instruments",
+                "rank": 1,
+                "score": 0.38,
+            }
+        ]
+    }
+    measured.evidence["physics_subpanels"] = {
+        "flat": {
+            "voice_score": 0.30,
+            "human_spoken_voice_score": 0.59,
+            "voice_choir_score": 0.47,
+            "fx_formant_score": 0.34,
+            "hand_drum_membrane_score": 0.67,
+            "drum_shaker_tambourine_source_score": 0.53,
+            "drum_guiro_scrape_source_score": 0.38,
+            "drum_tom_conga_source_score": 0.36,
+            "drum_loop_source_score": 0.23,
+            "rhythmic_break_loop_score": 0.51,
+        }
+    }
+
+    assert FamilyClaimArbiter()._facts_support_final_voice_instrument(measured, raw) is False
+
+
+def test_organic_percussion_loop_claim_beats_false_voice_and_sax_broadening() -> None:
+    """Organic percussion loops should not collapse to Voice or Instrument Loops."""
+    raw = raw_claim(
+        "Instruments/Woodwinds/Saxophone/Loops",
+        score=21.0,
+        shared=[
+            shared_row("Instruments/Woodwinds/Saxophone/Loops", 21.0, brain_rank=11, physics_rank=10),
+            shared_row("Drums/World Percussion/Latin Percussion/Bongo/Loops", 28.0, brain_rank=23, physics_rank=5),
+            shared_row("Drums/World Percussion/Latin Percussion/Conga/Loops", 35.0, brain_rank=29, physics_rank=6),
+            shared_row("Instruments/Voice/Vocal Loops/Loops", 38.0, brain_rank=18, physics_rank=20),
+        ],
+    )
+    measured = facts(
+        "hybrid_fx_motion",
+        0.70,
+        role="pitched_music_loop",
+        role_strengths={
+            "pitched_music_loop": 0.93,
+            "pitched_music_phrase": 0.84,
+            "low_rhythmic_drum_loop": 0.37,
+            "vocal_music_phrase": 0.0,
+            "vocal_phrase": 0.0,
+            "voiced_one_shot": 0.0,
+        },
+        shape_metrics={
+            "shape_scores": [("hybrid_fx_motion", 0.70), ("beat_loop", 0.62), ("pitched_phrase_shape", 0.67)],
+            "onset_count": 30.0,
+            "true_repetition_score": 0.90,
+            "low_event_ratio": 0.83,
+            "mid_event_ratio": 0.10,
+            "high_event_ratio": 0.07,
+            "pitched_event_ratio": 0.83,
+            "percussive_event_ratio": 0.07,
+            "drumlike_frame_ratio": 0.02,
+            "sustained_tonal_frame_ratio": 0.88,
+            "non_event_tonal_ratio": 0.89,
+            "f0_voiced_ratio": 0.70,
+            "pitch_confidence": 0.81,
+        },
+    )
+    measured.evidence["brain_ensemble_vote_result"] = {
+        "top_guesses": [
+            {
+                "folder_path": "Instruments/Voice/Vocal Loops/Loops",
+                "label": "Instruments/Voice/Vocal Loops/Loops",
+                "top_family": "Instruments",
+                "rank": 1,
+                "score": 0.38,
+            }
+        ]
+    }
+    measured.evidence["physics_vote_result"] = {
+        "top_guesses": [
+            {
+                "folder_path": "Drums/Percussion/Bells and Metallic Percussion/Loops",
+                "label": "Drums/Percussion/Bells and Metallic Percussion/Loops",
+                "top_family": "Drums",
+                "rank": 1,
+                "score": 0.45,
+                "evidence": {
+                    "physics_layer_top_family": "Drums",
+                    "drum_branch_selected": "DrumLoop",
+                    "drum_branch_selected_confidence": 0.51,
+                },
+            }
+        ]
+    }
+    measured.evidence["physics_subpanels"] = {
+        "flat": {
+            "voice_score": 0.30,
+            "human_spoken_voice_score": 0.59,
+            "voice_choir_score": 0.47,
+            "fx_formant_score": 0.34,
+            "hand_drum_membrane_score": 0.67,
+            "drum_shaker_tambourine_source_score": 0.53,
+            "drum_guiro_scrape_source_score": 0.38,
+            "drum_tom_conga_source_score": 0.36,
+            "drum_loop_source_score": 0.23,
+            "rhythmic_break_loop_score": 0.51,
+            "drum_hit_score": 0.28,
+        }
+    }
+    measured.evidence["physics_layer_decision"] = {
+        "physics_layer_top_family": "Drums",
+        "drum_branch_selected": "DrumLoop",
+        "drum_branch_selected_confidence": 0.51,
+    }
+    core = DecisionCoreV2()
+
+    final = decide_with_core_claims(core, raw, measured)
+
+    assert final.folder_path == "Drums/Drum Loops/Loops"
+    assert final.consensus_status == "measured_drum_loop_claim"
+
+
 def test_rank_one_concrete_piano_consensus_blocks_synthetic_sax_invariant() -> None:
     """Synthetic sax-depth claims cannot replace a concrete shared Piano winner."""
     raw = raw_claim(
@@ -506,6 +663,124 @@ def test_compound_music_physics_broadens_specific_sax_leaf() -> None:
     assert final.consensus_status == "final_compound_music_broad_instrument_loop_invariant"
 
 
+def test_compound_music_broadening_preserves_branch_compatible_sax_leaf() -> None:
+    """Broad Instrument Loops must not demote a sax leaf when physics is branch-compatible."""
+    raw = raw_claim("Instruments/Woodwinds/Saxophone/Loops", score=4.0)
+    measured = facts(
+        "pitched_phrase",
+        0.96,
+        role="pitched_music_loop",
+        shape_metrics={
+            "onset_count": 33.0,
+            "layered_loop_score": 0.40,
+            "instrument_plus_fx_loop_score": 0.53,
+            "true_repetition_score": 0.50,
+        },
+    )
+    measured.evidence["physics_layer_decision"] = {
+        "physics_layer_top_family": "Instruments",
+        "physics_layer_top_confidence": 0.90,
+        "physics_layer_branch": "MixedInstrument",
+        "physics_layer_branch_confidence": 0.74,
+        "instrument_branch_MixedInstrument": 0.74,
+        "compound_music_strength": 0.74,
+        "compound_music_prefer_broad_loop": True,
+    }
+    measured.evidence["physics_vote_result"] = {
+        "top_guesses": [
+            {
+                "folder_path": "Instruments/Brass and Woodwinds/Loops",
+                "top_family": "Instruments",
+                "rank": 1,
+                "score": 9.0,
+            }
+        ]
+    }
+    core = DecisionCoreV2()
+
+    final = decide_with_core_claims(core, raw, measured)
+
+    assert final.folder_path == "Instruments/Woodwinds/Saxophone/Loops"
+    assert final.consensus_status in {"strong_consensus", "final_measured_sax_loop_invariant"}
+
+
+def test_weak_voice_side_candidate_stands_down_for_branch_compatible_sax_loop() -> None:
+    """Weak Voice evidence must not interrupt raw Sax plus Physics Woodwinds agreement."""
+    raw = raw_claim(
+        "Instruments/Woodwinds/Saxophone/Loops",
+        score=4.0,
+        shared=[
+            shared_row("Instruments/Woodwinds/Saxophone/Loops", 4.0, brain_rank=1, physics_rank=2),
+            shared_row("Instruments/Voice/Vocal Loops/Loops", 8.0, brain_rank=3, physics_rank=5),
+        ],
+    )
+    measured = facts(
+        "pitched_phrase",
+        0.96,
+        role="pitched_music_loop",
+        role_strengths={
+            "vocal_music_phrase": 0.20,
+            "vocal_phrase": 0.18,
+            "voiced_one_shot": 0.0,
+        },
+        shape_metrics={
+            "onset_count": 18.0,
+            "pitched_event_ratio": 0.92,
+            "f0_voiced_ratio": 0.86,
+            "percussive_event_ratio": 0.08,
+            "drumlike_frame_ratio": 0.06,
+        },
+    )
+    measured.evidence["brain_ensemble_vote_result"] = {
+        "top_guesses": [
+            {
+                "folder_path": "Instruments/Woodwinds/Saxophone/Loops",
+                "top_family": "Instruments",
+                "rank": 1,
+                "score": 0.78,
+            },
+            {
+                "folder_path": "Instruments/Voice/Vocal Loops/Loops",
+                "top_family": "Instruments",
+                "rank": 3,
+                "score": 1.05,
+            },
+        ]
+    }
+    measured.evidence["physics_vote_result"] = {
+        "top_guesses": [
+            {
+                "folder_path": "Instruments/Brass and Woodwinds/Loops",
+                "top_family": "Instruments",
+                "rank": 1,
+                "score": 8.0,
+            }
+        ]
+    }
+    measured.evidence["physics_subpanels"] = {
+        "flat": {
+            "voice_score": 0.42,
+            "human_spoken_voice_score": 0.48,
+            "voice_choir_score": 0.76,
+            "reed_wind_score": 0.63,
+            "reed_wind_authority_score": 0.61,
+            "woodwind_sax_score": 0.59,
+        }
+    }
+    measured.evidence["physics_layer_decision"] = {
+        "physics_layer_top_family": "Instruments",
+        "physics_layer_branch": "Woodwinds",
+        "physics_layer_branch_confidence": 0.78,
+        "instrument_branch_Woodwinds": 0.78,
+    }
+    core = DecisionCoreV2()
+
+    final = decide_with_core_claims(core, raw, measured)
+
+    assert final.folder_path == "Instruments/Woodwinds/Saxophone/Loops"
+    assert final.consensus_status in {"strong_consensus", "final_measured_sax_loop_invariant"}
+
+
 def test_compound_shape_v2_broadens_specific_sax_leaf_without_identity_claim() -> None:
     """ShapeVoter V2 can prove compound structure without claiming an identity."""
     raw = raw_claim("Instruments/Woodwinds/Saxophone/Loops", score=4.0)
@@ -531,6 +806,47 @@ def test_compound_shape_v2_broadens_specific_sax_leaf_without_identity_claim() -
 
     assert final.folder_path == "Instruments/Instrument Loops/Loops"
     assert final.consensus_status == "final_compound_music_broad_instrument_loop_invariant"
+
+
+def test_compound_shape_v2_preserves_matched_learned_synth_leaf() -> None:
+    """Compound broadening must not erase exact user-trained source memory."""
+    raw = raw_claim("Instruments/Synths/Synth Arp/Loops", score=4.0)
+    measured = facts(
+        "mixed_instrument_loop",
+        0.82,
+        role="pitched_music_loop",
+        shape_metrics={
+            "shape_scores": [
+                ["mixed_instrument_loop", 0.82],
+                ["compound_musical_loop", 0.80],
+                ["layered_phrase", 0.78],
+            ],
+            "solo_isolation_score": 0.24,
+            "layered_loop_score": 0.82,
+            "instrument_plus_fx_loop_score": 0.73,
+            "true_repetition_score": 0.76,
+        },
+    )
+    measured.evidence["learned_voter_memory"] = {
+        "matched": True,
+        "top_family": "Instruments",
+        "label": "Instruments/Synths/Synth Arp/Loops",
+        "confidence": 0.94,
+        "role": "instrument_synth_loop",
+    }
+    measured.evidence["learned_physics_memory"] = {
+        "matched": True,
+        "top_family": "Instruments",
+        "branch": "Synth",
+        "label": "Instruments/Synths/Synth Arp/Loops",
+        "confidence": 0.96,
+    }
+    core = DecisionCoreV2()
+
+    final = decide_with_core_claims(core, raw, measured)
+
+    assert final.folder_path == "Instruments/Synths/Synth Arp/Loops"
+    assert final.consensus_status == "strong_consensus"
 
 
 def test_solo_isolation_shape_v2_does_not_broaden_sax_leaf() -> None:
@@ -931,6 +1247,89 @@ def test_repeated_phrase_loop_with_physics_voice_branch_stays_voice() -> None:
     assert final.consensus_status == "final_measured_voice_invariant"
 
 
+def test_strong_learned_voice_memory_survives_alert_shape_and_mallet_decoy() -> None:
+    """User-trained rap Voice memory must own the source over alert/mallet decoys."""
+    raw = raw_claim(
+        "Instruments/Mallets and Bells/Bells and Mallets/Loops",
+        score=5.0,
+        shared=[
+            shared_row("Instruments/Mallets and Bells/Bells and Mallets/Loops", 5.0, brain_rank=8, physics_rank=1),
+            shared_row("Instruments/Voice/Vocal Loops/Loops", 7.0, brain_rank=1, physics_rank=9),
+            shared_row("Instruments/Instrument Loops/Loops", 9.0, brain_rank=4, physics_rank=3),
+        ],
+    )
+    measured = facts(
+        "siren_alarm_tone",
+        0.82,
+        role="pitched_music_loop",
+        role_strengths={"vocal_music_phrase": 0.36, "voiced_one_shot": 0.0},
+        shape_metrics={
+            "duration_sec": 11.17,
+            "f0_voiced_ratio": 0.91,
+            "pitched_event_ratio": 0.88,
+            "sustained_tonal_frame_ratio": 0.74,
+            "percussive_event_ratio": 0.05,
+            "drumlike_frame_ratio": 0.04,
+            "onset_count": 24.0,
+        },
+    )
+    measured.evidence.update(
+        {
+            "voice_score": 0.46,
+            "human_spoken_voice_score": 0.75,
+            "human_breath_mouth_score": 0.46,
+            "pitched_mallet_instrument_score": 0.62,
+            "fx_transition_authority_score": 0.27,
+            "fx_motion_score": 0.22,
+            "drum_hit_score": 0.12,
+            "drum_loop_source_score": 0.18,
+        }
+    )
+    measured.evidence["physics_subpanels"] = {
+        "flat": {
+            "voice_score": 0.46,
+            "human_spoken_voice_score": 0.75,
+            "human_breath_mouth_score": 0.46,
+            "pitched_mallet_instrument_score": 0.62,
+            "fx_transition_authority_score": 0.27,
+            "fx_motion_score": 0.22,
+            "drum_hit_score": 0.12,
+            "drum_loop_source_score": 0.18,
+        }
+    }
+    measured.evidence["learned_voter_memory"] = {
+        "matched": True,
+        "top_family": "Instruments",
+        "label": "Instruments/Voice/Vocal Loops/Loops",
+        "confidence": 0.94,
+        "effective_weight": 1200,
+        "nearest_distance": 0.0,
+        "role": "instrument_voice_loop",
+    }
+    measured.evidence["learned_physics_memory"] = {
+        "matched": True,
+        "top_family": "Instruments",
+        "branch": "Voice",
+        "label": "Instruments/Voice/Vocal Loops/Loops",
+        "confidence": 0.96,
+        "effective_weight": 1200,
+        "nearest_distance": 0.0,
+    }
+    core = DecisionCoreV2()
+
+    claims = core.gather_eligibility_claims(
+        raw,
+        eligibility("pitched_music_loop", "Instruments/Instrument Loops/Loops"),
+        measured,
+        brain_result=VoterResult("brain", guesses=[guess("Instruments/Voice/Vocal Loops/Loops")]),
+        physics_result=VoterResult("physics", guesses=[guess("Instruments/Mallets and Bells/Bells and Mallets/Loops")]),
+    )
+    final = core.arbiter.adjudicate(raw_claim=raw, consensus_claims=[], eligibility_claims=claims, facts=measured)
+
+    assert final.folder_path == "Instruments/Voice/Vocal Loops/Loops"
+    assert final.consensus_status == "learned_owner_voice_body_claim"
+
+
 def test_short_voice_hit_beats_tonal_stab_synth_fallback() -> None:
     """Voice branch evidence must win before a drum leaf becomes Synth Chord."""
     raw = raw_claim(
@@ -1000,6 +1399,186 @@ def test_short_voice_hit_beats_tonal_stab_synth_fallback() -> None:
     )
     assert final.folder_path == "Instruments/Voice/Phrase/One Shots"
     assert final.consensus_status == "final_measured_voice_before_tonal_stab_invariant"
+
+
+def test_rank_one_brain_voice_stands_down_for_clean_guitar_chord_evidence() -> None:
+    """A formant-ish guitar chord must not become Voice from brain rank alone."""
+    raw = raw_claim(
+        "Instruments/Synths/Synth Lead/One Shots",
+        score=18.0,
+        shared=[
+            shared_row("Instruments/Synths/Synth Lead/One Shots", 18.0, brain_rank=6, physics_rank=12),
+            shared_row("Instruments/Guitar/Guitar Chords/One Shots", 24.0, brain_rank=9, physics_rank=15),
+        ],
+    )
+    measured = facts(
+        "pitched_repetition_phrase",
+        0.99,
+        role="pitched_music_phrase",
+        role_strengths={
+            "pitched_music_phrase": 0.87,
+            "vocal_music_phrase": 0.0,
+            "voiced_one_shot": 0.0,
+        },
+        shape_metrics={
+            "f0_voiced_ratio": 0.82,
+            "pitched_event_ratio": 1.0,
+            "percussive_event_ratio": 0.0,
+            "drumlike_frame_ratio": 0.0,
+            "spectral_flatness_mean": 0.04,
+        },
+    )
+    measured.evidence["brain_ensemble_vote_result"] = {
+        "top_guesses": [
+            {
+                "folder_path": "Instruments/Voice/Phrase/One Shots",
+                "label": "Instruments/Voice/Phrase/One Shots",
+                "support": 3.95,
+                "confidence": 1.0,
+                "score": 0.25,
+            },
+            {
+                "folder_path": "Instruments/Guitar/Electric Guitar/One Shots",
+                "label": "Instruments/Guitar/Electric Guitar/One Shots",
+                "support": 1.43,
+                "confidence": 0.77,
+                "score": 0.70,
+            },
+        ]
+    }
+    measured.evidence.update(
+        {
+            "voice_score": 0.52,
+            "human_spoken_voice_score": 0.48,
+            "human_breath_mouth_score": 0.21,
+            "voice_choir_score": 0.67,
+            "fx_formant_score": 0.61,
+            "plucked_string_score": 0.64,
+            "plucked_string_authority_score": 0.53,
+            "synth_tonal_source_score": 0.66,
+            "synth_chord_score": 0.69,
+            "guitar_acoustic_score": 0.59,
+            "guitar_nylon_score": 0.63,
+            "struck_keys_score": 0.53,
+        }
+    )
+    measured.evidence["physics_subpanels"] = {
+        "flat": {
+            "voice_score": 0.52,
+            "human_spoken_voice_score": 0.48,
+            "human_breath_mouth_score": 0.21,
+            "voice_choir_score": 0.67,
+            "fx_formant_score": 0.61,
+            "plucked_string_score": 0.64,
+            "plucked_string_authority_score": 0.53,
+            "synth_tonal_source_score": 0.66,
+            "synth_chord_score": 0.69,
+            "guitar_acoustic_score": 0.59,
+            "guitar_nylon_score": 0.63,
+            "struck_keys_score": 0.53,
+        }
+    }
+    core = DecisionCoreV2()
+
+    claims = core.gather_eligibility_claims(
+        raw,
+        eligibility("pitched_music_phrase", "Instruments/Instrument Loops/Loops"),
+        measured,
+        brain_result=VoterResult("brain", guesses=[]),
+        physics_result=VoterResult("physics", guesses=[]),
+    )
+    final = core.arbiter.adjudicate(raw_claim=raw, consensus_claims=[], eligibility_claims=claims, facts=measured)
+
+    assert not final.folder_path.startswith("Instruments/Voice")
+    assert final.consensus_status != "final_rank_one_brain_voice_body_invariant"
+
+
+def test_matched_synth_memory_blocks_legacy_voice_invariants() -> None:
+    """User-trained Synth evidence must not be overwritten by old Voice guards."""
+    raw = raw_claim(
+        "Instruments/Synths/Synth Arp/Loops",
+        score=6.0,
+        shared=[
+            shared_row("Instruments/Voice/Vocal Loops/Loops", 6.0, brain_rank=1, physics_rank=8),
+            shared_row("Instruments/Synths/Synth Arp/Loops", 8.0, brain_rank=2, physics_rank=2),
+        ],
+    )
+    measured = facts(
+        "pitched_repetition_phrase",
+        0.96,
+        role="pitched_music_loop",
+        role_strengths={
+            "pitched_music_loop": 0.73,
+            "vocal_music_phrase": 0.0,
+            "voiced_one_shot": 0.0,
+        },
+        shape_metrics={
+            "duration_sec": 2.60,
+            "f0_voiced_ratio": 0.94,
+            "onset_count": 109.0,
+            "true_repetition_score": 0.95,
+            "pitched_event_ratio": 1.0,
+            "sustained_tonal_frame_ratio": 0.88,
+            "percussive_event_ratio": 0.02,
+            "drumlike_frame_ratio": 0.01,
+        },
+    )
+    measured.evidence["brain_ensemble_vote_result"] = {
+        "top_guesses": [
+            {
+                "folder_path": "Instruments/Voice/Vocal Loops/Loops",
+                "label": "Instruments/Voice/Vocal Loops/Loops",
+                "support": 3.20,
+                "confidence": 0.95,
+                "score": 0.42,
+            },
+            {
+                "folder_path": "Instruments/Synths/Synth Arp/Loops",
+                "label": "Instruments/Synths/Synth Arp/Loops",
+                "support": 2.80,
+                "confidence": 0.94,
+                "score": 0.48,
+            },
+        ]
+    }
+    measured.evidence["learned_voter_memory"] = {
+        "matched": True,
+        "top_family": "Instruments",
+        "label": "Instruments/Synths/Synth Arp/Loops",
+        "confidence": 0.94,
+        "role": "instrument_synth_loop",
+    }
+    measured.evidence["learned_physics_memory"] = {
+        "matched": True,
+        "top_family": "Instruments",
+        "branch": "Synth",
+        "label": "Instruments/Synths/Synth Arp/Loops",
+        "confidence": 0.96,
+    }
+    measured.evidence.update(
+        {
+            "voice_score": 0.68,
+            "human_spoken_voice_score": 0.83,
+            "fx_formant_score": 0.72,
+            "synth_tonal_source_score": 0.68,
+            "synth_chord_score": 0.53,
+            "synth_lead_score": 0.49,
+        }
+    )
+    measured.evidence["physics_subpanels"] = {
+        "flat": {
+            "voice_score": 0.68,
+            "human_spoken_voice_score": 0.83,
+            "fx_formant_score": 0.72,
+            "synth_tonal_source_score": 0.68,
+            "synth_chord_score": 0.53,
+            "synth_lead_score": 0.49,
+        }
+    }
+    arbiter = FamilyClaimArbiter()
+
+    assert arbiter._rank_one_voice_brain_authority_path(measured) == ""
+    assert not arbiter._facts_support_final_voice_instrument(measured, raw)
 
 
 def test_physics_fx_role_layer_can_rescue_transition_from_instrument_loop() -> None:

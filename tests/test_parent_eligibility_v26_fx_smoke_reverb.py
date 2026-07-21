@@ -41,5 +41,5 @@ def test_drum_loop_with_riser_like_shape_stays_drum_loop(sorted_rows: dict[str, 
     rows = sorted_rows
     row = rows["ABOUTME_94_DRUMLOOP.wav"]
     path = row["folder_path"]
-    assert path == "Drums/Drum Loops/Loops", path
+    assert path.startswith("Drums/Drum Loops/"), path
     assert not path.startswith("FX/"), row["decision_reason"]

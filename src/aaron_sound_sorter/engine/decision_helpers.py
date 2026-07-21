@@ -58,6 +58,34 @@ DRUM_LOOP_STRUCTURE_ROLES = {
 
 DRUM_RESCUE_BLOCKING_PHRASE_SHAPES = {"vocal_phrase", "pitched_phrase", "pitched_phrase_shape", "sustained_pad"}
 
+TONAL_INSTRUMENT_VOICE_CONFLICT_SCORES = (
+    "plucked_string_score",
+    "plucked_string_authority_score",
+    "struck_keys_score",
+    "struck_keys_authority_score",
+    "synth_tonal_source_score",
+    "synth_chord_score",
+    "keys_chord_density_score",
+    "guitar_acoustic_score",
+    "guitar_electric_score",
+    "guitar_nylon_score",
+    "instruments_guitar_acoustic_guitar_one_shots_score",
+    "instruments_guitar_electric_guitar_one_shots_score",
+    "instruments_guitar_nylon_guitar_one_shots_score",
+    "instruments_guitar_guitar_chords_one_shots_score",
+    "instruments_synths_synth_chord_one_shots_score",
+    "instruments_keys_rhodes_one_shots_score",
+)
+
+ORGANIC_PERCUSSION_LOOP_REED_CONFLICT_SCORES = (
+    "reed_wind_score",
+    "reed_wind_authority_score",
+    "woodwind_sax_score",
+    "reed_reed_noise_score",
+    "reed_breath_attack_score",
+    "instruments_woodwinds_saxophone_one_shots_score",
+)
+
 
 def _is_measured_loop_phrase_context(shape: str, role: str, measured_role: str) -> bool:
     """Return True when a phrase-like shape is known to describe a loop.
@@ -123,6 +151,188 @@ def _stable_instrument_claim_strength(
     return min(1.0, max(0.0, score))
 
 
+def _feature_or_subpanel_number_from_facts(
+    facts: SharedAudioFacts | None,
+    name: str,
+    default: float = 0.0,
+) -> float:
+    """Return a flat measured score from evidence or PhysicsVoter subpanels."""
+    value = _feature_number_from_facts(facts, name, default)
+    if value != default:
+        return value
+    if facts is None or not isinstance(getattr(facts, "evidence", None), dict):
+        return default
+    subpanels = facts.evidence.get("physics_subpanels")
+    if not isinstance(subpanels, dict):
+        return default
+    flat = subpanels.get("flat")
+    if not isinstance(flat, dict):
+        return default
+    try:
+        return float(flat.get(name, default) or default)
+    except Exception:
+        return default
+
+
+def _direct_voice_source_score_from_facts(facts: SharedAudioFacts | None) -> float:
+    """Return direct human voice evidence without broad choir/formant proxies."""
+    return max(
+        _feature_or_subpanel_number_from_facts(facts, "voice_score"),
+        _feature_or_subpanel_number_from_facts(facts, "human_spoken_voice_score"),
+        _feature_or_subpanel_number_from_facts(facts, "human_breath_mouth_score"),
+        _feature_or_subpanel_number_from_facts(facts, "human_scream_score"),
+    )
+
+
+def _percussive_loop_pressure_from_facts(facts: SharedAudioFacts | None) -> float:
+    """Return measured repeated-percussion pressure from source-blind facts.
+
+    Some organic percussion loops are tonal and low-band heavy, so the generic
+    drum-loop scalar can stay modest while hand-drum, shaker, scrape, and
+    rhythmic-break panels all point at percussion.  This helper exposes that
+    combined pressure without choosing a leaf category.
+    """
+    repeated_structure = max(
+        _shape_metric_from_facts(facts, "true_repetition_score"),
+        _shape_metric_from_facts(facts, "pulse_regularity"),
+        _role_strength_from_facts(facts, "low_rhythmic_drum_loop"),
+        _role_strength_from_facts(facts, "percussive_drum_loop"),
+        _role_strength_from_facts(facts, "bright_drum_loop"),
+        _direct_body_role_strength_from_facts(facts, "low_rhythmic_drum_loop"),
+        _direct_body_role_strength_from_facts(facts, "percussive_drum_loop"),
+        _direct_body_role_strength_from_facts(facts, "bright_drum_loop"),
+    )
+    drum_panels = max(
+        _feature_or_subpanel_number_from_facts(facts, "drum_loop_source_score"),
+        _feature_or_subpanel_number_from_facts(facts, "rhythmic_break_loop_score"),
+        _feature_or_subpanel_number_from_facts(facts, "drum_branch_DrumLoop"),
+        _feature_or_subpanel_number_from_facts(facts, "drum_branch_score_DrumLoop"),
+    )
+    percussion_panels = max(
+        _feature_or_subpanel_number_from_facts(facts, "hand_drum_membrane_score"),
+        _feature_or_subpanel_number_from_facts(facts, "drum_shaker_tambourine_source_score"),
+        _feature_or_subpanel_number_from_facts(facts, "drum_guiro_scrape_source_score"),
+        _feature_or_subpanel_number_from_facts(facts, "drum_tom_conga_source_score"),
+    )
+    onset_count = _shape_metric_from_facts(facts, "onset_count")
+    if onset_count < 6.0:
+        return max(drum_panels, percussion_panels * 0.50)
+    if repeated_structure < 0.42 and onset_count < 12.0:
+        return max(drum_panels, percussion_panels * 0.65)
+    return max(drum_panels, min(1.0, percussion_panels * 0.82 + repeated_structure * 0.18))
+
+
+def _voice_claim_has_percussive_loop_conflict(facts: SharedAudioFacts | None) -> bool:
+    """Return True when weak Voice evidence is better explained as percussion loop."""
+    direct_voice = _direct_voice_source_score_from_facts(facts)
+    vocal_role = max(
+        _role_strength_from_facts(facts, "vocal_music_phrase"),
+        _role_strength_from_facts(facts, "vocal_phrase"),
+        _role_strength_from_facts(facts, "vocal_one_shot"),
+        _role_strength_from_facts(facts, "voiced_one_shot"),
+        _direct_body_role_strength_from_facts(facts, "vocal_music_phrase"),
+        _direct_body_role_strength_from_facts(facts, "vocal_phrase"),
+        _direct_body_role_strength_from_facts(facts, "vocal_one_shot"),
+        _direct_body_role_strength_from_facts(facts, "voiced_one_shot"),
+    )
+    if direct_voice >= 0.62 or vocal_role >= 0.40:
+        return False
+    if _feature_number_from_facts(facts, "formant_light_voice_identity") >= 0.64:
+        return False
+    pressure = _percussive_loop_pressure_from_facts(facts)
+    return bool(
+        pressure >= 0.52
+        and _shape_metric_from_facts(facts, "onset_count") >= 8.0
+        and _shape_metric_from_facts(facts, "true_repetition_score") >= 0.42
+    )
+
+
+def _organic_percussion_loop_has_identity_conflict(
+    facts: SharedAudioFacts | None,
+    pressure: float | None = None,
+) -> bool:
+    """Return True when Voice or reed/wind evidence should block Drums authority."""
+    loop_pressure = _percussive_loop_pressure_from_facts(facts) if pressure is None else max(0.0, min(1.0, pressure))
+    direct_voice = _direct_voice_source_score_from_facts(facts)
+    vocal_role = max(
+        _role_strength_from_facts(facts, "vocal_music_phrase"),
+        _role_strength_from_facts(facts, "vocal_phrase"),
+        _role_strength_from_facts(facts, "vocal_one_shot"),
+        _role_strength_from_facts(facts, "voiced_one_shot"),
+        _direct_body_role_strength_from_facts(facts, "vocal_music_phrase"),
+        _direct_body_role_strength_from_facts(facts, "vocal_phrase"),
+        _direct_body_role_strength_from_facts(facts, "vocal_one_shot"),
+        _direct_body_role_strength_from_facts(facts, "voiced_one_shot"),
+    )
+    if direct_voice >= 0.62 or vocal_role >= 0.40:
+        return True
+    reed_wind_identity = max(
+        _feature_or_subpanel_number_from_facts(facts, score_name)
+        for score_name in ORGANIC_PERCUSSION_LOOP_REED_CONFLICT_SCORES
+    )
+    return bool(reed_wind_identity >= 0.62 and reed_wind_identity >= loop_pressure - 0.10)
+
+
+def _organic_percussion_loop_has_shape_support(facts: SharedAudioFacts | None) -> bool:
+    """Return True when primary shape can represent a repeated percussion loop."""
+    shape = _shape_vote_from_facts(facts)
+    if shape in {"beat_loop", "top_loop", "drum_loop", "hybrid_fx_motion"}:
+        return True
+    if shape == "repeated_phrase_loop":
+        return (
+            max(
+                _feature_or_subpanel_number_from_facts(facts, "drum_loop_source_score"),
+                _feature_or_subpanel_number_from_facts(facts, "rhythmic_break_loop_score"),
+                _role_strength_from_facts(facts, "low_rhythmic_drum_loop"),
+                _role_strength_from_facts(facts, "percussive_drum_loop"),
+            )
+            >= 0.48
+        )
+    return False
+
+
+def _voice_claim_has_tonal_instrument_conflict(facts: SharedAudioFacts | None) -> bool:
+    """Return True when weak Voice evidence is better explained as a clean instrument.
+
+    Formant-like spectral bodies are common in guitar chords, synth chords,
+    keys, and bowed/string material.  A rank-one Voice brain candidate must
+    stand down when direct human evidence is weak, no measured vocal role is
+    present, and clean plucked/struck/synth-tonal evidence is stronger.
+    """
+    direct_voice = _direct_voice_source_score_from_facts(facts)
+    vocal_role = max(
+        _role_strength_from_facts(facts, "vocal_music_phrase"),
+        _role_strength_from_facts(facts, "voiced_one_shot"),
+        _direct_body_role_strength_from_facts(facts, "vocal_music_phrase"),
+        _direct_body_role_strength_from_facts(facts, "voiced_one_shot"),
+    )
+    if direct_voice >= 0.62 or vocal_role >= 0.40:
+        return False
+    tonal_instrument = max(
+        _feature_or_subpanel_number_from_facts(facts, score_name)
+        for score_name in TONAL_INSTRUMENT_VOICE_CONFLICT_SCORES
+    )
+    pitched_phrase = max(
+        _role_strength_from_facts(facts, "pitched_music_phrase"),
+        _role_strength_from_facts(facts, "pitched_music_loop"),
+        _direct_body_role_strength_from_facts(facts, "pitched_music_phrase"),
+        _direct_body_role_strength_from_facts(facts, "pitched_music_loop"),
+    )
+    clean_phrase_shape = _shape_vote_from_facts(facts) in {
+        "pitched_phrase",
+        "pitched_phrase_shape",
+        "pitched_repetition_phrase",
+        "bass_phrase",
+        "solo_phrase",
+        "sustained_pad",
+    }
+    return bool(
+        tonal_instrument >= 0.60
+        and tonal_instrument >= direct_voice + 0.06
+        and (pitched_phrase >= 0.70 or clean_phrase_shape)
+    )
+
+
 def _norm_path(path: str) -> str:
     return str(path or "").replace("\\", "/").lower()
 
@@ -130,6 +340,106 @@ def _norm_path(path: str) -> str:
 def _path_has_any(path: str, fragments: tuple[str, ...]) -> bool:
     low = _norm_path(path)
     return any(fragment.lower() in low for fragment in fragments)
+
+
+def _top_physics_guess_path_from_facts(facts: SharedAudioFacts | None) -> str:
+    """Return the source-blind top PhysicsVoter folder path.
+
+    Args:
+        facts: Shared measured audio facts carrying voter evidence.
+
+    Returns:
+        Normalized internal taxonomy path from PhysicsVoter's first guess, or
+        an empty string when no PhysicsVoter output is present.
+
+    Side Effects:
+        None.
+    """
+    if facts is None or not isinstance(getattr(facts, "evidence", None), dict):
+        return ""
+    physics_vote = facts.evidence.get("physics_vote_result")
+    if isinstance(physics_vote, dict):
+        top_guesses = physics_vote.get("top_guesses")
+        if isinstance(top_guesses, list) and top_guesses and isinstance(top_guesses[0], dict):
+            return _norm_path(str(top_guesses[0].get("folder_path") or top_guesses[0].get("label") or ""))
+    compact_vote = facts.evidence.get("physics_vote_1")
+    if isinstance(compact_vote, dict):
+        return _norm_path(str(compact_vote.get("folder_path") or compact_vote.get("label") or ""))
+    return ""
+
+
+def _instrument_source_branch_names(path: str) -> set[str]:
+    """Return broad source-identity branches for an internal instrument path.
+
+    Args:
+        path: Internal taxonomy/output label path. This must not be a source
+            filename or source folder path.
+
+    Returns:
+        Set of broad instrument branch names used only for comparing internal
+        voter candidates such as ``saxophone`` vs ``brass and woodwinds``.
+
+    Side Effects:
+        None.
+    """
+    normalized = _norm_path(path)
+    if not normalized.startswith("instruments/"):
+        return set()
+    branches: set[str] = set()
+    if any(
+        fragment in normalized
+        for fragment in (
+            "brass and woodwinds",
+            "woodwind",
+            "sax",
+            "saxophone",
+            "clarinet",
+            "flute",
+            "reed",
+            "trumpet",
+            "trombone",
+            "horn",
+            "/brass/",
+        )
+    ):
+        branches.add("brass_woodwinds")
+    if any(fragment in normalized for fragment in ("synth", "electronic")):
+        branches.add("synth")
+    if any(fragment in normalized for fragment in ("/bass/", "bass loops", "synth bass", "sub bass", "808")):
+        branches.add("bass")
+    if any(fragment in normalized for fragment in ("mallet", "bell", "glock", "vibes", "marimba", "xylophone")):
+        branches.add("mallet_bell")
+    if any(fragment in normalized for fragment in ("string", "violin", "cello", "viola", "bowed")):
+        branches.add("strings")
+    if any(fragment in normalized for fragment in ("voice", "vocal", "choir")):
+        branches.add("voice")
+    if any(fragment in normalized for fragment in ("guitar", "plucked", "koto", "harp", "banjo", "mandolin")):
+        branches.add("plucked")
+    if any(fragment in normalized for fragment in ("keys", "piano", "rhodes", "wurlitzer", "organ", "clav")):
+        branches.add("keys")
+    return branches
+
+
+def _instrument_paths_share_source_branch(first_path: str, second_path: str) -> bool:
+    """Return True when two internal instrument labels share a broad branch.
+
+    Args:
+        first_path: Internal instrument label path.
+        second_path: Internal instrument label path.
+
+    Returns:
+        True when both paths identify the same broad source branch, for example
+        ``Instruments/Woodwinds/Saxophone/Loops`` and
+        ``Instruments/Brass and Woodwinds/Loops``.
+
+    Side Effects:
+        None.
+    """
+    first_branches = _instrument_source_branch_names(first_path)
+    if not first_branches:
+        return False
+    second_branches = _instrument_source_branch_names(second_path)
+    return bool(first_branches.intersection(second_branches))
 
 
 def _candidate_combined_score(candidate: dict) -> float:

@@ -971,19 +971,10 @@ on run argv
     end if
 
     if chooserKind is "folder" then
-        repeat
-            if defaultLocation is missing value then
-                set selectedFolder to choose folder with prompt "Choose the exact sample folder to sort"
-            else
-                set selectedFolder to choose folder with prompt "Choose the exact sample folder to sort" default location defaultLocation
-            end if
-            set selectedPath to POSIX path of selectedFolder
-            set confirmation to display dialog "Preview will scan exactly this folder recursively:" & return & return & selectedPath buttons {"Pick Again", "Use Folder"} default button "Use Folder"
-            if button returned of confirmation is "Use Folder" then
-                return selectedPath
-            end if
-            set defaultLocation to selectedFolder
-        end repeat
+        if defaultLocation is missing value then
+            return POSIX path of (choose folder with prompt "Choose the exact sample folder to sort")
+        end if
+        return POSIX path of (choose folder with prompt "Choose the exact sample folder to sort" default location defaultLocation)
     end if
 
     if chooserKind is "destination" then
@@ -1610,6 +1601,40 @@ def render_index_html(
       }}
       th, td {{ padding: 8px; border-bottom: 1px solid #ece8df; text-align: left; vertical-align: top; }}
       th {{ position: sticky; top: 0; background: #fbfaf7; z-index: 1; }}
+      button.sort-header {{
+        display: inline-flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        width: 100%;
+        min-height: 0;
+        border: 0;
+        border-radius: 4px;
+        padding: 2px 4px;
+        background: transparent;
+        color: inherit;
+        font: inherit;
+        font-weight: 800;
+        text-align: left;
+      }}
+      button.sort-header:hover,
+      button.sort-header:focus-visible {{
+        background: color-mix(in srgb, var(--accent) 8%, white);
+        color: var(--accent-dark);
+      }}
+      .sort-indicator::before {{
+        content: "-";
+        color: var(--muted);
+        font-size: 11px;
+      }}
+      button.sort-header.active.asc .sort-indicator::before {{
+        content: "^";
+        color: var(--accent-dark);
+      }}
+      button.sort-header.active.desc .sort-indicator::before {{
+        content: "v";
+        color: var(--accent-dark);
+      }}
     tr.selected {{ background: var(--soft); }}
     tr.corrected {{ background: #fffaf0; }}
     tr.selected.corrected {{ background: #fff1ce; }}
@@ -2000,11 +2025,11 @@ def render_index_html(
                 <table>
                   <thead>
                     <tr>
-                      <th>Play</th>
-                      <th>File</th>
-                      <th>Approved Folder</th>
-                      <th>Sorter Proposed</th>
-                      <th>Decision</th>
+                      <th aria-sort="ascending"><button class="sort-header active asc" type="button" data-sort-column="play">Play<span class="sort-indicator" aria-hidden="true"></span></button></th>
+                      <th><button class="sort-header" type="button" data-sort-column="file">File<span class="sort-indicator" aria-hidden="true"></span></button></th>
+                      <th><button class="sort-header" type="button" data-sort-column="approved">Approved Folder<span class="sort-indicator" aria-hidden="true"></span></button></th>
+                      <th><button class="sort-header" type="button" data-sort-column="proposed">Sorter Proposed<span class="sort-indicator" aria-hidden="true"></span></button></th>
+                      <th><button class="sort-header" type="button" data-sort-column="decision">Decision<span class="sort-indicator" aria-hidden="true"></span></button></th>
                     </tr>
                   </thead>
                   <tbody id="rows"></tbody>
@@ -2101,7 +2126,7 @@ def render_index_html(
     <span id="stickyActionStatus" class="sticky-action-status">No preview loaded</span>
     <div class="sticky-action-group">
       <button id="quickExportButton" class="primary" type="button" disabled>Export Approved Sort</button>
-      <button id="quickTrainCorrectionsButton" class="primary" type="button" disabled>Train Brains</button>
+      <button id="quickTrainCorrectionsButton" class="primary" type="button" disabled title="Same action as Train Brains From Corrections">Train Brains From Corrections</button>
       <button id="quickOpenSortedButton" type="button" disabled>Open Sorted</button>
       <button id="quickOpenReportButton" type="button" disabled>Open Report</button>
       <button id="quickOpenTrainingReportButton" type="button" disabled>Open Training</button>
@@ -2142,6 +2167,8 @@ def render_index_html(
     rows: [],
     labels: [...initialAvailableLabels],
     selectedIndex: -1,
+    sortColumn: "play",
+    sortDirection: "asc",
   categoryEditIndex: -1,
   selectedCategory: "",
   lastReportPath: "",
@@ -2196,6 +2223,9 @@ const trainingStatus = document.getElementById("trainingStatus");
   const quickOpenSortedButton = document.getElementById("quickOpenSortedButton");
   const quickOpenReportButton = document.getElementById("quickOpenReportButton");
   const quickOpenTrainingReportButton = document.getElementById("quickOpenTrainingReportButton");
+
+  const TRAIN_FROM_CORRECTIONS_LABEL = "Train Brains From Corrections";
+  const TRAINING_FROM_CORRECTIONS_LABEL = "Training Brains...";
   const stickyActionStatus = document.getElementById("stickyActionStatus");
 
   function setStatus(text, isWarn=false) {{
@@ -2333,7 +2363,13 @@ const trainingStatus = document.getElementById("trainingStatus");
     const correctedCount = correctionRows().length;
     const rowText = state.rows.length ? `${{state.rows.length}} files loaded` : "No preview loaded";
     const correctionText = correctedCount ? ` · ${{correctedCount}} staged` : "";
-    stickyActionStatus.textContent = `${{rowText}}${{correctionText}}`;
+    const trainingStateText = state.trainingJobId ? " · training running" : "";
+    stickyActionStatus.textContent = `${{rowText}}${{correctionText}}${{trainingStateText}}`;
+    const trainingButtonLabel = state.trainingJobId ? TRAINING_FROM_CORRECTIONS_LABEL : TRAIN_FROM_CORRECTIONS_LABEL;
+    trainCorrectionsButton.textContent = trainingButtonLabel;
+    quickTrainCorrectionsButton.textContent = trainingButtonLabel;
+    trainCorrectionsButton.setAttribute("aria-busy", state.trainingJobId ? "true" : "false");
+    quickTrainCorrectionsButton.setAttribute("aria-busy", state.trainingJobId ? "true" : "false");
     quickExportButton.disabled = exportButton.disabled;
     quickTrainCorrectionsButton.disabled = trainCorrectionsButton.disabled;
     quickOpenSortedButton.disabled = openSortedButton.disabled;
@@ -2427,6 +2463,83 @@ function rowStableKey(row) {{
   return String(row?.row_id || row?.source_path || row?.display_name || row?.index || "");
 }}
 
+function currentSelectedKey() {{
+  return state.selectedIndex >= 0 ? rowStableKey(state.rows[state.selectedIndex]) : "";
+}}
+
+function rowSortValue(row, column) {{
+  if (column === "play") return Number(row?.index ?? 0);
+  if (column === "file") return String(row?.display_name || "");
+  if (column === "approved") return String(row?.approved_folder || "");
+  if (column === "proposed") return String(row?.proposed_folder || "");
+  if (column === "decision") return String(row?.consensus_status || "");
+  return "";
+}}
+
+function comparePreviewRows(left, right) {{
+  const leftValue = rowSortValue(left, state.sortColumn);
+  const rightValue = rowSortValue(right, state.sortColumn);
+  let comparison = 0;
+  if (typeof leftValue === "number" && typeof rightValue === "number") {{
+    comparison = leftValue - rightValue;
+  }} else {{
+    comparison = String(leftValue).localeCompare(String(rightValue), undefined, {{
+      numeric: true,
+      sensitivity: "base"
+    }});
+  }}
+  if (comparison === 0) {{
+    comparison = Number(left?.index ?? 0) - Number(right?.index ?? 0);
+  }}
+  return state.sortDirection === "desc" ? -comparison : comparison;
+}}
+
+function sortedPreviewRows(rows) {{
+  return [...(rows || [])].sort(comparePreviewRows);
+}}
+
+function renderSortHeaderState() {{
+  document.querySelectorAll("button[data-sort-column]").forEach(button => {{
+    const column = button.dataset.sortColumn || "";
+    const isActive = column === state.sortColumn;
+    const direction = isActive ? state.sortDirection : "";
+    button.classList.toggle("active", isActive);
+    button.classList.toggle("asc", isActive && direction === "asc");
+    button.classList.toggle("desc", isActive && direction === "desc");
+    const headerCell = button.closest("th");
+    if (headerCell) {{
+      headerCell.setAttribute(
+        "aria-sort",
+        isActive ? (direction === "desc" ? "descending" : "ascending") : "none"
+      );
+    }}
+  }});
+}}
+
+function changePreviewSort(column) {{
+  const selectedKey = currentSelectedKey();
+  if (state.sortColumn === column) {{
+    state.sortDirection = state.sortDirection === "asc" ? "desc" : "asc";
+  }} else {{
+    state.sortColumn = column;
+    state.sortDirection = "asc";
+  }}
+  renderRows();
+  if (selectedKey) selectRowByKey(selectedKey);
+  const direction = state.sortDirection === "asc" ? "ascending" : "descending";
+  setStatus(`Sorted preview queue by ${{sortColumnLabel(column)}} (${{direction}}).`);
+}}
+
+function sortColumnLabel(column) {{
+  return {{
+    play: "Play",
+    file: "File",
+    approved: "Approved Folder",
+    proposed: "Sorter Proposed",
+    decision: "Decision"
+  }}[column] || "queue";
+}}
+
 function rowAudioUrl(row) {{
   if (!row) return "";
   if (state.sessionId) return `/api/audio/${{encodeURIComponent(state.sessionId)}}/${{row.index}}`;
@@ -2483,7 +2596,7 @@ function rowsWithPreservedCorrections(incomingRows) {{
 
 function mergeLivePreviewRows(partialRows) {{
   if (!Array.isArray(partialRows) || !partialRows.length) return;
-  const selectedKey = state.selectedIndex >= 0 ? rowStableKey(state.rows[state.selectedIndex]) : "";
+  const selectedKey = currentSelectedKey();
   state.rows = rowsWithPreservedCorrections(partialRows);
   if (selectedKey) {{
     const selectedIndex = state.rows.findIndex(row => rowStableKey(row) === selectedKey);
@@ -2631,6 +2744,13 @@ function syncLabelOptions(labels) {{
 
 function renderRows() {{
   rowCountEl.textContent = `${{state.rows.length}} files`;
+  const selectedKey = currentSelectedKey();
+  state.rows = sortedPreviewRows(state.rows);
+  if (selectedKey) {{
+    const selectedIndex = state.rows.findIndex(row => rowStableKey(row) === selectedKey);
+    state.selectedIndex = selectedIndex >= 0 ? selectedIndex : Math.min(state.selectedIndex, state.rows.length - 1);
+  }}
+  renderSortHeaderState();
   const fragment = document.createDocumentFragment();
   state.rows.forEach((row, index) => {{
     const tr = document.createElement("tr");
@@ -2700,6 +2820,11 @@ function updateCorrectionNotice() {{
 function selectRow(index) {{
   state.selectedIndex = index;
   refreshSelectedRowDetails();
+}}
+
+function selectRowByKey(rowKey) {{
+  const index = state.rows.findIndex(row => rowStableKey(row) === rowKey);
+  if (index >= 0) selectRow(index);
 }}
 
 function refreshSelectedRowDetails() {{
@@ -2855,6 +2980,7 @@ function refreshSelectedRowDetails() {{
 }}
 
 function openCategoryChooser(index) {{
+  if (index < 0 || index >= state.rows.length) return;
   state.categoryEditIndex = index;
   const row = state.rows[index];
   state.selectedCategory = row.approved_folder || row.proposed_folder || "";
@@ -2951,6 +3077,7 @@ function buildLabelTree(labels) {{
 
   function stageApprovedFolder(index, approvedFolder) {{
     if (index < 0 || index >= state.rows.length) return;
+    const editedKey = rowStableKey(state.rows[index]);
     const approved = normalizeFolder(approvedFolder);
     if (!approved) {{
       setStatus("Choose or type an approved folder first.", true);
@@ -2960,7 +3087,7 @@ function buildLabelTree(labels) {{
     state.lastTrainingReportPath = "";
     openTrainingReportButton.disabled = true;
     renderRows();
-    selectRow(index);
+    selectRowByKey(editedKey);
     setStatus("Approved folder staged. Export will use it; training can teach the brains from it.");
   }}
 
@@ -2978,13 +3105,13 @@ function buildLabelTree(labels) {{
 
 function resetApprovedCategory() {{
   if (state.categoryEditIndex < 0 || state.categoryEditIndex >= state.rows.length) return;
+  const editedKey = rowStableKey(state.rows[state.categoryEditIndex]);
   state.rows[state.categoryEditIndex].approved_folder = state.rows[state.categoryEditIndex].proposed_folder;
   state.lastTrainingReportPath = "";
   openTrainingReportButton.disabled = true;
-  const editedIndex = state.categoryEditIndex;
   closeCategoryChooser();
   renderRows();
-  selectRow(editedIndex);
+  selectRowByKey(editedKey);
   setStatus("Approved folder reset to sorter proposal.");
 }}
 
@@ -3199,6 +3326,9 @@ document.getElementById("applyCategoryButton").addEventListener("click", () => a
     const rowElement = eventTarget.closest("tr[data-row-index]");
     if (rowElement) selectRow(Number(rowElement.dataset.rowIndex));
   }});
+  document.querySelectorAll("button[data-sort-column]").forEach(button => {{
+    button.addEventListener("click", () => changePreviewSort(button.dataset.sortColumn || "play"));
+  }});
   document.querySelectorAll("[data-collapse-target]").forEach(button => {{
     button.addEventListener("click", () => togglePanel(button.dataset.collapseTarget));
   }});
@@ -3217,6 +3347,7 @@ document.getElementById("applyCategoryButton").addEventListener("click", () => a
   restoreDetailsPaneWidth();
   initDetailsResizer();
   syncLabelOptions(state.labels);
+  renderSortHeaderState();
   updateQueueScrollbars();
   syncStickyActionDock();
   categorySearch.addEventListener("input", () => renderCategoryTree());

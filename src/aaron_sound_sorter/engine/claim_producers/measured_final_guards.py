@@ -18,7 +18,8 @@ from aaron_sound_sorter.domain.models import SharedAudioFacts
 from aaron_sound_sorter.engine.decision_context import DecisionContext
 from aaron_sound_sorter.engine.decision_helpers import _feature_number_from_facts
 from aaron_sound_sorter.engine.family_claim_arbiter import FamilyClaimArbiter
-from aaron_sound_sorter.engine.family_claims import ConsensusClaim, claim_from_folder_path
+from aaron_sound_sorter.engine.family_claims import ConsensusClaim, claim_from_folder_path, review_claim
+from aaron_sound_sorter.engine.instrument_pitch_ranges import check_instrument_pitch_range
 
 
 class MeasuredFinalGuardClaimProducer:
@@ -177,6 +178,9 @@ class MeasuredFinalGuardClaimProducer:
         consensus firewall still runs after candidate-local guards so cross-family
         final claims cannot bypass strong raw committee consensus.
         """
+        pitch_range_review = self._review_impossible_instrument_pitch_range(seed, facts)
+        if pitch_range_review is not None:
+            return pitch_range_review
         claim = seed
         for mutator in (
             self.guard._release_shape_review_to_broad_bucket,
@@ -207,6 +211,40 @@ class MeasuredFinalGuardClaimProducer:
         if self._same_claim(seed, claim):
             return None
         return claim
+
+    @staticmethod
+    def _review_impossible_instrument_pitch_range(
+        seed: ConsensusClaim,
+        facts: SharedAudioFacts | None,
+    ) -> ConsensusClaim | None:
+        """Review narrow instrument leaves that fail hard pitch-range proof.
+
+        This is a measured safety guard, not an identity scorer.  It only
+        activates when a proposed internal instrument leaf has confident F0
+        evidence outside a conservative hard range.  Broad instrument parents
+        and low-confidence pitch estimates are left alone.
+        """
+        if seed.family != "Instruments" or seed.is_review:
+            return None
+        folder_path = seed.folder_path or seed.label
+        check = check_instrument_pitch_range(folder_path, facts)
+        if not check.is_hard_violation or check.rule is None or check.evidence is None:
+            return None
+        reason = (
+            "measured pitch-range guard reviewed an impossible narrow "
+            f"{check.rule.family_name} leaf: observed {check.evidence.observed_hz:.1f} Hz "
+            f"from {check.evidence.source} with confidence {check.evidence.confidence:.2f} "
+            f"and voiced ratio {check.evidence.voiced_ratio:.2f}; hard allowed range is "
+            f"{check.rule.hard_min_hz:.1f}-{check.rule.hard_max_hz:.1f} Hz"
+        )
+        return review_claim(
+            label="_TO_REVIEW/Instrument Pitch Range Conflict",
+            source="final_instrument_pitch_range_conflict_review",
+            reason=reason,
+            shared=seed.shared_candidates,
+            winner=seed,
+            strength=max(0.99, seed.strength),
+        )
 
     @staticmethod
     def _facts_have_short_percussive_hit_pressure(facts: SharedAudioFacts | None) -> bool:

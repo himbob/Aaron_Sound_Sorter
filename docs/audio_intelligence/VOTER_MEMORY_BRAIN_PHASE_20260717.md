@@ -111,9 +111,15 @@ Final Phonk run family distribution:
 
 - User corrections should keep teaching memory brains first.
 - Full/core/spread/outlier brains should be rebuilt from curated training data, not edited by sparse GUI corrections.
-- Voter memory should stay a calibration lane. It can nudge PhysicsVoter and ShapeVoter, but it should not become a hidden top-family override.
-- When memory confidence is strong and low-level measured evidence agrees, the sorter can use it to deepen source identity.
+- Voter memory and physics memory are no longer decorative telemetry. They may
+  produce owner evidence when paired with measured body compatibility.
+- Memory must not become a blind top-family override. It can own a deep label
+  only when the broad measured family/body contract is compatible.
+- When memory confidence is strong and low-level measured evidence agrees, the sorter should use it to deepen source identity.
 - If memory and measured shape/family strongly disagree, review is still preferred over a forced folder.
+- Static Python should block catastrophic contradictions and report why; it
+  should not flatten strong learned memory into broad fallback buckets merely
+  because old hand-coded identity thresholds are uncertain.
 
 ## Remaining Work
 

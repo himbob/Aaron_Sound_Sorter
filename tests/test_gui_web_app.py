@@ -54,6 +54,15 @@ def test_web_gui_shell_contains_core_controls() -> None:
     assert "cancelPreviewButton" in html
     assert "/api/preview-cancel" in html
     assert "cancelPreview()" in html
+    assert "sort-header" in html
+    assert 'data-sort-column="play"' in html
+    assert 'data-sort-column="file"' in html
+    assert 'data-sort-column="approved"' in html
+    assert 'data-sort-column="proposed"' in html
+    assert 'data-sort-column="decision"' in html
+    assert "changePreviewSort" in html
+    assert "renderSortHeaderState" in html
+    assert "sortedPreviewRows" in html
     assert "Export Approved Sort" in html
     assert "audioPlayer" in html
     assert "Listen" in html
@@ -86,6 +95,9 @@ def test_web_gui_shell_contains_core_controls() -> None:
     assert "stickyActionDock" in html
     assert "quickExportButton" in html
     assert "quickTrainCorrectionsButton" in html
+    assert "Same action as Train Brains From Corrections" in html
+    assert "Training Brains..." in html
+    assert "training running" in html
     assert "quickOpenTrainingReportButton" in html
     assert "already in training" in html
     assert "setAudioSourceForRow" in html

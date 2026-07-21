@@ -128,6 +128,47 @@ def apply_source_panel_lifts(
     return lifted
 
 
+def organic_percussion_loop_pressure(
+    *,
+    hand_drum: float,
+    shaker_tambourine: float,
+    scrape_rasp: float,
+    tom_conga: float,
+    drum_loop_source: float,
+    rhythmic_break_loop: float,
+    drum_branch: str,
+    drum_branch_confidence: float,
+    event_count: float,
+    event_low: float,
+    repeated_loop_score: float,
+    voice_role_signal: float,
+    clean_low_bass_phrase: bool,
+    tonal_instrument_loop_veto: bool,
+) -> float:
+    """Return source-blind pressure for repeated organic percussion loops.
+
+    Organic percussion loops can be tonal, low-band heavy, and not especially
+    broadband.  This score lets hand-drum/shaker/scrape panels contribute to
+    the Drums parent only when the sound is also a repeated loop.  It does not
+    choose a leaf and it stands down for protected voice, bass, or clean tonal
+    instrument contexts.
+    """
+    if clean_low_bass_phrase or tonal_instrument_loop_veto or voice_role_signal >= 0.50:
+        return 0.0
+    if event_count < 8.0 or repeated_loop_score < 0.52:
+        return 0.0
+    percussion_source = max(hand_drum, shaker_tambourine, scrape_rasp, tom_conga)
+    if percussion_source < 0.50 and drum_loop_source < 0.30:
+        return 0.0
+    body_or_repetition = max(rhythmic_break_loop, repeated_loop_score, event_low if event_low >= 0.55 else 0.0)
+    pressure = percussion_source * 0.78 + body_or_repetition * 0.22
+    if drum_branch == "DrumLoop":
+        pressure = max(pressure, drum_branch_confidence * 0.96)
+    if drum_loop_source >= 0.30 and rhythmic_break_loop >= 0.50:
+        pressure = max(pressure, drum_loop_source * 0.70 + rhythmic_break_loop * 0.30)
+    return clamp01(pressure)
+
+
 def candidate_is_broad_drum(folder: str) -> bool:
     low = folder.lower()
     return (

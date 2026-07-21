@@ -160,6 +160,59 @@ def _clean_low_tonal_beat_bass_facts() -> SharedAudioFacts:
     )
 
 
+def _clean_low_solo_phrase_bass_facts() -> SharedAudioFacts:
+    """Facts matching a clean low bass loop mis-shaped as a solo phrase."""
+    shape_vote = {
+        "primary_shape": "solo_phrase",
+        "confidence": 0.86,
+        "onset_count": 8.0,
+        "onset_span_ratio": 0.84,
+        "true_repetition_score": 0.66,
+        "low_event_ratio": 0.99,
+        "mid_event_ratio": 0.01,
+        "high_event_ratio": 0.001,
+        "pitched_event_ratio": 1.0,
+        "sustained_tonal_frame_ratio": 0.88,
+        "non_event_tonal_ratio": 0.85,
+        "percussive_event_ratio": 0.0,
+        "drumlike_frame_ratio": 0.0,
+        "pitch_confidence": 0.93,
+        "spectral_flatness_mean": 0.09,
+    }
+    subpanel_flat = {
+        "bass_synth_score": 0.73,
+        "bass_sub_score": 0.58,
+        "drum_loop_source_score": 0.06,
+        "rhythmic_break_loop_score": 0.10,
+        "fx_motion_score": 0.12,
+        "fx_transition_authority_score": 0.19,
+        "fx_riser_build_score": 0.19,
+        "fx_drop_downlifter_score": 0.24,
+    }
+    return SharedAudioFacts(
+        is_broken_or_tiny=False,
+        is_loop_like=True,
+        is_single_event_like=False,
+        is_short_hit_like=False,
+        is_long=True,
+        evidence={
+            "shape_vote": shape_vote,
+            "physics_subpanels": {"flat": subpanel_flat},
+            "measured_roles": {
+                "detected_parent_role": "pitched_music_loop",
+                "pitched_music_loop": 0.82,
+                "drum_loop": 0.0,
+                "percussive_drum_loop": 0.0,
+            },
+            "physics_layer_decision": {
+                "instrument_branch_selected": "Bass",
+                "physics_layer_branch": "Bass",
+                "instrument_branch_selected_confidence": 0.80,
+            },
+        },
+    )
+
+
 def _context_with_drum_loop_candidate(facts: SharedAudioFacts) -> DecisionContext:
     raw = claim_from_folder_path(
         folder_path="Instruments/Bass/Electric Bass/One Shots",
@@ -208,6 +261,14 @@ def test_clean_low_tonal_beat_loop_bass_does_not_emit_drum_loop_claim() -> None:
 
 def test_clean_low_tonal_beat_loop_bass_emits_bass_loop_claim() -> None:
     facts = _clean_low_tonal_beat_bass_facts()
+
+    claims = MeasuredInstrumentBranchClaimProducer().produce(_context_with_drum_loop_candidate(facts))
+
+    assert any(claim.source == "final_measured_bass_loop_invariant" for claim in claims)
+
+
+def test_clean_low_solo_phrase_bass_emits_bass_loop_claim() -> None:
+    facts = _clean_low_solo_phrase_bass_facts()
 
     claims = MeasuredInstrumentBranchClaimProducer().produce(_context_with_drum_loop_candidate(facts))
 
@@ -296,6 +357,10 @@ def test_true_low_drum_loop_still_emits_drum_loop_claim_despite_bass_energy() ->
     claims = FinalDrumLoopClaimProducer().produce(_context_with_drum_loop_candidate(facts))
 
     assert any(claim.source == "measured_drum_loop_claim" for claim in claims)
+    assert any(
+        claim.source == "measured_drum_loop_claim" and claim.is_real_candidate and claim.strength >= 0.99
+        for claim in claims
+    )
 
 
 def test_true_low_drum_loop_blocks_clean_bass_loop_claim_despite_bass_energy() -> None:
@@ -304,3 +369,64 @@ def test_true_low_drum_loop_blocks_clean_bass_loop_claim_despite_bass_energy() -
     claims = MeasuredInstrumentBranchClaimProducer().produce(_context_with_drum_loop_candidate(facts))
 
     assert all(claim.source != "final_measured_bass_loop_invariant" for claim in claims)
+
+
+def test_organic_percussion_loop_claim_survives_pitched_music_role() -> None:
+    """Hand-percussion loop pressure should authorize broad Drums before review."""
+    facts = SharedAudioFacts(
+        is_broken_or_tiny=False,
+        is_loop_like=True,
+        is_single_event_like=False,
+        is_short_hit_like=False,
+        is_long=True,
+        evidence={
+            "shape_vote": {
+                "primary_shape": "hybrid_fx_motion",
+                "confidence": 0.70,
+                "shape_scores": [("pitched_phrase_shape", 0.67), ("beat_loop", 0.62)],
+                "onset_count": 30.0,
+                "true_repetition_score": 0.90,
+                "low_event_ratio": 0.83,
+                "mid_event_ratio": 0.10,
+                "high_event_ratio": 0.07,
+                "pitched_event_ratio": 0.83,
+                "percussive_event_ratio": 0.07,
+                "drumlike_frame_ratio": 0.02,
+                "sustained_tonal_frame_ratio": 0.88,
+                "non_event_tonal_ratio": 0.89,
+                "f0_voiced_ratio": 0.70,
+                "pitch_confidence": 0.81,
+            },
+            "physics_subpanels": {
+                "flat": {
+                    "voice_score": 0.30,
+                    "human_spoken_voice_score": 0.59,
+                    "voice_choir_score": 0.47,
+                    "fx_formant_score": 0.34,
+                    "hand_drum_membrane_score": 0.67,
+                    "drum_shaker_tambourine_source_score": 0.53,
+                    "drum_guiro_scrape_source_score": 0.38,
+                    "drum_tom_conga_source_score": 0.36,
+                    "drum_loop_source_score": 0.23,
+                    "rhythmic_break_loop_score": 0.51,
+                    "drum_hit_score": 0.28,
+                }
+            },
+            "measured_roles": {
+                "pitched_music_loop": 0.93,
+                "pitched_music_phrase": 0.84,
+                "low_rhythmic_drum_loop": 0.37,
+                "vocal_music_phrase": 0.0,
+                "vocal_phrase": 0.0,
+                "voiced_one_shot": 0.0,
+            },
+            "physics_layer_decision": {
+                "drum_branch_selected": "DrumLoop",
+                "drum_branch_selected_confidence": 0.51,
+            },
+        },
+    )
+
+    claims = FinalDrumLoopClaimProducer().produce(_context_with_drum_loop_candidate(facts))
+
+    assert any(claim.source == "measured_drum_loop_claim" for claim in claims)

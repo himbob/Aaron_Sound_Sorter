@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from aaron_sound_sorter.domain.models import CategoryGuess, SharedAudioFacts, VoterResult
 from aaron_sound_sorter.engine.claim_producers.learned_owner_authority import (
+    LEARNED_OWNER_CLAIM_SOURCE,
     VOICE_OWNER_CLAIM_SOURCE,
     LearnedOwnerAuthorityClaimProducer,
 )
@@ -82,7 +83,7 @@ def physics_guess(path: str) -> CategoryGuess:
 def voice_facts(
     *,
     shape: str = "pitched_repetition_phrase",
-    voice_score: float = 0.52,
+    voice_score: float = 0.72,
     drum_hit_score: float = 0.22,
     woodwind_sax_score: float = 0.24,
 ) -> SharedAudioFacts:
@@ -134,10 +135,59 @@ def context_with_voice_brain(facts: SharedAudioFacts) -> DecisionContext:
     )
 
 
-def test_learned_owner_voice_claim_emits_when_rank_one_brain_and_body_agree() -> None:
+def add_matched_voice_memory(
+    facts: SharedAudioFacts,
+    *,
+    label: str = "Instruments/Voice/Vocal Loops/Loops",
+    confidence: float = 0.93,
+) -> SharedAudioFacts:
+    """Attach matched trainable Voice memory to synthetic facts."""
+    facts.evidence["learned_voter_memory"] = {
+        "matched": True,
+        "top_family": label.split("/", 1)[0],
+        "label": label,
+        "confidence": confidence,
+        "effective_weight": 1200,
+        "nearest_distance": 0.18,
+        "role": "instrument_voice_loop",
+    }
+    return facts
+
+
+def add_matched_owner_memory(
+    facts: SharedAudioFacts,
+    *,
+    label: str,
+    branch: str,
+    role: str,
+    confidence: float = 0.94,
+) -> SharedAudioFacts:
+    """Attach a matched non-Voice trainable owner memory row."""
+    facts.evidence["learned_physics_memory"] = {
+        "matched": True,
+        "top_family": label.split("/", 1)[0],
+        "branch": branch,
+        "label": label,
+        "confidence": confidence,
+        "effective_weight": 1200,
+        "nearest_distance": 0.16,
+        "role": role,
+    }
+    return facts
+
+
+def test_learned_owner_voice_claim_ignores_plain_rank_one_brain_without_memory() -> None:
     producer = LearnedOwnerAuthorityClaimProducer()
 
     claims = producer.produce(context_with_voice_brain(voice_facts()))
+
+    assert claims == []
+
+
+def test_learned_owner_voice_claim_emits_when_matched_memory_and_body_agree() -> None:
+    producer = LearnedOwnerAuthorityClaimProducer()
+
+    claims = producer.produce(context_with_voice_brain(add_matched_voice_memory(voice_facts())))
 
     assert len(claims) == 1
     assert claims[0].source == VOICE_OWNER_CLAIM_SOURCE
@@ -145,12 +195,80 @@ def test_learned_owner_voice_claim_emits_when_rank_one_brain_and_body_agree() ->
     assert claims[0].is_real_candidate is True
 
 
+def test_learned_owner_claim_emits_exact_non_voice_instrument_label() -> None:
+    producer = LearnedOwnerAuthorityClaimProducer()
+    learned_path = "Instruments/Plucked Strings/Koto/One Shots"
+    facts = add_matched_owner_memory(
+        voice_facts(shape="designed_tonal_fx", voice_score=0.24),
+        label=learned_path,
+        branch="PluckedString",
+        role="instrument_plucked_one_shot",
+    )
+
+    claims = producer.produce(context_with_voice_brain(facts))
+
+    assert len(claims) == 1
+    assert claims[0].source == LEARNED_OWNER_CLAIM_SOURCE
+    assert claims[0].folder_path == learned_path
+    assert claims[0].is_real_candidate is True
+
+
+def test_learned_owner_claim_emits_exact_fx_label_when_fx_body_agrees() -> None:
+    producer = LearnedOwnerAuthorityClaimProducer()
+    learned_path = "FX/Structural and Transitional FX/Risers and Builds/Generic Riser/Long FX"
+    facts = add_matched_owner_memory(
+        voice_facts(shape="transition_riser", voice_score=0.18),
+        label=learned_path,
+        branch="RiserBuild",
+        role="fx_riser",
+    )
+    facts.evidence["physics_subpanels"]["flat"].update(
+        {
+            "fx_motion_score": 0.74,
+            "fx_transition_authority_score": 0.82,
+            "fx_riser_build_score": 0.88,
+            "drum_hit_score": 0.18,
+        }
+    )
+
+    claims = producer.produce(context_with_voice_brain(facts))
+
+    assert len(claims) == 1
+    assert claims[0].source == LEARNED_OWNER_CLAIM_SOURCE
+    assert claims[0].folder_path == learned_path
+
+
+def test_learned_owner_claim_stands_down_for_incompatible_family_body() -> None:
+    producer = LearnedOwnerAuthorityClaimProducer()
+    learned_path = "Drums/Drum Loops/Loops"
+    facts = add_matched_owner_memory(
+        voice_facts(shape="sustained_pad", voice_score=0.18),
+        label=learned_path,
+        branch="DrumLoop",
+        role="drum_loop",
+    )
+    facts.evidence["physics_subpanels"]["flat"].update(
+        {
+            "drum_hit_score": 0.10,
+            "drum_loop_source_score": 0.08,
+            "compact_struck_tonal_percussion_score": 0.06,
+        }
+    )
+
+    claims = producer.produce(context_with_voice_brain(facts))
+
+    assert claims == []
+
+
 def test_learned_owner_rehomes_internal_human_voice_fx_to_instrument_voice() -> None:
     producer = LearnedOwnerAuthorityClaimProducer()
     context = DecisionContext(
         raw=raw_claim("Instruments/Mixed Musical Loops/Multi Instrument/Loops"),
         eligibility=eligibility(),
-        facts=voice_facts(shape="pitched_phrase"),
+        facts=add_matched_voice_memory(
+            voice_facts(shape="pitched_phrase"),
+            label="FX/Human and Voice FX/Spoken Voice/Long FX",
+        ),
         brain_result=VoterResult(
             voter_name="brain",
             guesses=[voice_guess("FX/Human and Voice FX/Spoken Voice/Long FX")],
@@ -166,14 +284,14 @@ def test_learned_owner_rehomes_internal_human_voice_fx_to_instrument_voice() -> 
 def test_learned_owner_voice_claim_stands_down_for_hard_drum_body() -> None:
     producer = LearnedOwnerAuthorityClaimProducer()
 
-    claims = producer.produce(context_with_voice_brain(voice_facts(drum_hit_score=0.72)))
+    claims = producer.produce(context_with_voice_brain(add_matched_voice_memory(voice_facts(drum_hit_score=0.72))))
 
     assert claims == []
 
 
 def test_learned_owner_voice_claim_stands_down_for_non_voice_memory_match() -> None:
     producer = LearnedOwnerAuthorityClaimProducer()
-    facts = voice_facts(voice_score=0.86)
+    facts = add_matched_voice_memory(voice_facts(voice_score=0.86))
     facts.evidence["learned_physics_memory"] = {
         "matched": True,
         "top_family": "Instruments",
@@ -189,7 +307,7 @@ def test_learned_owner_voice_claim_stands_down_for_non_voice_memory_match() -> N
 
 def test_learned_owner_voice_claim_stands_down_for_measured_sax_physics_branch() -> None:
     producer = LearnedOwnerAuthorityClaimProducer()
-    facts = voice_facts(voice_score=0.71, woodwind_sax_score=0.64)
+    facts = add_matched_voice_memory(voice_facts(voice_score=0.71, woodwind_sax_score=0.64), confidence=0.88)
     context = DecisionContext(
         raw=raw_claim("Instruments/Instrument Loops/Loops"),
         eligibility=eligibility(),
@@ -214,7 +332,7 @@ def test_arbiter_prefers_learned_voice_owner_over_generic_loop_fallback() -> Non
         DecisionContext(
             raw=raw,
             eligibility=eligibility(),
-            facts=facts,
+            facts=add_matched_voice_memory(facts),
             brain_result=VoterResult(voter_name="brain", guesses=[voice_guess()]),
         )
     )[0]
@@ -227,3 +345,39 @@ def test_arbiter_prefers_learned_voice_owner_over_generic_loop_fallback() -> Non
 
     assert final.source == VOICE_OWNER_CLAIM_SOURCE
     assert final.folder_path == "Instruments/Voice/Vocal Loops/Loops"
+
+
+def test_arbiter_prefers_learned_non_voice_owner_over_generic_loop_fallback() -> None:
+    producer = LearnedOwnerAuthorityClaimProducer()
+    learned_path = "Instruments/Keys/Piano/Loops"
+    facts = add_matched_owner_memory(
+        voice_facts(shape="pitched_repetition_phrase", voice_score=0.20),
+        label=learned_path,
+        branch="KeysPiano",
+        role="instrument_keys_loop",
+    )
+    facts.evidence["physics_subpanels"]["flat"].update(
+        {
+            "struck_keys_score": 0.66,
+            "struck_keys_authority_score": 0.72,
+            "keys_tonal_decay_score": 0.74,
+        }
+    )
+    raw = raw_claim("Instruments/Instrument Loops/Loops")
+    learned_claim = producer.produce(
+        DecisionContext(
+            raw=raw,
+            eligibility=eligibility(),
+            facts=facts,
+            brain_result=VoterResult(voter_name="brain", guesses=[]),
+        )
+    )[0]
+
+    final = FamilyClaimArbiter().pick_winner(
+        raw_claim=raw,
+        claims=[broad_loop_claim(), learned_claim],
+        facts=facts,
+    )
+
+    assert final.source == LEARNED_OWNER_CLAIM_SOURCE
+    assert final.folder_path == learned_path

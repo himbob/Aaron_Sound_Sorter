@@ -24,12 +24,15 @@ from aaron_sound_sorter.engine.decision_context import DecisionContext
 from aaron_sound_sorter.engine.decision_helpers import (
     _candidate_combined_score,
     _feature_number_from_facts,
+    _instrument_paths_share_source_branch,
     _norm_path,
     _shape_confidence_from_facts,
     _shape_metric_from_facts,
     _shape_vote_from_facts,
+    _top_physics_guess_path_from_facts,
 )
 from aaron_sound_sorter.engine.family_claims import ConsensusClaim, claim_from_folder_path
+from aaron_sound_sorter.engine.measured_source_contracts import supports_clean_low_bass_phrase_owner
 from aaron_sound_sorter.voters.scoring_tools import role_strength
 
 SYNTH_PATH_FRAGMENTS = ("synth", "electronic")
@@ -728,6 +731,8 @@ class MeasuredInstrumentBranchClaimProducer:
     def _facts_support_clean_bass_loop(self, facts: SharedAudioFacts | None) -> bool:
         if facts is None:
             return False
+        if supports_clean_low_bass_phrase_owner(facts):
+            return True
         shape = _shape_vote_from_facts(facts)
         if shape not in {"bass_phrase", "beat_loop", "pitched_repetition_phrase"}:
             return False
@@ -1266,10 +1271,21 @@ class MeasuredInstrumentBranchClaimProducer:
             ) or merged.get("physics_top_layer_instrument_branch_confidence", 0.0)
         return merged
 
+    def _top_physics_guess_path(self, facts: SharedAudioFacts | None) -> str:
+        """Return the source-blind top PhysicsVoter folder path."""
+        return _top_physics_guess_path_from_facts(facts)
+
+    def _physics_top_is_brass_or_woodwind(self, facts: SharedAudioFacts | None) -> bool:
+        """Return true when PhysicsVoter's top folder stays in the reed/brass branch."""
+        path = self._top_physics_guess_path(facts)
+        return _instrument_paths_share_source_branch("Instruments/Brass and Woodwinds/Loops", path)
+
     def _facts_have_non_woodwind_branch_identity_conflict(self, facts: SharedAudioFacts | None) -> bool:
         """Return True when layered physics selected a strong non-woodwind branch."""
         layer = self._physics_layer(facts)
         if not layer:
+            return False
+        if self._physics_top_is_brass_or_woodwind(facts):
             return False
         branch = str(layer.get("physics_layer_branch") or layer.get("instrument_branch_selected") or "")
         if not branch or branch in {"Woodwinds", "ReedWoodwind"}:

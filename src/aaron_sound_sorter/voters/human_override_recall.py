@@ -14,6 +14,12 @@ from typing import Any
 
 import numpy as np
 
+from aaron_sound_sorter.engine.learned_memory_contracts import (
+    memory_conflicts_with_candidate_top_family,
+    normalize_internal_path,
+    top_family_from_path,
+)
+
 
 @dataclass(frozen=True)
 class HumanOverrideRecallMatch:
@@ -223,25 +229,14 @@ def human_override_recall_allowed_by_memory(
         This is source-name blind. It compares internal learned-memory targets
         against internal candidate labels and never reads producer filenames.
     """
-    candidate_path = normalized_path(candidate_folder_path)
-    candidate_top = top_family(candidate_path)
-    evidence = getattr(facts, "evidence", {}) if facts is not None else {}
-    if not isinstance(evidence, dict) or not candidate_top:
+    candidate_path = normalize_internal_path(candidate_folder_path)
+    if not top_family_from_path(candidate_path):
         return True
-    for key in ("learned_voter_memory", "learned_physics_memory"):
-        memory = evidence.get(key, {})
-        if not isinstance(memory, dict) or not bool(memory.get("matched")):
-            continue
-        confidence = safe_float(memory.get("confidence"), 0.0)
-        if confidence < confidence_gate:
-            continue
-        target_label = normalized_path(str(memory.get("label", "")))
-        if target_label and target_label == candidate_path:
-            return True
-        target_top = str(memory.get("top_family", ""))
-        if target_top in {"Drums", "Instruments", "FX"} and target_top != candidate_top:
-            return False
-    return True
+    return not memory_conflicts_with_candidate_top_family(
+        facts,
+        candidate_path,
+        minimum_confidence=confidence_gate,
+    )
 
 
 def gui_correction_examples(brain: dict[str, Any], label: str) -> list[dict[str, Any]]:
@@ -387,9 +382,9 @@ def safe_float(value: Any, default: float = 0.0) -> float:
 
 def normalized_path(value: str) -> str:
     """Return a normalized internal folder path string."""
-    return str(value or "").replace("\\", "/").strip("/")
+    return normalize_internal_path(value)
 
 
 def top_family(folder_path: str) -> str:
     """Return the top family token from an internal folder path."""
-    return normalized_path(folder_path).split("/", 1)[0]
+    return top_family_from_path(folder_path)

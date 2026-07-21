@@ -405,6 +405,22 @@ class LayeredPhysicsScorer:
         adjusted = float(score)
         reasons: list[str] = []
         if not folder.startswith("Instruments/"):
+            measured_voice_branch_support = bool(
+                branch == "Voice"
+                and confidence >= 0.56
+                and max(
+                    safe_float(decision.evidence.get("instrument_subpanel_human_spoken_voice_score", 0.0), 0.0),
+                    safe_float(decision.evidence.get("instrument_subpanel_fx_formant_score", 0.0), 0.0),
+                    safe_float(decision.evidence.get("instrument_human_voice_texture", 0.0), 0.0),
+                    safe_float(decision.evidence.get("instrument_rap_voice_texture", 0.0), 0.0),
+                )
+                >= 0.66
+            )
+            if measured_voice_branch_support:
+                penalty = 0.55
+                adjusted += penalty
+                reasons.append(f"measured_voice_branch_blocks_non_instrument:+{penalty:.2f}")
+                return adjusted, reasons
             if confidence >= 0.72:
                 if branch == "MixedInstrument" and bool(decision.evidence.get("compound_music_prefer_broad_loop")):
                     penalty = 6.00

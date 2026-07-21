@@ -40,7 +40,7 @@ from aaron_audio_intelligence.voter_memory_brain import (
     voter_memory_match_for_facts,
     voter_memory_role_for_label,
 )
-from aaron_sound_sorter.core import FEATURE_WEIGHTS, FP_SIZE, FeatureRow
+from aaron_sound_sorter.core import FEATURE_NAMES, FEATURE_WEIGHTS, FP_SIZE, FeatureRow
 from aaron_sound_sorter.domain.models import AudioPhysics, SharedAudioFacts
 from aaron_sound_sorter.gui import incremental_brain_update as updater_module
 from aaron_sound_sorter.gui.incremental_brain_update import (
@@ -128,6 +128,35 @@ def _row(label: str, source: Path, value: float = 0.25) -> FeatureRow:
         read_status="ok",
         source_pack="unit",
     )
+
+
+def _row_with_fingerprint(label: str, source: Path, fingerprint: list[float]) -> FeatureRow:
+    structure = "loop" if label.endswith("/Loops") else "one_shot"
+    return FeatureRow(
+        path=str(source),
+        group_key=label,
+        label=label,
+        top=label.split("/", 1)[0],
+        structure=structure,
+        duration_sec=3.0 if structure == "loop" else 1.0,
+        fingerprint=fingerprint,
+        read_status="ok",
+        source_pack="unit",
+    )
+
+
+def _base_brain_with_real_feature_names(labels: list[str] | None = None) -> dict:
+    brain = _base_brain(labels)
+    brain["feature_names"] = list(FEATURE_NAMES)
+    brain["feature_weights"] = [1.0] * FP_SIZE
+    return brain
+
+
+def _named_fingerprint(values_by_feature_name: dict[str, float]) -> list[float]:
+    vector = np.zeros(FP_SIZE, dtype=np.float32)
+    for feature_name, value in values_by_feature_name.items():
+        vector[FEATURE_NAMES.index(feature_name)] = float(value)
+    return vector.astype(float).tolist()
 
 
 def _profile_for_vector(vector: list[float]) -> dict:
@@ -594,6 +623,41 @@ def test_shape_memory_does_not_fire_for_far_audio(tmp_path: Path) -> None:
     assert match.matched is False
 
 
+def test_shape_memory_generalizes_role_across_pitch_register(tmp_path: Path) -> None:
+    label = "Instruments/Woodwinds/Saxophone/Loops"
+    teacher = _named_fingerprint(
+        {
+            "f0_median_hz": 220.0,
+            "pitch_confidence": 0.88,
+            "f0_voiced_ratio": 0.82,
+            "harmonic_to_noise_ratio": 0.72,
+            "loop_pitched_event_ratio": 0.84,
+            "loop_percussive_event_ratio": 0.08,
+            "loop_sustained_tonal_frame_ratio": 0.68,
+            "event_rate_hz": 2.4,
+            "spectral_entropy_mean": 0.34,
+            "attack_noise_ratio": 0.22,
+            "body_noise_ratio": 0.18,
+        }
+    )
+    query = list(teacher)
+    query[FEATURE_NAMES.index("f0_median_hz")] = 440.0
+    brain = _base_brain_with_real_feature_names()
+    memory = build_empty_shape_memory_brain(brain)
+    update_shape_memory_with_row(
+        memory,
+        _row_with_fingerprint(label, tmp_path / "sax_teacher.wav", teacher),
+        evidence_weight=1200,
+    )
+    merge_shape_memory_into_brain(brain, memory)
+
+    match = shape_memory_match_for_facts(brain, query)
+
+    assert match.matched is True
+    assert match.shape == "pitched_repetition_phrase"
+    assert match.match_kind == "teacher_shape_signature_cloud"
+
+
 def test_voter_memory_teaches_low_level_role_with_exact_correction(tmp_path: Path) -> None:
     label = "FX/Impacts and Hits/Generic Impact/Long FX"
     brain = _base_brain([label])
@@ -606,6 +670,48 @@ def test_voter_memory_teaches_low_level_role_with_exact_correction(tmp_path: Pat
     assert match.matched is True
     assert match.role == "fx_impact"
     assert match.top_family == "FX"
+
+
+def test_voter_memory_generalizes_source_owner_across_pitch_register(tmp_path: Path) -> None:
+    label = "Instruments/Woodwinds/Saxophone/Loops"
+    teacher = _named_fingerprint(
+        {
+            "mfcc_mu_1": 0.40,
+            "mfcc_mu_2": -0.18,
+            "mfcc_std_1": 0.08,
+            "f0_median_hz": 196.0,
+            "pitch_confidence": 0.90,
+            "f0_voiced_ratio": 0.86,
+            "f0_stability_cents": 0.64,
+            "harmonic_to_noise_ratio": 0.74,
+            "harmonic_energy_ratio": 0.78,
+            "formant_like_peak_spacing": 0.52,
+            "spectral_envelope_slope": -0.18,
+            "attack_noise_ratio": 0.24,
+            "body_noise_ratio": 0.16,
+            "loop_pitched_event_ratio": 0.82,
+            "loop_percussive_event_ratio": 0.07,
+            "loop_sustained_tonal_frame_ratio": 0.71,
+        }
+    )
+    query = list(teacher)
+    query[FEATURE_NAMES.index("f0_median_hz")] = 392.0
+    query[FEATURE_NAMES.index("top1_peak_frequency_hz")] = 784.0
+    brain = _base_brain_with_real_feature_names([label])
+    memory = build_empty_voter_memory_brain(brain)
+    update_voter_memory_with_row(
+        memory,
+        _row_with_fingerprint(label, tmp_path / "sax_teacher.wav", teacher),
+        evidence_weight=1200,
+    )
+    merge_voter_memory_into_brain(brain, memory)
+
+    match = voter_memory_match_for_facts(brain, query)
+
+    assert match.matched is True
+    assert match.role == "instrument_wind_loop"
+    assert match.top_family == "Instruments"
+    assert match.match_kind == "teacher_role_signature_cloud"
 
 
 def test_physics_memory_teaches_physics_branch_with_exact_correction(tmp_path: Path) -> None:
@@ -623,6 +729,51 @@ def test_physics_memory_teaches_physics_branch_with_exact_correction(tmp_path: P
     assert match.top_family == "Instruments"
     assert match.branch == "Voice"
     assert match.match_kind == "fingerprint"
+
+
+def test_physics_memory_generalizes_branch_across_pitch_register(tmp_path: Path) -> None:
+    label = "Instruments/Woodwinds/Saxophone/Loops"
+    teacher = _named_fingerprint(
+        {
+            "f0_median_hz": 185.0,
+            "low_peak_frequency_hz": 185.0,
+            "pitch_confidence": 0.91,
+            "f0_voiced_ratio": 0.88,
+            "f0_stability_cents": 0.62,
+            "harmonic_to_noise_ratio": 0.73,
+            "harmonic_peak_count": 0.58,
+            "harmonic_energy_ratio": 0.79,
+            "formant_like_peak_spacing": 0.54,
+            "spectral_envelope_slope": -0.16,
+            "attack_noise_ratio": 0.26,
+            "body_noise_ratio": 0.18,
+            "tail_noise_ratio": 0.20,
+            "loop_pitched_event_ratio": 0.80,
+            "loop_percussive_event_ratio": 0.06,
+            "loop_sustained_tonal_frame_ratio": 0.72,
+            "loop_non_event_tonal_ratio": 0.61,
+        }
+    )
+    query = list(teacher)
+    query[FEATURE_NAMES.index("f0_median_hz")] = 370.0
+    query[FEATURE_NAMES.index("low_peak_frequency_hz")] = 370.0
+    query[FEATURE_NAMES.index("top1_peak_frequency_hz")] = 740.0
+    brain = _base_brain_with_real_feature_names()
+    memory = build_empty_physics_memory_brain(brain)
+    update_physics_memory_with_row(
+        memory,
+        _row_with_fingerprint(label, tmp_path / "sax_teacher.wav", teacher),
+        evidence_weight=1200,
+    )
+    merge_physics_memory_into_brain(brain, memory)
+
+    match = physics_memory_match_for_facts(brain, query)
+
+    assert match.matched is True
+    assert match.target_key == "Instruments/Woodwinds"
+    assert match.top_family == "Instruments"
+    assert match.branch == "Woodwinds"
+    assert match.match_kind == "teacher_physics_register_invariant_cloud"
 
 
 def test_physics_memory_does_not_seed_from_voter_memory_when_dedicated_lane_exists(tmp_path: Path) -> None:

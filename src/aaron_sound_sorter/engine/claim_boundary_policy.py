@@ -18,6 +18,7 @@ from enum import Enum
 
 from aaron_sound_sorter.domain.models import SharedAudioFacts
 from aaron_sound_sorter.engine.family_claims import ConsensusClaim
+from aaron_sound_sorter.engine.measured_source_contracts import supports_measured_drum_loop_owner
 
 
 class ClaimEvidenceKind(str, Enum):
@@ -82,6 +83,8 @@ class ClaimBoundaryPolicy:
             return ClaimEvidenceKind.REVIEW_REASON
         if source.startswith("measured_") or source.startswith("final_measured_"):
             return ClaimEvidenceKind.SOURCE_IDENTITY if claim.is_real_candidate else ClaimEvidenceKind.ROLE
+        if source.startswith("learned_owner_"):
+            return ClaimEvidenceKind.SOURCE_IDENTITY
         if "parent_eligibility" in source:
             return ClaimEvidenceKind.FAMILY_PERMISSION
         if "shape" in source:
@@ -145,6 +148,8 @@ class ClaimBoundaryPolicy:
         facts: SharedAudioFacts | None,
     ) -> bool:
         if claim.family != "Drums" or claim.sub_family != "Drum Loops":
+            return False
+        if supports_measured_drum_loop_owner(facts):
             return False
         shape = self._shape(facts)
         synth_identity = self._score(

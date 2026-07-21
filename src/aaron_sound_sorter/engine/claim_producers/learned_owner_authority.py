@@ -14,31 +14,31 @@ replacement classifier.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 
 from aaron_sound_sorter.domain.models import CategoryGuess, SharedAudioFacts
 from aaron_sound_sorter.engine.decision_context import DecisionContext
 from aaron_sound_sorter.engine.decision_helpers import (
+    _direct_body_role_strength_from_facts,
+    _direct_voice_source_score_from_facts,
     _feature_number_from_facts,
-    _norm_path,
+    _role_strength_from_facts,
     _shape_confidence_from_facts,
     _shape_metric_from_facts,
     _shape_vote_from_facts,
+    _voice_claim_has_tonal_instrument_conflict,
 )
 from aaron_sound_sorter.engine.family_claims import ConsensusClaim, claim_from_folder_path
-
-VOICE_OWNER_CLAIM_SOURCE = "learned_owner_voice_body_claim"
-
-VOICE_PATH_FRAGMENTS = (
-    "voice",
-    "vocal",
-    "vocals",
-    "spoken",
-    "choir",
-    "breath",
-    "mouth",
-    "human and voice",
+from aaron_sound_sorter.engine.learned_memory_contracts import (
+    LearnedMemoryMatch,
+    has_non_voice_memory_match,
+    is_voice_category_path,
+    iter_learned_memory_matches,
+    safe_float,
 )
+
+LEARNED_OWNER_CLAIM_SOURCE = "learned_owner_body_claim"
+VOICE_OWNER_CLAIM_SOURCE = "learned_owner_voice_body_claim"
+LEARNED_OWNER_CLAIM_SOURCES = frozenset({LEARNED_OWNER_CLAIM_SOURCE, VOICE_OWNER_CLAIM_SOURCE})
 
 VOICE_BODY_SHAPES = {
     "vocal_phrase",
@@ -89,15 +89,11 @@ class LearnedOwnerCandidate:
 class LearnedOwnerAuthorityClaimProducer:
     """Emit learned owner claims after measured body validation.
 
-    Args:
-        None.
-
-    Side Effects:
-        None.
-
     Important Constraints:
-        The producer does not train, mutate brains, or finalize placement.  It
-        emits normal ``ConsensusClaim`` objects for the arbiter to compare.
+        The producer does not train, mutate brains, or finalize placement.
+        It emits normal ``ConsensusClaim`` objects for the arbiter to
+        compare. It may only speak for matched trainable memory lanes; raw
+        brain rank-one candidates belong to ordinary brain arbitration.
     """
 
     def produce(self, context: DecisionContext) -> list[ConsensusClaim]:
@@ -115,29 +111,60 @@ class LearnedOwnerAuthorityClaimProducer:
         Raises:
             No intentional exceptions.
         """
-        voice_candidate = self.voice_owner_candidate(context)
-        if voice_candidate is None:
+        owner_candidate = self.owner_candidate(context)
+        if owner_candidate is None:
             return []
+        claim_source = self._claim_source(owner_candidate)
         return [
             claim_from_folder_path(
-                folder_path=voice_candidate.target_path,
-                source=VOICE_OWNER_CLAIM_SOURCE,
+                folder_path=owner_candidate.target_path,
+                source=claim_source,
                 reason=(
-                    "learned owner claim: rank-one Voice memory/brain evidence "
-                    "was validated by measured voice/formant body facts before "
-                    f"broad role fallback; origin={voice_candidate.origin}; "
-                    f"evidence={voice_candidate.evidence_path}"
+                    "learned owner claim: matched trainable memory evidence "
+                    "was validated by measured body facts before broad static "
+                    f"fallback; origin={owner_candidate.origin}; "
+                    f"evidence={owner_candidate.evidence_path}"
                 ),
                 shared=context.raw.shared_candidates,
-                raw_candidate_score=self._claim_score(context.raw, voice_candidate),
+                raw_candidate_score=self._claim_score(context.raw, owner_candidate),
                 brain_rank=1,
                 physics_rank=None,
-                shared_winner=voice_candidate.target_path,
+                shared_winner=owner_candidate.target_path,
                 can_override=True,
-                strength=self._claim_strength(voice_candidate),
+                strength=self._claim_strength(owner_candidate),
                 is_real_candidate=True,
             )
         ]
+
+    def owner_candidate(self, context: DecisionContext) -> LearnedOwnerCandidate | None:
+        """Return the best trainable owner candidate authorized by body facts.
+
+        Args:
+            context: Decision context with raw claim, facts, and voter outputs.
+
+        Returns:
+            A learned owner candidate, or ``None`` when memory is missing,
+            weak, or contradicted by measured top-family evidence.
+
+        Side Effects:
+            None.
+
+        Raises:
+            No intentional exceptions.
+        """
+        candidate = self._best_owner_candidate_from_learned_lanes(context)
+        if candidate is None:
+            return None
+        if self._learned_memory_conflict_blocks_candidate(context, candidate):
+            return None
+        if not self._facts_support_owner_body(context, candidate):
+            return None
+        if candidate.target_path.startswith("Instruments/Voice") and self._measured_non_voice_instrument_conflicts(
+            context,
+            candidate,
+        ):
+            return None
+        return candidate
 
     def voice_owner_candidate(self, context: DecisionContext) -> LearnedOwnerCandidate | None:
         """Return a Voice owner candidate when learned evidence and body agree.
@@ -155,29 +182,26 @@ class LearnedOwnerAuthorityClaimProducer:
         Raises:
             No intentional exceptions.
         """
-        facts = context.facts
-        candidate = self._best_voice_candidate_from_learned_lanes(context)
-        if candidate is None:
-            return None
-        if self._learned_non_voice_memory_conflicts(context):
-            return None
-        if not self._facts_support_voice_owner_body(facts):
-            return None
-        if self._measured_non_voice_instrument_conflicts(context, candidate):
+        candidate = self.owner_candidate(context)
+        if candidate is None or not candidate.target_path.startswith("Instruments/Voice"):
             return None
         return candidate
+
+    def _best_owner_candidate_from_learned_lanes(
+        self,
+        context: DecisionContext,
+    ) -> LearnedOwnerCandidate | None:
+        candidates = self._candidates_from_memory_facts(context)
+        if not candidates:
+            return None
+        candidates.sort(key=lambda candidate: (-candidate.confidence, -candidate.support, candidate.score))
+        return candidates[0]
 
     def _best_voice_candidate_from_learned_lanes(
         self,
         context: DecisionContext,
     ) -> LearnedOwnerCandidate | None:
         candidates: list[LearnedOwnerCandidate] = []
-        from_brain = self._candidate_from_brain_result(context)
-        if from_brain is not None:
-            candidates.append(from_brain)
-        from_ensemble = self._candidate_from_ensemble_facts(context)
-        if from_ensemble is not None:
-            candidates.append(from_ensemble)
         from_memory = self._candidate_from_memory_facts(context)
         if from_memory is not None:
             candidates.append(from_memory)
@@ -186,115 +210,52 @@ class LearnedOwnerAuthorityClaimProducer:
         candidates.sort(key=lambda candidate: (-candidate.confidence, -candidate.support, candidate.score))
         return candidates[0]
 
-    def _candidate_from_brain_result(self, context: DecisionContext) -> LearnedOwnerCandidate | None:
-        result = context.brain_result
-        if result is None or not getattr(result, "guesses", None):
-            return None
-        top_guess = result.guesses[0]
-        if not self._guess_path_is_voice(top_guess):
-            return None
-        confidence = safe_float(getattr(top_guess, "confidence", 0.0))
-        support = self._guess_support(top_guess)
-        score = safe_float(getattr(top_guess, "score", 9999.0), 9999.0)
-        if confidence < 0.70 and support < 2.20 and score > 0.70:
-            return None
-        return LearnedOwnerCandidate(
-            target_path=self._voice_target_path(
-                context.facts,
-                str(top_guess.folder_path or top_guess.label or ""),
-            ),
-            evidence_path=str(top_guess.folder_path or top_guess.label or ""),
-            confidence=max(confidence, 0.74 if support >= 2.20 else 0.0),
-            support=support,
-            score=score,
-            origin="brain_result_rank_one",
-        )
-
-    def _candidate_from_ensemble_facts(self, context: DecisionContext) -> LearnedOwnerCandidate | None:
-        facts = context.facts
-        if facts is None or not isinstance(getattr(facts, "evidence", None), dict):
-            return None
-        ensemble = facts.evidence.get("brain_ensemble_vote_result")
-        guesses = ensemble.get("top_guesses") if isinstance(ensemble, dict) else []
-        if not isinstance(guesses, list) or not guesses or not isinstance(guesses[0], dict):
-            return None
-        top_guess = guesses[0]
-        top_path = self._row_path(top_guess)
-        if not self._path_is_voice(top_path):
-            return None
-        support = safe_float(top_guess.get("support", top_guess.get("ensemble_support", 0.0)))
-        confidence = safe_float(top_guess.get("confidence"))
-        score = safe_float(top_guess.get("score", top_guess.get("ensemble_score", 9999.0)), 9999.0)
-        non_voice_support = self._nearest_non_voice_support(guesses[1:6])
-        strong_margin = bool(
-            support >= 2.20
-            and (non_voice_support <= 0.0 or support >= non_voice_support + 0.65 or support >= non_voice_support * 1.35)
-        )
-        if confidence < 0.70 and not strong_margin and score > 0.70:
-            return None
-        return LearnedOwnerCandidate(
-            target_path=self._voice_target_path(facts, top_path),
-            evidence_path=top_path,
-            confidence=max(confidence, 0.76 if strong_margin else 0.0),
-            support=support,
-            score=score,
-            origin="brain_ensemble_rank_one",
-        )
-
     def _candidate_from_memory_facts(self, context: DecisionContext) -> LearnedOwnerCandidate | None:
-        facts = context.facts
-        if facts is None or not isinstance(getattr(facts, "evidence", None), dict):
-            return None
-        candidates: list[LearnedOwnerCandidate] = []
-        for key, origin in (
-            ("learned_voter_memory", "voter_memory"),
-            ("learned_physics_memory", "physics_memory"),
-        ):
-            memory = facts.evidence.get(key)
-            if not isinstance(memory, dict) or not bool(memory.get("matched")):
-                continue
-            label = str(memory.get("label", ""))
-            top_family = str(memory.get("top_family", ""))
-            if top_family not in {"Instruments", "FX"} or not self._path_is_voice(label):
-                continue
-            confidence = safe_float(memory.get("confidence"))
-            if confidence < 0.72:
-                continue
-            candidates.append(
-                LearnedOwnerCandidate(
-                    target_path=self._voice_target_path(facts, label),
-                    evidence_path=label,
-                    confidence=confidence,
-                    support=float(safe_int(memory.get("effective_weight"))),
-                    score=safe_float(memory.get("nearest_distance"), 9999.0),
-                    origin=origin,
-                )
-            )
+        candidates = [
+            candidate
+            for candidate in self._candidates_from_memory_facts(context)
+            if candidate.target_path.startswith("Instruments/Voice")
+        ]
         if not candidates:
             return None
         candidates.sort(key=lambda candidate: (-candidate.confidence, -candidate.support, candidate.score))
         return candidates[0]
 
-    def _learned_non_voice_memory_conflicts(self, context: DecisionContext) -> bool:
-        """Return True when learned memory has a closer non-voice owner match."""
+    def _candidates_from_memory_facts(self, context: DecisionContext) -> list[LearnedOwnerCandidate]:
         facts = context.facts
         if facts is None or not isinstance(getattr(facts, "evidence", None), dict):
+            return []
+        candidates: list[LearnedOwnerCandidate] = []
+        for memory in iter_learned_memory_matches(facts, minimum_confidence=0.72):
+            target_path = self._target_path_for_memory(facts, memory)
+            if target_path is None:
+                continue
+            candidates.append(
+                LearnedOwnerCandidate(
+                    target_path=target_path,
+                    evidence_path=memory.label,
+                    confidence=memory.confidence,
+                    support=float(memory.effective_weight),
+                    score=memory.nearest_distance,
+                    origin=memory.origin,
+                )
+            )
+        return candidates
+
+    def _learned_non_voice_memory_conflicts(self, context: DecisionContext) -> bool:
+        """Return True when learned memory has a closer non-voice owner match."""
+        return has_non_voice_memory_match(context.facts, minimum_confidence=0.86)
+
+    def _learned_memory_conflict_blocks_candidate(
+        self,
+        context: DecisionContext,
+        candidate: LearnedOwnerCandidate,
+    ) -> bool:
+        """Return True when another memory lane clearly owns another source."""
+        if candidate.confidence >= 0.94 or candidate.support >= 512.0:
             return False
-        for key in ("learned_voter_memory", "learned_physics_memory"):
-            memory = facts.evidence.get(key)
-            if not isinstance(memory, dict) or not bool(memory.get("matched")):
-                continue
-            confidence = safe_float(memory.get("confidence"))
-            if confidence < 0.86:
-                continue
-            label = str(memory.get("label", ""))
-            top_family = str(memory.get("top_family", ""))
-            branch = str(memory.get("branch", ""))
-            role = str(memory.get("role", ""))
-            if self._memory_target_is_voice(label=label, top_family=top_family, branch=branch, role=role):
-                continue
-            if top_family in {"Instruments", "Drums", "FX"} or branch or role:
-                return True
+        if candidate.target_path.startswith("Instruments/Voice"):
+            return self._learned_non_voice_memory_conflicts(context)
         return False
 
     def _measured_non_voice_instrument_conflicts(
@@ -315,7 +276,7 @@ class LearnedOwnerAuthorityClaimProducer:
         if physics_guess is None or str(physics_guess.top_family) != "Instruments":
             return False
         physics_path = str(physics_guess.folder_path or physics_guess.label or "")
-        if not physics_path or self._path_is_voice(physics_path):
+        if not physics_path or is_voice_category_path(physics_path):
             return False
         facts = context.facts
         if facts is None:
@@ -344,12 +305,16 @@ class LearnedOwnerAuthorityClaimProducer:
             return False
         return bool(voice_body <= non_voice_body + 0.12 and voice_body < 0.82)
 
-    def _facts_support_voice_owner_body(self, facts: SharedAudioFacts | None) -> bool:
+    def _facts_support_voice_owner_body(
+        self,
+        facts: SharedAudioFacts | None,
+        candidate: LearnedOwnerCandidate,
+    ) -> bool:
         if facts is None:
             return False
         shape = _shape_vote_from_facts(facts)
         confidence = _shape_confidence_from_facts(facts)
-        if shape not in VOICE_BODY_SHAPES or confidence < 0.62:
+        if not self._shape_authorizes_voice_owner_body(facts, candidate, shape, confidence):
             return False
         voice_body = self._voice_body_score(facts)
         hard_drum = max(
@@ -374,7 +339,231 @@ class LearnedOwnerAuthorityClaimProducer:
             return False
         if transition_fx >= 0.68 and shape not in {"vocal_phrase", "vocal_one_shot"}:
             return False
+        vocal_role = max(
+            _role_strength_from_facts(facts, "vocal_music_phrase"),
+            _role_strength_from_facts(facts, "voiced_one_shot"),
+            _direct_body_role_strength_from_facts(facts, "vocal_music_phrase"),
+            _direct_body_role_strength_from_facts(facts, "voiced_one_shot"),
+        )
+        if _direct_voice_source_score_from_facts(facts) < 0.62 and vocal_role < 0.40:
+            return False
+        if _voice_claim_has_tonal_instrument_conflict(facts):
+            return False
         return bool(voice_body >= 0.40 and percussive_ratio <= 0.72 and drumlike_ratio <= 0.72)
+
+    def _shape_authorizes_voice_owner_body(
+        self,
+        facts: SharedAudioFacts,
+        candidate: LearnedOwnerCandidate,
+        shape: str,
+        confidence: float,
+    ) -> bool:
+        """Return whether shape evidence may coexist with learned Voice memory.
+
+        Strong learned memory owns source identity. ShapeVoter only describes
+        structure, and processed rap/vocal loops can look alert-like because
+        pitch contour, filtering, or repeats resemble sirens. Keep those
+        teachable only when direct voice evidence is present and measured
+        drum/transition evidence does not dominate.
+        """
+        if shape in VOICE_BODY_SHAPES and confidence >= 0.62:
+            return True
+        strong_memory = candidate.confidence >= 0.90 or candidate.support >= 512.0
+        if not strong_memory or confidence < 0.58:
+            return False
+        if shape not in {"siren_alarm_tone", "hybrid_fx_motion", "designed_tonal_fx", "designed_low_fx"}:
+            return False
+        voice_body = self._voice_body_score(facts)
+        direct_voice = max(
+            _direct_voice_source_score_from_facts(facts),
+            self._score(facts, "human_spoken_voice_score"),
+            self._score(facts, "human_breath_mouth_score"),
+        )
+        hard_drum = max(
+            self._score(facts, "drum_hit_score"),
+            self._score(facts, "drum_loop_source_score"),
+            self._score(facts, "drum_kick_source_score"),
+            self._score(facts, "drum_snare_source_score"),
+            self._score(facts, "drum_clap_source_score"),
+        )
+        transition_fx = max(
+            self._score(facts, "fx_motion_score"),
+            self._score(facts, "fx_transition_authority_score"),
+            self._score(facts, "fx_riser_build_score"),
+            self._score(facts, "fx_drop_downlifter_score"),
+            self._score(facts, "fx_whoosh_sweep_score"),
+        )
+        return bool(voice_body >= 0.46 and direct_voice >= 0.62 and hard_drum < 0.62 and transition_fx < 0.62)
+
+    def _facts_support_owner_body(
+        self,
+        context: DecisionContext,
+        candidate: LearnedOwnerCandidate,
+    ) -> bool:
+        """Return whether measured facts authorize a learned owner target.
+
+        This is intentionally a top-family/body contract, not a static leaf
+        classifier. The learned memory owns the label. Code only blocks obvious
+        catastrophic family mismatches.
+        """
+        facts = context.facts
+        if facts is None:
+            return False
+        target_top = candidate.target_path.split("/", 1)[0]
+        if candidate.target_path.startswith("Instruments/Voice"):
+            return self._facts_support_voice_owner_body(facts, candidate)
+        if target_top == "Drums":
+            return self._facts_support_drum_owner_body(facts, candidate)
+        if target_top == "Instruments":
+            return self._facts_support_instrument_owner_body(facts, candidate)
+        if target_top == "FX":
+            return self._facts_support_fx_owner_body(facts, candidate)
+        return False
+
+    def _facts_support_drum_owner_body(
+        self,
+        facts: SharedAudioFacts,
+        candidate: LearnedOwnerCandidate,
+    ) -> bool:
+        drum_body = max(
+            self._score(facts, "drum_hit_score"),
+            self._score(facts, "drum_loop_source_score"),
+            self._score(facts, "drum_kick_source_score"),
+            self._score(facts, "drum_snare_source_score"),
+            self._score(facts, "drum_clap_source_score"),
+            self._score(facts, "drum_tom_conga_source_score"),
+            self._score(facts, "drum_metallic_percussion_source_score"),
+            self._score(facts, "compact_struck_tonal_percussion_score"),
+        )
+        shape = _shape_vote_from_facts(facts)
+        confidence = _shape_confidence_from_facts(facts)
+        percussive_ratio = _shape_metric_from_facts(facts, "percussive_event_ratio")
+        drumlike_ratio = _shape_metric_from_facts(facts, "drumlike_frame_ratio")
+        strong_memory = candidate.confidence >= 0.90 or candidate.support >= 512.0
+        return bool(
+            drum_body >= (0.46 if strong_memory else 0.58)
+            or (
+                shape in {"single_hit", "hit_with_tail", "beat_loop", "top_loop", "drum_loop"}
+                and confidence >= 0.70
+                and max(percussive_ratio, drumlike_ratio) >= (0.22 if strong_memory else 0.34)
+            )
+        )
+
+    def _facts_support_instrument_owner_body(
+        self,
+        facts: SharedAudioFacts,
+        candidate: LearnedOwnerCandidate,
+    ) -> bool:
+        shape = _shape_vote_from_facts(facts)
+        confidence = _shape_confidence_from_facts(facts)
+        pitched_ratio = _shape_metric_from_facts(facts, "pitched_event_ratio")
+        tonal_ratio = _shape_metric_from_facts(facts, "sustained_tonal_frame_ratio")
+        percussive_ratio = _shape_metric_from_facts(facts, "percussive_event_ratio")
+        drumlike_ratio = _shape_metric_from_facts(facts, "drumlike_frame_ratio")
+        instrument_body = max(
+            self._score(facts, "woodwind_sax_score"),
+            self._score(facts, "reed_wind_score"),
+            self._score(facts, "reed_wind_authority_score"),
+            self._score(facts, "plucked_string_score"),
+            self._score(facts, "plucked_string_authority_score"),
+            self._score(facts, "struck_keys_score"),
+            self._score(facts, "struck_keys_authority_score"),
+            self._score(facts, "synth_tonal_source_score"),
+            self._score(facts, "bass_synth_score"),
+            self._score(facts, "bass_electric_score"),
+            self._score(facts, "bowed_string_score"),
+            self._score(facts, "pitched_mallet_instrument_score"),
+        )
+        voice_body = self._voice_body_score(facts)
+        hard_drum = max(
+            self._score(facts, "drum_hit_score"),
+            self._score(facts, "drum_loop_source_score"),
+            self._score(facts, "drum_kick_source_score"),
+            self._score(facts, "compact_struck_tonal_percussion_score"),
+        )
+        transition_fx = max(
+            self._score(facts, "fx_motion_score"),
+            self._score(facts, "fx_transition_authority_score"),
+            self._score(facts, "fx_riser_build_score"),
+            self._score(facts, "fx_whoosh_sweep_score"),
+        )
+        strong_memory = candidate.confidence >= 0.90 or candidate.support >= 512.0
+        if hard_drum >= 0.78 and max(percussive_ratio, drumlike_ratio) >= 0.48:
+            return False
+        if transition_fx >= 0.82 and shape in {"transition_riser", "transition_drop", "whoosh_sweep"}:
+            return False
+        if voice_body >= 0.70 and instrument_body < voice_body - 0.16:
+            return False
+        return bool(
+            instrument_body >= (0.34 if strong_memory else 0.48)
+            or (
+                shape
+                in {
+                    "pitched_phrase",
+                    "pitched_phrase_shape",
+                    "pitched_repetition_phrase",
+                    "repeated_phrase_loop",
+                    "bass_phrase",
+                    "solo_phrase",
+                    "sustained_pad",
+                    "vocal_phrase",
+                    "designed_tonal_fx",
+                }
+                and confidence >= 0.62
+                and max(pitched_ratio, tonal_ratio) >= (0.28 if strong_memory else 0.44)
+                and max(percussive_ratio, drumlike_ratio) <= 0.80
+            )
+        )
+
+    def _facts_support_fx_owner_body(
+        self,
+        facts: SharedAudioFacts,
+        candidate: LearnedOwnerCandidate,
+    ) -> bool:
+        shape = _shape_vote_from_facts(facts)
+        confidence = _shape_confidence_from_facts(facts)
+        fx_body = max(
+            self._score(facts, "fx_motion_score"),
+            self._score(facts, "fx_transition_authority_score"),
+            self._score(facts, "fx_riser_build_score"),
+            self._score(facts, "fx_drop_downlifter_score"),
+            self._score(facts, "fx_whoosh_sweep_score"),
+            self._score(facts, "fx_reverse_score"),
+            self._score(facts, "fx_impact_score"),
+            self._score(facts, "fx_blip_beep_score"),
+            self._score(facts, "fx_glitch_stutter_score"),
+            self._score(facts, "fx_formant_score"),
+            self._score(facts, "fx_foley_material_score"),
+            self._score(facts, "texture_bed_score"),
+        )
+        hard_drum = max(
+            self._score(facts, "drum_hit_score"),
+            self._score(facts, "drum_loop_source_score"),
+            self._score(facts, "drum_kick_source_score"),
+            self._score(facts, "drum_snare_source_score"),
+        )
+        strong_memory = candidate.confidence >= 0.90 or candidate.support >= 512.0
+        if hard_drum >= 0.82 and shape in {"single_hit", "beat_loop", "top_loop", "drum_loop"}:
+            return False
+        return bool(
+            fx_body >= (0.34 if strong_memory else 0.52)
+            or (
+                shape
+                in {
+                    "transition_riser",
+                    "transition_drop",
+                    "whoosh_sweep",
+                    "reverse_swell",
+                    "hit_with_tail",
+                    "ui_blip",
+                    "designed_low_fx",
+                    "designed_tonal_fx",
+                    "texture_bed",
+                    "foley_action",
+                }
+                and confidence >= (0.58 if strong_memory else 0.70)
+            )
+        )
 
     def _voice_body_score(self, facts: SharedAudioFacts) -> float:
         """Return the strongest measured voice/formant body score."""
@@ -388,7 +577,7 @@ class LearnedOwnerAuthorityClaimProducer:
         )
 
     def _voice_target_path(self, facts: SharedAudioFacts | None, evidence_path: str) -> str:
-        normalized = _norm_path(evidence_path)
+        normalized = str(evidence_path or "").replace("\\", "/").strip("/").lower()
         if normalized.startswith("instruments/voice"):
             return str(evidence_path).strip("/")
         duration = _feature_number_from_facts(facts, "duration_sec")
@@ -404,6 +593,31 @@ class LearnedOwnerAuthorityClaimProducer:
             return "Instruments/Voice/Vocal Loops/Loops"
         return "Instruments/Voice/Phrase/One Shots"
 
+    def _target_path_for_memory(
+        self,
+        facts: SharedAudioFacts | None,
+        memory: LearnedMemoryMatch,
+    ) -> str | None:
+        """Return the product folder owned by a memory row."""
+        if memory.confidence < 0.72:
+            return None
+        normalized_label = str(memory.label or "").strip("/")
+        if not normalized_label or normalized_label.lower().startswith("_to_review"):
+            return None
+        if memory.is_voice_source:
+            return self._voice_target_path(facts, normalized_label)
+        target_top = normalized_label.split("/", 1)[0]
+        if target_top not in {"Drums", "Instruments", "FX"}:
+            return None
+        return normalized_label
+
+    @staticmethod
+    def _claim_source(candidate: LearnedOwnerCandidate) -> str:
+        """Return the stable source id for a learned owner claim."""
+        if candidate.target_path.startswith("Instruments/Voice"):
+            return VOICE_OWNER_CLAIM_SOURCE
+        return LEARNED_OWNER_CLAIM_SOURCE
+
     @staticmethod
     def _claim_strength(candidate: LearnedOwnerCandidate) -> float:
         support_bonus = 0.03 if candidate.support >= 2.20 else 0.0
@@ -418,67 +632,11 @@ class LearnedOwnerAuthorityClaimProducer:
         return raw_score
 
     @staticmethod
-    def _guess_path_is_voice(guess: CategoryGuess) -> bool:
-        return LearnedOwnerAuthorityClaimProducer._path_is_voice(str(guess.folder_path or guess.label or ""))
-
-    @staticmethod
-    def _guess_support(guess: CategoryGuess) -> float:
-        evidence = getattr(guess, "evidence", {}) or {}
-        if not isinstance(evidence, dict):
-            return 0.0
-        return max(
-            safe_float(evidence.get("support")),
-            safe_float(evidence.get("ensemble_support")),
-            safe_float(evidence.get("human_override_effective_weight")),
-        )
-
-    @staticmethod
     def _top_physics_guess(context: DecisionContext) -> CategoryGuess | None:
         result = context.physics_result
         if result is None or not getattr(result, "guesses", None):
             return None
         return result.guesses[0]
-
-    @staticmethod
-    def _nearest_non_voice_support(rows: list[object]) -> float:
-        best = 0.0
-        for row in rows:
-            if not isinstance(row, dict):
-                continue
-            if LearnedOwnerAuthorityClaimProducer._path_is_voice(LearnedOwnerAuthorityClaimProducer._row_path(row)):
-                continue
-            best = max(best, safe_float(row.get("support", row.get("ensemble_support", 0.0))))
-        return best
-
-    @staticmethod
-    def _row_path(row: dict[str, Any]) -> str:
-        return str(row.get("folder_path") or row.get("path") or row.get("label") or "").strip("/")
-
-    @staticmethod
-    def _path_is_voice(path: str) -> bool:
-        normalized = _norm_path(path)
-        if normalized.startswith("instruments/voice") or normalized.startswith("fx/human and voice fx"):
-            return True
-        return any(fragment in normalized for fragment in VOICE_PATH_FRAGMENTS)
-
-    @staticmethod
-    def _memory_target_is_voice(*, label: str, top_family: str, branch: str, role: str) -> bool:
-        normalized_label = _norm_path(label)
-        normalized_role = str(role or "").lower()
-        normalized_branch = str(branch or "").lower()
-        if LearnedOwnerAuthorityClaimProducer._path_is_voice(normalized_label):
-            return True
-        if str(top_family) == "Instruments" and normalized_branch == "voice":
-            return True
-        if "voice" in normalized_role or "vocal" in normalized_role:
-            return True
-        if str(top_family) == "FX" and (
-            normalized_branch in {"formantfx", "humancreaturefx"}
-            or "human_voice" in normalized_role
-            or "formant" in normalized_role
-        ):
-            return True
-        return False
 
     @staticmethod
     def _score(facts: SharedAudioFacts, key: str) -> float:
@@ -489,31 +647,3 @@ class LearnedOwnerAuthorityClaimProducer:
         if isinstance(flat, dict):
             best = max(best, safe_float(flat.get(key)))
         return best
-
-
-def safe_float(value: object, default: float = 0.0) -> float:
-    """Return ``value`` as a finite float, or ``default``.
-
-    Args:
-        value: Object to coerce.
-        default: Fallback value when coercion fails.
-
-    Returns:
-        Finite float value.
-
-    Side Effects:
-        None.
-    """
-    try:
-        number = float(value)  # type: ignore[arg-type]
-    except Exception:
-        return default
-    return number if number == number else default
-
-
-def safe_int(value: object, default: int = 0) -> int:
-    """Return ``value`` as an integer, or ``default`` when parsing fails."""
-    try:
-        return int(float(value))  # type: ignore[arg-type]
-    except Exception:
-        return default

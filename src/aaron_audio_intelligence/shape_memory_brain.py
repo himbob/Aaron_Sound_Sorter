@@ -32,6 +32,77 @@ _METADATA_KEYS = (
     "scaler_std",
 )
 
+PITCH_REGISTER_SENSITIVE_MEMORY_FEATURES = frozenset(
+    {
+        "f0_median_hz",
+        "low_peak_frequency_hz",
+        "top1_peak_frequency_hz",
+        "top2_peak_frequency_hz",
+        "top3_peak_frequency_hz",
+    }
+)
+
+SHAPE_ROLE_MEMORY_FEATURES = frozenset(
+    {
+        "log_rolloff85_hz",
+        "log_crest",
+        "spectral_flux_mean",
+        "spectral_flatness_mean",
+        "spectral_entropy_mean",
+        "log_decay_ratio",
+        "stereo_width",
+        "mid_side_ratio",
+        "centroid_slope_norm",
+        "log_transient_count",
+        "zcr_mean",
+        "temporal_centroid_ratio",
+        "onset_interval_regularity",
+        "attack_rise_time_norm",
+        "onset_span_ratio",
+        "event_rate_hz",
+        "tail_energy_ratio",
+        "spectral_flux_variance",
+        "attack_flatness",
+        "body_flatness",
+        "tail_flatness",
+        "attack_entropy",
+        "body_entropy",
+        "tail_entropy",
+        "attack_zcr",
+        "body_zcr",
+        "tail_zcr",
+        "attack_high_ratio",
+        "body_high_ratio",
+        "tail_high_ratio",
+        "attack_low_ratio",
+        "body_low_ratio",
+        "tail_low_ratio",
+        "noise_burst_duration_ms",
+        "high_band_decay_slope",
+        "spectral_centroid_decay_slope",
+        "noise_tail_decay_slope",
+        "attack_noise_ratio",
+        "body_noise_ratio",
+        "tail_noise_ratio",
+        "sub_attack_time_ms",
+        "sub_decay_time_ms",
+        "sub_to_click_offset_ms",
+        "sub_sustain_ratio",
+        "loop_pitched_event_ratio",
+        "loop_percussive_event_ratio",
+        "loop_noisy_event_ratio",
+        "loop_event_timbre_diversity",
+        "loop_sustained_tonal_frame_ratio",
+        "loop_drumlike_frame_ratio",
+        "loop_tonal_to_percussive_balance",
+        "loop_mean_event_pitch_confidence",
+        "loop_mean_event_noise_ratio",
+        "loop_mean_event_low_ratio",
+        "loop_mean_event_high_ratio",
+        "loop_non_event_tonal_ratio",
+    }
+)
+
 
 @dataclass(frozen=True)
 class ShapeMemoryMatch:
@@ -317,17 +388,26 @@ def shape_memory_match_for_facts(
     query = weighted_normalized_vector(brain, feature_vector)
     if query.size <= 0:
         return no_shape_memory_match()
+    shape_signature_query = weighted_normalized_signature_vector(
+        brain,
+        feature_vector,
+        include_feature_names=SHAPE_ROLE_MEMORY_FEATURES,
+        exclude_feature_names=PITCH_REGISTER_SENSITIVE_MEMORY_FEATURES,
+        minimum_feature_count=24,
+    )
 
     best_shape = ""
     best_distance = float("inf")
     best_count = 0
     best_weight = 0
+    best_match_kind = "teacher_shape_cloud"
     for shape, examples in examples_by_shape.items():
         if not isinstance(examples, list):
             continue
         valid_count = 0
         effective_weight = 0
         nearest = float("inf")
+        nearest_kind = "teacher_shape_cloud"
         for example in examples:
             if not isinstance(example, dict):
                 continue
@@ -335,19 +415,36 @@ def shape_memory_match_for_facts(
             if vector.size <= 0:
                 continue
             weighted_example = weighted_normalized_vector(brain, vector)
-            usable = min(query.size, weighted_example.size)
-            if usable <= 0:
-                continue
-            distance = float(np.linalg.norm(query[:usable] - weighted_example[:usable]))
+            distance = scaled_vector_distance(query, weighted_example)
+            shape_signature_example = weighted_normalized_signature_vector(
+                brain,
+                vector,
+                include_feature_names=SHAPE_ROLE_MEMORY_FEATURES,
+                exclude_feature_names=PITCH_REGISTER_SENSITIVE_MEMORY_FEATURES,
+                minimum_feature_count=24,
+            )
+            signature_distance = scaled_vector_distance(
+                shape_signature_query,
+                shape_signature_example,
+                reference_size=query.size,
+            )
+            if signature_distance < distance:
+                distance = signature_distance
+                candidate_kind = "teacher_shape_signature_cloud"
+            else:
+                candidate_kind = "teacher_shape_cloud"
             if math.isfinite(distance):
                 valid_count += 1
-                nearest = min(nearest, distance)
+                if distance < nearest:
+                    nearest = distance
+                    nearest_kind = candidate_kind
                 effective_weight = max(effective_weight, safe_int(example.get("human_override_evidence_weight")))
         if valid_count > 0 and nearest < best_distance:
             best_shape = str(shape)
             best_distance = nearest
             best_count = valid_count
             best_weight = effective_weight
+            best_match_kind = nearest_kind
 
     if not best_shape:
         return no_shape_memory_match()
@@ -357,7 +454,11 @@ def shape_memory_match_for_facts(
     confidence = 0.0
     if matched:
         exact_threshold = min(1.35, max(0.24, 0.24 + math.log1p(max(1, best_weight)) / 10.5))
-        match_kind = "fingerprint" if best_distance <= exact_threshold else "teacher_shape_cloud"
+        match_kind = (
+            "fingerprint"
+            if best_match_kind == "teacher_shape_cloud" and best_distance <= exact_threshold
+            else best_match_kind
+        )
         distance_ratio = min(1.0, best_distance / max(threshold, 1e-6))
         confidence = min(0.96, max(0.68, 0.96 - 0.24 * distance_ratio + math.log1p(max(1, best_count)) / 30.0))
     return ShapeMemoryMatch(
@@ -615,6 +716,84 @@ def weighted_normalized_vector(
     weights = pad_vector(np.asarray(brain.get("feature_weights", FEATURE_WEIGHTS), dtype=np.float32), 1.0)
     safe_std = np.where(np.abs(std) < 1e-6, 1.0, std)
     return ((vector - mean) / safe_std * weights).astype(np.float32)
+
+
+def weighted_normalized_signature_vector(
+    brain: dict[str, Any],
+    values: tuple[float, ...] | list[float] | np.ndarray,
+    *,
+    include_feature_names: frozenset[str] | set[str] | tuple[str, ...],
+    exclude_feature_names: frozenset[str] | set[str] | tuple[str, ...] = (),
+    include_feature_prefixes: tuple[str, ...] = (),
+    minimum_feature_count: int = 8,
+    fallback_width: int | None = None,
+) -> np.ndarray:
+    """Return a named, weighted feature signature for learned-memory matching.
+
+    Args:
+        brain: Brain metadata containing feature names, scaler, and weights.
+        values: Raw fingerprint values.
+        include_feature_names: Exact feature names to keep.
+        exclude_feature_names: Exact feature names to remove even if included.
+        include_feature_prefixes: Feature-name prefixes to keep, such as MFCC
+            families.
+        minimum_feature_count: Minimum named features required before using the
+            named signature.
+        fallback_width: Optional leading weighted-vector width for test brains
+            that lack real feature names. ``None`` returns the full vector.
+
+    Returns:
+        Weighted normalized signature vector.
+
+    Side Effects:
+        None.
+    """
+    weighted = weighted_normalized_vector(brain, values)
+    if weighted.size <= 0:
+        return np.asarray([], dtype=np.float32)
+    names = [str(name) for name in brain.get("feature_names", [])]
+    include_names = {str(name) for name in include_feature_names}
+    exclude_names = {str(name) for name in exclude_feature_names}
+    selected: list[int] = []
+    for index, feature_name in enumerate(names[: weighted.size]):
+        exact_match = feature_name in include_names
+        prefix_match = any(feature_name.startswith(prefix) for prefix in include_feature_prefixes)
+        if (exact_match or prefix_match) and feature_name not in exclude_names:
+            selected.append(index)
+    if len(selected) < max(1, int(minimum_feature_count)):
+        if fallback_width is None:
+            return weighted.astype(np.float32)
+        return weighted[: min(max(1, int(fallback_width)), weighted.size)].astype(np.float32)
+    return weighted[np.asarray(selected, dtype=np.int64)].astype(np.float32)
+
+
+def scaled_vector_distance(
+    query: np.ndarray,
+    example: np.ndarray,
+    *,
+    reference_size: int | None = None,
+) -> float:
+    """Return a finite Euclidean distance scaled to a comparable width.
+
+    Args:
+        query: Weighted query vector.
+        example: Weighted stored example vector.
+        reference_size: Optional vector width used to scale compact signatures
+            into the same rough distance range as full fingerprints.
+
+    Returns:
+        Finite distance, or infinity when either vector is empty.
+
+    Side Effects:
+        None.
+    """
+    usable = min(int(query.size), int(example.size))
+    if usable <= 0:
+        return float("inf")
+    distance = float(np.linalg.norm(query[:usable] - example[:usable]))
+    if reference_size is not None and reference_size > usable:
+        distance *= math.sqrt(float(reference_size) / float(usable))
+    return distance
 
 
 def pad_vector(values: np.ndarray, fill: float) -> np.ndarray:

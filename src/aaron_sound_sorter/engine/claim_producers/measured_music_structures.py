@@ -22,11 +22,14 @@ from aaron_sound_sorter.engine.claim_contracts import is_rank_one_concrete_non_s
 from aaron_sound_sorter.engine.decision_context import DecisionContext
 from aaron_sound_sorter.engine.decision_helpers import (
     _feature_number_from_facts,
+    _instrument_paths_share_source_branch,
+    _instrument_source_branch_names,
     _measured_role_from_facts,
     _norm_path,
     _shape_confidence_from_facts,
     _shape_metric_from_facts,
     _shape_vote_from_facts,
+    _top_physics_guess_path_from_facts,
 )
 from aaron_sound_sorter.engine.family_claims import ConsensusClaim, claim_from_folder_path
 from aaron_sound_sorter.voters.scoring_tools import role_strength
@@ -83,6 +86,8 @@ class MeasuredMusicStructureClaimProducer:
         material is weak.
         """
         facts = context.facts
+        if self._branch_consensus_blocks_weak_voice_claim(context):
+            return None
         if not self._facts_support_voice_instrument_loop(facts):
             return None
         raw = context.raw
@@ -104,6 +109,97 @@ class MeasuredMusicStructureClaimProducer:
             ),
             strength=0.98,
         )
+
+    def _branch_consensus_blocks_weak_voice_claim(self, context: DecisionContext) -> bool:
+        """Return True when non-voice instrument branch agreement outranks weak Voice.
+
+        Args:
+            context: Current decision context with raw Brain winner and shared
+                measured facts.
+
+        Returns:
+            True when the raw Brain winner is a concrete non-voice instrument,
+            PhysicsVoter's top guess supports the same broad source branch, and
+            the measured voice evidence is not strong enough to override that
+            branch agreement.
+
+        Side Effects:
+            None.
+        """
+        facts = context.facts
+        if facts is None or context.raw.family != "Instruments":
+            return False
+        raw_path = _norm_path(context.raw.folder_path or context.raw.label)
+        raw_branches = _instrument_source_branch_names(raw_path)
+        if not raw_branches or "voice" in raw_branches or "instrument loops" in raw_path:
+            return False
+        physics_path = _top_physics_guess_path_from_facts(facts)
+        if not physics_path or not _instrument_paths_share_source_branch(raw_path, physics_path):
+            return False
+        if context.raw.brain_rank > 2:
+            return False
+        if self._safe_float(context.raw.raw_candidate_score, 9999.0) > 18.0:
+            return False
+        if self._facts_support_true_voice_role(facts):
+            return False
+        if self._facts_have_matched_voice_memory(facts):
+            return False
+        direct_voice = self._measured_score(
+            facts,
+            "voice_score",
+            "human_spoken_voice_score",
+            "human_breath_mouth_score",
+        )
+        core_voice = max(
+            self._measured_score(facts, "voice_score", "human_breath_mouth_score"),
+            _feature_number_from_facts(facts, "formant_light_voice_identity"),
+        )
+        roles = self._roles(facts)
+        vocal_role = max(
+            role_strength(roles, "vocal_music_phrase"),
+            role_strength(roles, "vocal_phrase"),
+            role_strength(roles, "vocal_one_shot"),
+            role_strength(roles, "voiced_one_shot"),
+        )
+        branch_score = self._compatible_instrument_branch_score(facts, raw_branches)
+        strong_voice = bool(core_voice >= 0.68 or (direct_voice >= 0.82 and vocal_role >= 0.50))
+        return bool(not strong_voice and vocal_role < 0.62 and branch_score >= 0.54)
+
+    def _facts_have_matched_voice_memory(self, facts: SharedAudioFacts | None) -> bool:
+        """Return True when learned user memory explicitly matches Voice."""
+        if facts is None or not isinstance(getattr(facts, "evidence", None), dict):
+            return False
+        for key in ("learned_voter_memory", "learned_physics_memory"):
+            memory = facts.evidence.get(key)
+            if not isinstance(memory, dict) or not memory.get("matched"):
+                continue
+            label = _norm_path(str(memory.get("label") or ""))
+            branch = _norm_path(str(memory.get("branch") or memory.get("role") or ""))
+            if label.startswith("instruments/voice") or branch in {"voice", "instrument_voice_loop"}:
+                return True
+        return False
+
+    def _compatible_instrument_branch_score(self, facts: SharedAudioFacts | None, branches: set[str]) -> float:
+        """Return measured branch support for a broad instrument branch set."""
+        score_names_by_branch = {
+            "brass_woodwinds": (
+                "reed_wind_score",
+                "reed_wind_authority_score",
+                "woodwind_sax_score",
+                "instrument_branch_Woodwinds",
+                "instrument_branch_Brass",
+            ),
+            "synth": ("synth_tonal_source_score", "synth_lead_score", "synth_chord_score", "synth_pad_score"),
+            "bass": ("bass_loop_score", "bass_synth_score", "bass_sub_score", "low_end_source_score"),
+            "keys": ("struck_keys_score", "struck_keys_authority_score", "keys_piano_score"),
+            "plucked": ("plucked_string_score", "plucked_string_authority_score", "guitar_acoustic_score"),
+            "strings": ("bowed_string_score", "strings_source_score", "instrument_branch_Strings"),
+            "mallet_bell": ("mallet_bell_score", "pitched_mallet_instrument_score", "instrument_branch_MalletBell"),
+        }
+        best = 0.0
+        for branch_name in branches:
+            best = max(best, self._measured_score(facts, *score_names_by_branch.get(branch_name, ())))
+        return best
 
     def _tonal_chord_or_voice_stab_claim(self, context: DecisionContext) -> ConsensusClaim | None:
         """Keep clean tonal/voice stabs out of drum and brittle plucked leaves."""

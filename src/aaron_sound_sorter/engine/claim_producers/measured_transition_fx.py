@@ -24,6 +24,7 @@ from aaron_sound_sorter.engine.decision_helpers import (
     _shape_vote_from_facts,
 )
 from aaron_sound_sorter.engine.family_claims import ConsensusClaim, claim_from_folder_path
+from aaron_sound_sorter.engine.measured_source_contracts import supports_clean_low_bass_phrase_owner
 from aaron_sound_sorter.voters.scoring_tools import role_strength
 
 MOTION_BRANCHES = {
@@ -1401,6 +1402,8 @@ class MeasuredTransitionFxClaimProducer:
         """Return True when measured bass-loop ownership should block FX."""
         if facts is None or not isinstance(getattr(facts, "evidence", None), dict):
             return False
+        if supports_clean_low_bass_phrase_owner(facts):
+            return True
         brain_label = self._brain_ensemble_top_label(facts).lower()
         if not brain_label.startswith("instruments/bass/"):
             return False

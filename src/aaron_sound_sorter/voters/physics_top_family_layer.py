@@ -318,6 +318,25 @@ class PhysicsTopFamilyLayer:
         rhythmic_break_loop = safe_float(
             instrument_evidence.get("instrument_subpanel_rhythmic_break_loop_score", 0.0), 0.0
         )
+        organic_percussion_direct_voice = max(
+            safe_float(instrument_evidence.get("instrument_subpanel_voice_score", 0.0), 0.0),
+            safe_float(instrument_evidence.get("instrument_subpanel_human_spoken_voice_score", 0.0), 0.0),
+            safe_float(instrument_evidence.get("instrument_subpanel_human_breath_mouth_score", 0.0), 0.0),
+            safe_float(instrument_evidence.get("instrument_human_voice_texture", 0.0), 0.0),
+        )
+        organic_percussion_reed_identity = max(
+            safe_float(instrument_evidence.get("instrument_subpanel_reed_wind_score", 0.0), 0.0),
+            safe_float(instrument_evidence.get("instrument_subpanel_reed_wind_authority_score", 0.0), 0.0),
+            safe_float(instrument_evidence.get("instrument_branch_Woodwinds", 0.0), 0.0),
+        )
+        organic_percussion_voice_role_signal = max(
+            role_value(roles, "vocal_music_phrase"),
+            role_value(roles, "voiced_one_shot"),
+            organic_percussion_direct_voice if organic_percussion_direct_voice >= 0.62 else 0.0,
+            organic_percussion_reed_identity if organic_percussion_reed_identity >= 0.62 else 0.0,
+            1.0 if bool(instrument_evidence.get("instrument_processed_vocal_shot_signal")) else 0.0,
+        )
+        organic_percussion_shape_support = shape_name in {"beat_loop", "top_loop", "drum_loop", "hybrid_fx_motion"}
         strong_repeated_event_drum_loop = bool(
             shape_name in {"beat_loop", "top_loop", "repeated_phrase_loop", "pitched_repetition_phrase"}
             and shape_confidence >= 0.72
@@ -392,6 +411,47 @@ class PhysicsTopFamilyLayer:
             and repeated_loop_score >= 0.62
             and (drum_anchor >= 0.45 or drum_loop_source >= 0.24 or drum_role >= 0.20 or low_drum_role >= 0.24)
         )
+        organic_percussion_loop = (
+            organic_percussion_loop_pressure(
+                hand_drum=safe_float(drum_evidence.get("drum_source_panel_hand_drum_membrane", 0.0), 0.0),
+                shaker_tambourine=safe_float(drum_evidence.get("drum_source_panel_shaker_tambourine", 0.0), 0.0),
+                scrape_rasp=safe_float(drum_evidence.get("drum_source_panel_guiro_scrape", 0.0), 0.0),
+                tom_conga=safe_float(drum_evidence.get("drum_source_panel_tom_conga", 0.0), 0.0),
+                drum_loop_source=drum_loop_source,
+                rhythmic_break_loop=rhythmic_break_loop,
+                drum_branch=drum_branch,
+                drum_branch_confidence=drum_branch_confidence,
+                event_count=event_count,
+                event_low=event_low,
+                repeated_loop_score=repeated_loop_score,
+                voice_role_signal=organic_percussion_voice_role_signal,
+                clean_low_bass_phrase=clean_low_bass_phrase,
+                tonal_instrument_loop_veto=tonal_instrument_loop_veto,
+            )
+            if organic_percussion_shape_support
+            else 0.0
+        )
+        if organic_percussion_loop >= 0.58 and instrument_anchor < max(0.94, drum_anchor + 0.38):
+            return (
+                "Drums",
+                max(drum_anchor, drum_branch_confidence, organic_percussion_loop, beat_loop_score),
+                {
+                    **drum_evidence,
+                    **instrument_evidence,
+                    **fx_evidence,
+                    "physics_top_layer_source": "organic_percussion_loop_source_layer",
+                    "physics_top_layer_organic_percussion_loop_pressure": round(float(organic_percussion_loop), 6),
+                    "physics_top_layer_drum_branch": drum_branch,
+                    "physics_top_layer_drum_branch_confidence": round(float(drum_branch_confidence), 6),
+                    "physics_top_layer_drum_anchor": round(float(drum_anchor), 6),
+                    "physics_top_layer_drum_loop_source_score": round(float(drum_loop_source), 6),
+                    "physics_top_layer_rhythmic_break_loop_score": round(float(rhythmic_break_loop), 6),
+                    "physics_top_layer_repeated_loop_score": round(float(repeated_loop_score), 6),
+                    "physics_top_layer_instrument_branch": instrument_branch,
+                    "physics_top_layer_instrument_branch_confidence": round(float(instrument_branch_confidence), 6),
+                    "physics_top_layer_instrument_anchor": round(float(instrument_anchor), 6),
+                },
+            )
         nonpercussive_pitched_loop_guard = bool(
             instrument_role >= 0.75
             and max(role_value(roles, "pitched_music_loop"), role_value(roles, "pitched_music_phrase")) >= 0.78
@@ -434,6 +494,62 @@ class PhysicsTopFamilyLayer:
                     "physics_top_layer_pitched_music_loop_role": round(
                         float(role_value(roles, "pitched_music_loop")), 6
                     ),
+                    "physics_top_layer_shape": shape_name,
+                    "physics_top_layer_shape_confidence": round(float(shape_confidence), 6),
+                },
+            )
+        voice_subpanel_strength = max(
+            safe_float(instrument_evidence.get("instrument_subpanel_voice_score", 0.0), 0.0),
+            safe_float(instrument_evidence.get("instrument_subpanel_human_spoken_voice_score", 0.0), 0.0),
+            safe_float(instrument_evidence.get("instrument_subpanel_fx_formant_score", 0.0), 0.0),
+            safe_float(instrument_evidence.get("instrument_human_voice_texture", 0.0), 0.0),
+            safe_float(instrument_evidence.get("instrument_rap_voice_texture", 0.0), 0.0),
+        )
+        voice_role_signal = max(
+            role_value(roles, "vocal_music_phrase"),
+            role_value(roles, "voiced_one_shot"),
+            safe_float(instrument_evidence.get("instrument_human_voice_texture", 0.0), 0.0),
+            safe_float(instrument_evidence.get("instrument_rap_voice_texture", 0.0), 0.0),
+            1.0 if bool(instrument_evidence.get("instrument_processed_vocal_shot_signal")) else 0.0,
+        )
+        measured_voice_family_protection = bool(
+            shape_name
+            in {
+                "vocal_phrase",
+                "pitched_repetition_phrase",
+                "pitched_phrase",
+                "pitched_phrase_shape",
+                "mixed_instrument_loop",
+                "instrument_plus_fx_loop",
+                "layered_phrase",
+                "solo_phrase",
+                "echo_tail_hit",
+                "hit_with_tail",
+            }
+            and shape_confidence >= 0.58
+            and voice_subpanel_strength >= 0.66
+            and voice_role_signal >= 0.50
+            and max(drum_loop_source, rhythmic_break_loop) <= 0.42
+            and max(loop_percussive, number(shape, "drumlike_frame_ratio", 0.0)) <= 0.32
+            and not (drum_role >= 0.65 and drum_anchor >= 0.64)
+            and not bool(drum_evidence.get("drum_anchor_low_sub_kick_exception"))
+        )
+        if measured_voice_family_protection:
+            return (
+                "Instruments",
+                max(instrument_anchor, instrument_branch_confidence, instrument_role, voice_subpanel_strength, 0.70),
+                {
+                    **drum_evidence,
+                    **instrument_evidence,
+                    **fx_evidence,
+                    "physics_top_layer_source": "measured_voice_family_protection",
+                    "physics_top_layer_voice_subpanel_strength": round(float(voice_subpanel_strength), 6),
+                    "physics_top_layer_voice_role_signal": round(float(voice_role_signal), 6),
+                    "physics_top_layer_drum_anchor": round(float(drum_anchor), 6),
+                    "physics_top_layer_drum_loop_source_score": round(float(drum_loop_source), 6),
+                    "physics_top_layer_rhythmic_break_loop_score": round(float(rhythmic_break_loop), 6),
+                    "physics_top_layer_instrument_branch": instrument_branch,
+                    "physics_top_layer_instrument_branch_confidence": round(float(instrument_branch_confidence), 6),
                     "physics_top_layer_shape": shape_name,
                     "physics_top_layer_shape_confidence": round(float(shape_confidence), 6),
                 },

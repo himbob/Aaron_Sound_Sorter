@@ -80,6 +80,10 @@ class PhysicsDrumLayer:
         sub_onset_pitched = safe_float(subpanel_flat.get("onset_pitched_onset_score", 0.0), 0.0)
         sub_onset_percussive = safe_float(subpanel_flat.get("onset_percussive_onset_score", 0.0), 0.0)
         sub_synth_tonal = safe_float(subpanel_flat.get("synth_tonal_source_score", 0.0), 0.0)
+        sub_voice = safe_float(subpanel_flat.get("voice_score", 0.0), 0.0)
+        sub_human_spoken_voice = safe_float(subpanel_flat.get("human_spoken_voice_score", 0.0), 0.0)
+        sub_voice_choir = safe_float(subpanel_flat.get("voice_choir_score", 0.0), 0.0)
+        sub_formant_fx = safe_float(subpanel_flat.get("fx_formant_score", 0.0), 0.0)
         sub_hand_drum_membrane = safe_float(subpanel_flat.get("hand_drum_membrane_score", 0.0), 0.0)
         sub_pitched_metal_percussion = safe_float(subpanel_flat.get("pitched_metal_percussion_score", 0.0), 0.0)
         sub_struck_wood = safe_float(subpanel_flat.get("struck_wood_score", 0.0), 0.0)
@@ -543,6 +547,50 @@ class PhysicsDrumLayer:
             ):
                 branch_scores[branch_name] = min(branch_scores[branch_name], 0.38)
             drum_anchor = min(drum_anchor, 0.42)
+        voice_formant_identity = max(sub_voice, sub_human_spoken_voice, sub_voice_choir, sub_formant_fx)
+        voice_phrase_or_loop_shape = shape_name in {
+            "vocal_phrase",
+            "pitched_repetition_phrase",
+            "pitched_phrase",
+            "pitched_phrase_shape",
+            "mixed_instrument_loop",
+            "instrument_plus_fx_loop",
+            "layered_phrase",
+            "solo_phrase",
+            "echo_tail_hit",
+        }
+        voiced_phrase_loop_stand_down = bool(
+            voice_phrase_or_loop_shape
+            and shape_confidence >= 0.58
+            and voice_formant_identity >= 0.66
+            and max(sub_voice, sub_human_spoken_voice) >= 0.52
+            and max(sub_drum_loop_source, sub_rhythmic_break_loop) <= 0.42
+            and max(loop_percussive, loop_drumlike) <= 0.32
+            and max(
+                safe_float(subpanel_flat.get("role_phrase_score", 0.0), 0.0),
+                safe_float(subpanel_flat.get("role_loop_score", 0.0), 0.0),
+                voiced_role,
+            )
+            >= safe_float(subpanel_flat.get("role_one_shot_score", 0.0), 0.0) - 0.06
+            and not (percussive_role >= 0.78 and sub_drum_loop_source >= 0.52)
+            and not low_sub_kick_exception
+            and not sub_struck_percussion_exception
+        )
+        if voiced_phrase_loop_stand_down:
+            for branch_name in (
+                "DrumLoop",
+                "TomOrConga",
+                "Snare",
+                "Clap",
+                "Hat",
+                "Cymbal",
+                "RimOrStick",
+                "ShakerTambourine",
+                "ScrapeGuiro",
+                "MetallicPercussion",
+            ):
+                branch_scores[branch_name] = min(branch_scores[branch_name], 0.34)
+            drum_anchor = min(drum_anchor, 0.38)
         if designed_fx_slow_tail_stand_down:
             for branch_name in (
                 "Snare",
@@ -584,6 +632,8 @@ class PhysicsDrumLayer:
             "drum_anchor_designed_fx_slow_tail_stand_down": bool(designed_fx_slow_tail_stand_down),
             "drum_anchor_shape_name": shape_name,
             "drum_anchor_shape_confidence": round(float(shape_confidence), 6),
+            "drum_voiced_phrase_loop_stand_down": bool(voiced_phrase_loop_stand_down),
+            "drum_voice_formant_identity": round(float(voice_formant_identity), 6),
             "drum_low_body": round(float(low_body), 6),
             "drum_high_noise": round(float(high_noise), 6),
             "drum_broadband_noise": round(float(broadband_noise), 6),

@@ -9,6 +9,7 @@ from dataclasses import dataclass
 
 from aaron_sound_sorter.domain.models import SharedAudioFacts, VoterResult
 from aaron_sound_sorter.engine.decision_helpers import (
+    _direct_voice_source_score_from_facts,
     _feature_number_from_facts,
     _measured_role_from_facts,
     _norm_path,
@@ -18,6 +19,7 @@ from aaron_sound_sorter.engine.decision_helpers import (
     _shape_confidence_from_facts,
     _shape_metric_from_facts,
     _shape_vote_from_facts,
+    _voice_claim_has_tonal_instrument_conflict,
     _voice_identity_from_facts,
 )
 from aaron_sound_sorter.engine.family_claims import (
@@ -2649,6 +2651,14 @@ class ProfileInstrumentClaimMixin:
             self._score_from_facts(facts, "voice_choir_score"),
             self._score_from_facts(facts, "fx_formant_score"),
         )
+        vocal_role = max(
+            _role_strength_from_facts(facts, "vocal_music_phrase"),
+            _role_strength_from_facts(facts, "voiced_one_shot"),
+        )
+        if _direct_voice_source_score_from_facts(facts) < 0.62 and vocal_role < 0.40:
+            return False
+        if _voice_claim_has_tonal_instrument_conflict(facts):
+            return False
         hard_drum = max(
             self._score_from_facts(facts, "drum_hit_score"),
             self._score_from_facts(facts, "drum_loop_source_score"),
@@ -2997,6 +3007,8 @@ class ProfileInstrumentClaimMixin:
             shape_confidence,
             facts,
         ):
+            return None
+        if self._facts_have_measured_drum_loop_authority(facts):
             return None
         if self._facts_support_clean_designed_tonal_keys_loop(facts):
             return None

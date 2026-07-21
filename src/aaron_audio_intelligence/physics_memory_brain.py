@@ -17,10 +17,13 @@ from typing import Any
 import numpy as np
 
 from aaron_audio_intelligence.shape_memory_brain import (
+    PITCH_REGISTER_SENSITIVE_MEMORY_FEATURES,
     example_fingerprint,
     pad_vector,
     safe_int,
+    scaled_vector_distance,
     shape_target_for_label,
+    weighted_normalized_signature_vector,
     weighted_normalized_vector,
 )
 from aaron_audio_intelligence.voter_memory_brain import VOTER_MEMORY_KEY
@@ -120,6 +123,13 @@ _PHYSICS_SIGNATURE_FEATURES = frozenset(
         "loop_non_event_tonal_ratio",
         "loop_true_repetition_score",
         "formant_like_peak_spacing",
+    }
+)
+
+_PHYSICS_REGISTER_INVARIANT_EXCLUSIONS = frozenset(
+    {
+        *PITCH_REGISTER_SENSITIVE_MEMORY_FEATURES,
+        "low_pitch_drop_hz_per_sec",
     }
 )
 
@@ -403,6 +413,7 @@ def physics_memory_match_for_facts(
     query = physics_signature_vector(brain, feature_vector)
     if query.size <= 0:
         return no_physics_memory_match()
+    register_invariant_query = physics_register_invariant_signature_vector(brain, feature_vector)
 
     best_target = ""
     best_top = ""
@@ -412,12 +423,14 @@ def physics_memory_match_for_facts(
     best_distance = float("inf")
     best_count = 0
     best_weight = 0
+    best_match_kind = "teacher_physics_cloud"
     for target_key, examples in examples_by_target.items():
         if not isinstance(examples, list):
             continue
         valid_count = 0
         effective_weight = 0
         nearest = float("inf")
+        nearest_kind = "teacher_physics_cloud"
         nearest_example: dict[str, Any] | None = None
         for example in examples:
             if not isinstance(example, dict):
@@ -426,21 +439,31 @@ def physics_memory_match_for_facts(
             if vector.size <= 0:
                 continue
             signature = physics_signature_vector(brain, vector)
-            usable = min(query.size, signature.size)
-            if usable <= 0:
-                continue
-            distance = float(np.linalg.norm(query[:usable] - signature[:usable]))
+            distance = scaled_vector_distance(query, signature)
+            invariant_signature = physics_register_invariant_signature_vector(brain, vector)
+            invariant_distance = scaled_vector_distance(
+                register_invariant_query,
+                invariant_signature,
+                reference_size=query.size,
+            )
+            if invariant_distance < distance:
+                distance = invariant_distance
+                candidate_kind = "teacher_physics_register_invariant_cloud"
+            else:
+                candidate_kind = "teacher_physics_cloud"
             if math.isfinite(distance):
                 valid_count += 1
                 effective_weight = max(effective_weight, safe_int(example.get("human_override_evidence_weight")))
                 if distance < nearest:
                     nearest = distance
+                    nearest_kind = candidate_kind
                     nearest_example = example
         if valid_count > 0 and nearest < best_distance:
             best_target = str(target_key)
             best_distance = nearest
             best_count = valid_count
             best_weight = effective_weight
+            best_match_kind = nearest_kind
             best_top = str(nearest_example.get("top_family", "")) if isinstance(nearest_example, dict) else ""
             best_branch = str(nearest_example.get("physics_branch", "")) if isinstance(nearest_example, dict) else ""
             best_label = str(nearest_example.get("approved_label", "")) if isinstance(nearest_example, dict) else ""
@@ -454,7 +477,11 @@ def physics_memory_match_for_facts(
     confidence = 0.0
     if matched:
         exact_threshold = min(1.20, max(0.18, 0.18 + math.log1p(max(1, best_weight)) / 12.0))
-        match_kind = "fingerprint" if best_distance <= exact_threshold else "teacher_physics_cloud"
+        match_kind = (
+            "fingerprint"
+            if best_match_kind == "teacher_physics_cloud" and best_distance <= exact_threshold
+            else best_match_kind
+        )
         distance_ratio = min(1.0, best_distance / max(threshold, 1e-6))
         confidence = min(0.96, max(0.66, 0.96 - 0.28 * distance_ratio + math.log1p(max(1, best_count)) / 30.0))
     return PhysicsMemoryMatch(
@@ -505,6 +532,34 @@ def physics_signature_vector(
     if len(selected) < 12:
         return weighted[: min(32, weighted.size)].astype(np.float32)
     return weighted[np.asarray(selected, dtype=np.int64)].astype(np.float32)
+
+
+def physics_register_invariant_signature_vector(
+    brain: dict[str, Any],
+    feature_vector: tuple[float, ...] | list[float] | np.ndarray,
+) -> np.ndarray:
+    """Return a physics signature that can generalize across key/register.
+
+    Args:
+        brain: Brain metadata containing feature names, scaler, and weights.
+        feature_vector: Raw feature vector for the query or teacher example.
+
+    Returns:
+        Weighted physics signature with exact pitch/register coordinates
+        removed. Falls back to the existing physics signature for test brains
+        without named production features.
+
+    Side Effects:
+        None.
+    """
+    return weighted_normalized_signature_vector(
+        brain,
+        feature_vector,
+        include_feature_names=_PHYSICS_SIGNATURE_FEATURES,
+        exclude_feature_names=_PHYSICS_REGISTER_INVARIANT_EXCLUSIONS,
+        minimum_feature_count=32,
+        fallback_width=32,
+    )
 
 
 def ensure_physics_memory_payload(brain: dict[str, Any]) -> dict[str, Any]:
