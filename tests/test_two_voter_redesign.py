@@ -391,6 +391,8 @@ def test_cli_uses_baby_brain_ensemble_by_default_with_disable_escape_hatch() -> 
 
     assert default_request.use_baby_brains_in_sort is True
     assert default_request.use_harmonic_brains_in_sort is False
+    assert default_request.use_neural_runtime is True
+    assert default_request.neural_project_root is not None
 
     disabled_args = parser.parse(["sort", "input.wav", "out", "--disable-baby-brain-ensemble"])
     disabled_request = request_from_args(disabled_args)
@@ -402,6 +404,11 @@ def test_cli_uses_baby_brain_ensemble_by_default_with_disable_escape_hatch() -> 
 
     assert opt_in_request.use_baby_brains_in_sort is True
     assert opt_in_request.use_harmonic_brains_in_sort is True
+
+    neural_disabled_args = parser.parse(["sort", "input.wav", "out", "--no-neural"])
+    neural_disabled_request = request_from_args(neural_disabled_args)
+
+    assert neural_disabled_request.use_neural_runtime is False
 
 
 def test_cli_exposes_persistent_measured_analysis_cache_flags(tmp_path: Path) -> None:

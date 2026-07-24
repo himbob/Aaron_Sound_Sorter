@@ -65,6 +65,23 @@ def test_prediction_uses_finite_reduction_without_matmul_warnings() -> None:
     assert np.isfinite(prediction.top_similarity)
 
 
+def test_label_similarities_exposes_content_scores_without_source_names() -> None:
+    index = PrototypeIndexBuilder().build(
+        {
+            "Instruments/Voice/Vocal Loops": [rec("p", "m", 1, [1.0, 0.0])],
+            "Instruments/Woodwinds/Saxophone": [rec("p", "m", 2, [0.0, 1.0])],
+        }
+    )
+
+    scores = index.label_similarities(rec("p", "m", 3, [0.2, 0.8]))
+
+    assert list(scores) == [
+        "Instruments/Woodwinds/Saxophone",
+        "Instruments/Voice/Vocal Loops",
+    ]
+    assert scores["Instruments/Woodwinds/Saxophone"] > scores["Instruments/Voice/Vocal Loops"]
+
+
 def test_failed_index_replacement_restores_previous_index(tmp_path, monkeypatch) -> None:
     original = PrototypeIndexBuilder().build(
         {

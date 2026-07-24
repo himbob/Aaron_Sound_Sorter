@@ -237,3 +237,57 @@ def test_versioned_prototype_rebuild_teaches_correction_and_is_filename_invarian
     assert np.array_equal(original_record.vector, renamed_record.vector)
     assert index.predict(original_record).predicted_label == SYNTH_LABEL
     assert index.predict(renamed_record).predicted_label == SYNTH_LABEL
+
+
+def test_sample_library_uri_restores_explicit_hash_verified_training_audio(tmp_path: Path) -> None:
+    sample_library_root = tmp_path / "external_samples"
+    external_audio = write_audio(sample_library_root / "pack" / "approved.wav", 510.0)
+    identity = audio_identity(external_audio)
+    split_path = tmp_path / "neural_artifacts/base/dataset_splits.csv"
+    split_path.parent.mkdir(parents=True, exist_ok=True)
+    with split_path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=[
+                "audio_path",
+                "intended_label",
+                "source_kind",
+                "allowed_use",
+                "duplicate_group_id",
+                "file_sha256",
+                "decoded_audio_sha256",
+                "normalized_audio_sha256",
+            ],
+            lineterminator="\n",
+        )
+        writer.writeheader()
+        writer.writerow(
+            {
+                "audio_path": "sample-library://pack/approved.wav",
+                "intended_label": VOICE_LABEL,
+                "source_kind": "locked_human_seed",
+                "allowed_use": "prototype_training",
+                "duplicate_group_id": "external_approved",
+                **identity,
+            }
+        )
+    provider = ContentVectorProvider({identity["file_sha256"]: np.array([0.0, 1.0], dtype=np.float32)})
+    inbox_path = tmp_path / "neural_artifacts/gui_training_inbox/current.csv"
+    trainer = NeuralPrototypeTrainer(
+        project_root=tmp_path,
+        provider=provider,
+        cache_root=tmp_path / "neural_artifacts/cache",
+        index_root=tmp_path / "neural_artifacts/indexes",
+        pointer_path=tmp_path / "config/runtime/index.txt",
+        base_split_path=split_path,
+        inbox_path=inbox_path,
+        training_root=tmp_path / "training",
+        sample_library_root=sample_library_root,
+    )
+
+    summary = trainer.rebuild()
+
+    assert summary.status == "built"
+    assert summary.training_example_count == 1
+    assert summary.missing_audio_hashes == ()
+    assert summary.index_path is not None

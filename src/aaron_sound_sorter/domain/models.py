@@ -128,6 +128,8 @@ class SortRequest:
     sort_workers: int = 1
     use_persistent_analysis_cache: bool = False
     analysis_cache_dir: Path | None = None
+    use_neural_runtime: bool = False
+    neural_project_root: Path | None = None
 
 
 @dataclass(frozen=True)

@@ -39,6 +39,12 @@ from aaron_sound_sorter.infrastructure.report_writer import (
     safe_folder_path,
     unique_path,
 )
+from aaron_sound_sorter.neural_audio.authority import (
+    has_decisive_loop_structure,
+    neural_defers_to_exact_human_teacher,
+    neural_owner_family,
+    neural_structure_conflicts,
+)
 from aaron_sound_sorter.neural_audio.gui_training import NeuralTrainingInbox
 from aaron_sound_sorter.neural_audio.runtime import (
     NeuralRuntimeBatch,
@@ -1122,10 +1128,10 @@ def apply_neural_runtime_authority(
 ) -> None:
     """Apply conservative category-wide neural ownership to GUI proposals.
 
-    A prediction inside a learned prototype neighborhood owns the proposal
-    unless measured structure contradicts it. Outside learned neighborhoods,
-    disagreement between broad source families becomes Review. This policy is
-    identical for voice, instruments, drums, and FX.
+    Exact human-trained content or a supported, separated learned neighborhood
+    owns the proposal unless measured structure contradicts it. Weak or sparse
+    neural disagreements become Review across voice, instruments, drums, and
+    FX.
     """
     predictions = {prediction.row_id: prediction for prediction in batch.predictions}
     for row in rows:
@@ -1142,6 +1148,10 @@ def _apply_neural_prediction(row: PreviewRow, prediction: NeuralRuntimePredictio
     neural_label = normalize_taxonomy_label(prediction.predicted_label)
     row.neural_folder = neural_label
     row.neural_known_distribution = prediction.known_distribution
+    row.neural_ownership_ready = prediction.ownership_ready
+    row.neural_ownership_reason = prediction.ownership_block_reason
+    row.neural_label_example_count = prediction.label_example_count
+    row.neural_exact_training_match = prediction.exact_training_match
     row.neural_similarity = prediction.top_similarity
     row.neural_margin = prediction.margin
     row.neural_radius_ratio = prediction.radius_ratio
@@ -1151,6 +1161,10 @@ def _apply_neural_prediction(row: PreviewRow, prediction: NeuralRuntimePredictio
     neural_summary = (
         f"neural={neural_label or 'none'} "
         f"(known={prediction.known_distribution}, "
+        f"ownership_ready={prediction.ownership_ready}, "
+        f"ownership_reason={prediction.ownership_block_reason or 'unspecified'}, "
+        f"label_examples={prediction.label_example_count}, "
+        f"exact_training={prediction.exact_training_match}, "
         f"similarity={prediction.top_similarity:.3f}, "
         f"margin={prediction.margin:.3f}, "
         f"radius_ratio={prediction.radius_ratio:.3f})"
@@ -1160,8 +1174,8 @@ def _apply_neural_prediction(row: PreviewRow, prediction: NeuralRuntimePredictio
         return
 
     legacy_label = row.proposed_folder
-    if prediction.known_distribution:
-        if _neural_structure_conflicts(row, neural_label):
+    if prediction.ownership_ready:
+        if row.result is not None and neural_structure_conflicts(row.result, neural_label):
             row.proposed_folder = "_TO_REVIEW/Measured Role Conflict"
             row.approved_folder = row.proposed_folder
             row.final_top = "_TO_REVIEW"
@@ -1177,51 +1191,26 @@ def _apply_neural_prediction(row: PreviewRow, prediction: NeuralRuntimePredictio
         row.consensus_status = "neural_known_distribution_owner"
         row.confidence = max(0.0, min(1.0, prediction.top_similarity))
         row.decision_reason = (
-            "Source-name-blind neural audio matched a learned prototype neighborhood "
+            "Source-name-blind neural audio had production-ready learned evidence "
             f"and took ownership from the legacy proposal ({legacy_label})."
         )
         return
 
-    legacy_owner = _neural_owner_family(legacy_label)
-    neural_owner = _neural_owner_family(neural_label)
+    if row.result is not None and neural_defers_to_exact_human_teacher(row.result, prediction):
+        row.neural_ownership_reason = "defer_to_exact_human_teacher"
+        return
+
+    legacy_owner = neural_owner_family(legacy_label)
+    neural_owner = neural_owner_family(neural_label)
     if legacy_owner and neural_owner and legacy_owner != neural_owner:
         row.proposed_folder = "_TO_REVIEW/Measured Role Conflict"
         row.approved_folder = row.proposed_folder
         row.final_top = "_TO_REVIEW"
         row.consensus_status = "neural_legacy_owner_conflict_review"
         row.decision_reason = (
-            "Neural audio was outside its learned radius and disagreed with the "
+            "Neural audio was not ready for production ownership and disagreed with the "
             f"legacy source family ({neural_owner} vs {legacy_owner}); forcing human review."
         )
-
-
-def _neural_owner_family(label: str) -> str:
-    """Return a broad source-family contract for conflict-only review."""
-    normalized = normalize_taxonomy_label(label)
-    lowered = normalized.lower()
-    if normalized.startswith("_TO_REVIEW/"):
-        return "review"
-    if normalized.startswith("Instruments/Voice/") or normalized.startswith("FX/Human and Voice FX/"):
-        return "voice"
-    if normalized.startswith("Drums/"):
-        return "drums"
-    if normalized.startswith("FX/"):
-        return "fx"
-    if normalized.startswith("Instruments/"):
-        return "instruments_nonvoice"
-    if "voice" in lowered or "vocal" in lowered:
-        return "voice"
-    return ""
-
-
-def _neural_structure_conflicts(row: PreviewRow, neural_label: str) -> bool:
-    """Return whether strong measured structure rejects a neural terminal."""
-    if row.result is None:
-        return False
-    terminal = taxonomy_label_contract(neural_label).structure_terminal
-    if has_decisive_loop_structure(row.result) and terminal == "One Shots":
-        return True
-    return bool(row.result.facts.is_single_event_like and terminal == "Loops")
 
 
 def decision_confidence(result: SortFileResult) -> float:
@@ -1299,86 +1288,6 @@ def detected_candidate_folders(result: SortFileResult, *, limit: int = 40) -> li
             if taxonomy_label_contract(candidate).structure_terminal != "One Shots"
         ]
     return candidates
-
-
-def has_decisive_loop_structure(result: SortFileResult) -> bool:
-    """Return True when measured structure rules out one-shot GUI suggestions.
-
-    Duration alone is not decisive because impacts, risers, and reverberant
-    hits can be long one-shots. This display gate requires the shared loop fact
-    plus a repeated-event, loop-role, or sustained tonal-loop contract.
-    """
-    facts = result.facts
-    if not facts.is_loop_like or facts.is_single_event_like:
-        return False
-    evidence = facts.evidence if isinstance(facts.evidence, dict) else {}
-    shape = evidence.get("shape_vote") if isinstance(evidence.get("shape_vote"), dict) else {}
-    roles = evidence.get("measured_roles") if isinstance(evidence.get("measured_roles"), dict) else {}
-    structure = evidence.get("structure_facts") if isinstance(evidence.get("structure_facts"), dict) else {}
-
-    shape_name = str(shape.get("primary_shape") or "")
-    shape_confidence = _preview_number(shape.get("confidence"))
-    event_count = max(
-        _preview_number(shape.get("onset_count")),
-        _preview_number(structure.get("event_count_estimate")),
-        _preview_number(evidence.get("event_count_estimate")),
-    )
-    onset_span = max(
-        _preview_number(shape.get("onset_span_ratio")),
-        _preview_number(structure.get("onset_span_ratio")),
-        _preview_number(evidence.get("onset_span_ratio")),
-    )
-    repetition = _preview_number(shape.get("true_repetition_score"))
-    loop_population = max(
-        _preview_number(shape.get("pitched_event_ratio")),
-        _preview_number(shape.get("percussive_event_ratio")),
-        _preview_number(shape.get("drumlike_frame_ratio")),
-    )
-    loop_role = max(
-        *(
-            _preview_number(roles.get(role_name))
-            for role_name in (
-                "bass_loop",
-                "pitched_music_loop",
-                "bright_drum_loop",
-                "percussive_drum_loop",
-                "low_rhythmic_drum_loop",
-            )
-        ),
-        0.0,
-    )
-    repeated_shape_names = {
-        "bass_phrase",
-        "beat_loop",
-        "compound_musical_loop",
-        "designed_motion_fx_loop",
-        "instrument_plus_fx_loop",
-        "layered_phrase",
-        "mixed_instrument_loop",
-        "pitched_phrase",
-        "pitched_phrase_shape",
-        "pitched_repetition_phrase",
-        "repeated_phrase_loop",
-        "solo_phrase",
-        "vocal_phrase",
-    }
-    repeated_shape = bool(
-        shape_name in repeated_shape_names
-        and shape_confidence >= 0.70
-        and event_count >= 4.0
-        and onset_span >= 0.45
-        and (repetition >= 0.45 or loop_population >= 0.72)
-    )
-    measured_loop_role = bool(loop_role >= 0.74 and event_count >= 4.0 and onset_span >= 0.40)
-    sustained_loop = bool(
-        facts.is_long
-        and shape_name == "sustained_pad"
-        and shape_confidence >= 0.80
-        and _preview_number(shape.get("pitched_event_ratio")) >= 0.72
-        and _preview_number(shape.get("sustained_tonal_frame_ratio")) >= 0.72
-        and _preview_number(shape.get("percussive_event_ratio")) <= 0.25
-    )
-    return bool(repeated_shape or measured_loop_role or sustained_loop)
 
 
 def _preview_number(value: object) -> float:
@@ -1711,6 +1620,10 @@ def preview_manifest_fields() -> list[str]:
         "candidate_folders_json",
         "neural_folder",
         "neural_known_distribution",
+        "neural_ownership_ready",
+        "neural_ownership_reason",
+        "neural_label_example_count",
+        "neural_exact_training_match",
         "neural_similarity",
         "neural_margin",
         "neural_radius_ratio",
@@ -1738,6 +1651,12 @@ def preview_row_to_csv(row: PreviewRow) -> dict[str, str]:
         "neural_known_distribution": (
             "" if row.neural_known_distribution is None else ("1" if row.neural_known_distribution else "0")
         ),
+        "neural_ownership_ready": (
+            "" if row.neural_ownership_ready is None else ("1" if row.neural_ownership_ready else "0")
+        ),
+        "neural_ownership_reason": row.neural_ownership_reason,
+        "neural_label_example_count": str(row.neural_label_example_count),
+        "neural_exact_training_match": "1" if row.neural_exact_training_match else "0",
         "neural_similarity": f"{row.neural_similarity:.8f}",
         "neural_margin": f"{row.neural_margin:.8f}",
         "neural_radius_ratio": f"{row.neural_radius_ratio:.8f}",

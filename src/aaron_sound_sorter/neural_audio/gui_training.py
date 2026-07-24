@@ -251,6 +251,7 @@ class NeuralPrototypeTrainer:
         base_split_path: Path,
         inbox_path: Path,
         training_root: Path,
+        sample_library_root: Path | None = None,
         max_prototypes_per_label: int = 6,
         keep_fraction: float = 0.95,
         production_ownership_enabled: bool = False,
@@ -263,6 +264,9 @@ class NeuralPrototypeTrainer:
         self.base_split_path = Path(base_split_path).expanduser().resolve()
         self.inbox_path = Path(inbox_path).expanduser().resolve()
         self.training_root = Path(training_root).expanduser().resolve()
+        self.sample_library_root = (
+            Path(sample_library_root).expanduser().resolve() if sample_library_root is not None else None
+        )
         self.production_ownership_enabled = bool(production_ownership_enabled)
         self.builder = PrototypeIndexBuilder(
             max_prototypes_per_label=max_prototypes_per_label,
@@ -282,12 +286,14 @@ class NeuralPrototypeTrainer:
         base_examples, missing_base = _examples_from_rows(
             base_rows,
             project_root=self.project_root,
+            sample_library_root=self.sample_library_root,
             training_hash_paths=training_hash_paths,
             only_training_use=True,
         )
         correction_examples, missing_corrections = _examples_from_rows(
             inbox_rows,
             project_root=self.project_root,
+            sample_library_root=self.sample_library_root,
             training_hash_paths=training_hash_paths,
             only_training_use=False,
         )
@@ -483,6 +489,7 @@ def configured_clap_trainer(project_root: Path) -> NeuralPrototypeTrainer:
         device=str(config.get("device", "auto")),
         allow_network=False,
     )
+    sample_library_root = _configured_sample_library_root(root, config)
     return NeuralPrototypeTrainer(
         project_root=root,
         provider=provider,
@@ -492,6 +499,7 @@ def configured_clap_trainer(project_root: Path) -> NeuralPrototypeTrainer:
         base_split_path=root / str(config["base_split_path"]),
         inbox_path=root / str(config["inbox_path"]),
         training_root=root / str(config["training_root"]),
+        sample_library_root=sample_library_root,
         max_prototypes_per_label=int(config.get("max_prototypes_per_label", 6)),
         keep_fraction=float(config.get("keep_fraction", 0.95)),
         production_ownership_enabled=bool(config.get("production_ownership_enabled", False)),
@@ -610,13 +618,58 @@ def _project_uri(project_root: Path, path: Path) -> str:
     return f"project://{relative.as_posix()}"
 
 
-def _resolve_project_uri(project_root: Path, value: str) -> Path | None:
+def _configured_sample_library_root(project_root: Path, config: Mapping[str, Any]) -> Path | None:
+    """Resolve an optional local sample-library root without committing it."""
+    environment_name = str(config.get("sample_library_root_env", "")).strip()
+    environment_value = os.environ.get(environment_name, "").strip() if environment_name else ""
+    candidates: list[str] = []
+    if environment_value:
+        candidates.append(environment_value)
+    pointer_value = str(config.get("sample_library_root_pointer_path", "")).strip()
+    if pointer_value:
+        pointer_path = Path(pointer_value).expanduser()
+        if not pointer_path.is_absolute():
+            pointer_path = project_root / pointer_path
+        if pointer_path.is_file():
+            candidates.append(pointer_path.read_text(encoding="utf-8").strip())
+    configured_value = str(config.get("sample_library_root", "")).strip()
+    if configured_value:
+        candidates.append(configured_value)
+    for value in candidates:
+        candidate = Path(value).expanduser()
+        if not candidate.is_absolute():
+            candidate = project_root / candidate
+        if candidate.is_dir():
+            return candidate.resolve()
+    return None
+
+
+def _resolve_audio_uri(
+    project_root: Path,
+    sample_library_root: Path | None,
+    value: str,
+) -> Path | None:
     if value.startswith("project://"):
-        return (project_root / value.removeprefix("project://")).resolve()
+        return _safe_uri_path(project_root, value.removeprefix("project://"))
+    if value.startswith("sample-library://"):
+        if sample_library_root is None:
+            return None
+        return _safe_uri_path(sample_library_root, value.removeprefix("sample-library://"))
     candidate = Path(value).expanduser()
     if candidate.is_absolute():
         return candidate.resolve()
     return None
+
+
+def _safe_uri_path(root: Path, relative_value: str) -> Path | None:
+    """Resolve a manifest URI below its configured operational root."""
+    resolved_root = Path(root).expanduser().resolve()
+    candidate = (resolved_root / relative_value).resolve()
+    try:
+        candidate.relative_to(resolved_root)
+    except ValueError:
+        return None
+    return candidate
 
 
 def _training_paths_by_hash(training_root: Path, wanted_hashes: set[str]) -> dict[str, Path]:
@@ -641,6 +694,7 @@ def _examples_from_rows(
     rows: Sequence[Mapping[str, str]],
     *,
     project_root: Path,
+    sample_library_root: Path | None,
     training_hash_paths: Mapping[str, Path],
     only_training_use: bool,
 ) -> tuple[list[NeuralTrainingExample], set[str]]:
@@ -653,7 +707,11 @@ def _examples_from_rows(
         if not is_trainable_taxonomy_label(label):
             continue
         file_digest = str(row.get("file_sha256", "")).strip()
-        audio_path = _resolve_project_uri(project_root, str(row.get("source_path") or row.get("audio_path") or ""))
+        audio_path = _resolve_audio_uri(
+            project_root,
+            sample_library_root,
+            str(row.get("source_path") or row.get("audio_path") or ""),
+        )
         if audio_path is None or not audio_path.is_file() or (file_digest and sha256_file(audio_path) != file_digest):
             audio_path = training_hash_paths.get(file_digest)
         if audio_path is None or not audio_path.is_file():

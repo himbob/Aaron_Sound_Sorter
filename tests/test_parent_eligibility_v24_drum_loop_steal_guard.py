@@ -122,7 +122,6 @@ def label_for(rows: dict[str, dict[str, str]], name: str) -> str:
             "SCY097_03_Drums_Full_Loop_90bpm_03.wav",
             "US_JF_Drum_140_Dapocket_FULL.wav",
             "2.Drum Loop_1_100bpm.wav",
-            "A1_Kick_Clap_Loop_99bpm.wav",
             "MKS_98_Beat1.wav",
             "QUp_DzU_DrumLp_03_100bpm.wav",
             "WS2_KIT_1_WestCoast_Drum_&_Perc_Loop_101BPM.wav",

@@ -73,7 +73,13 @@ def _neural_prediction(
     *,
     known: bool,
     row_id: str = "00001",
+    margin: float = 0.26,
+    label_example_count: int = 4,
+    exact_training_match: bool = False,
+    ownership_ready: bool | None = None,
+    ownership_reason: str = "supported_separated_neighborhood",
 ) -> NeuralRuntimePrediction:
+    ready = known if ownership_ready is None else ownership_ready
     return NeuralRuntimePrediction(
         row_id=row_id,
         file_sha256="a" * 64,
@@ -81,9 +87,13 @@ def _neural_prediction(
         second_label="Instruments/Mixed Musical Loops/Multi Instrument/Loops",
         top_similarity=0.81,
         second_similarity=0.55,
-        margin=0.26,
+        margin=margin,
         radius_ratio=0.72 if known else 2.4,
         known_distribution=known,
+        label_example_count=label_example_count,
+        exact_training_match=exact_training_match,
+        ownership_ready=ready,
+        ownership_block_reason=ownership_reason,
     )
 
 
@@ -206,6 +216,126 @@ def test_known_neural_neighborhood_takes_gui_ownership_for_any_category(tmp_path
     assert row.consensus_status == "neural_known_distribution_owner"
     assert row.neural_known_distribution is True
     assert row.neural_folder == "Drums/Drum Loops/Loops"
+
+
+def test_known_but_ambiguous_voice_sax_prediction_cannot_steal_ownership(tmp_path: Path) -> None:
+    row = _row(
+        _audio_file(tmp_path, "display_text_is_not_evidence.wav"),
+        proposed="Instruments/Winds/Saxophone/Sax Loops",
+    )
+
+    apply_neural_runtime_authority(
+        [row],
+        _neural_batch(
+            _neural_prediction(
+                "Instruments/Voice/Vocal Loops/Loops",
+                known=True,
+                margin=0.04,
+                ownership_ready=False,
+                ownership_reason="ambiguous_nearest_labels",
+            )
+        ),
+    )
+
+    assert row.proposed_folder == "_TO_REVIEW/Measured Role Conflict"
+    assert row.consensus_status == "neural_legacy_owner_conflict_review"
+    assert row.neural_known_distribution is True
+    assert row.neural_ownership_ready is False
+    assert row.neural_ownership_reason == "ambiguous_nearest_labels"
+
+
+def test_sparse_pad_prediction_cannot_steal_keys_ownership(tmp_path: Path) -> None:
+    legacy = "Instruments/Keys/Electric Piano/Loops"
+    row = _row(_audio_file(tmp_path), proposed=legacy)
+
+    apply_neural_runtime_authority(
+        [row],
+        _neural_batch(
+            _neural_prediction(
+                "Instruments/Synths/Synth Pad/Loops",
+                known=True,
+                label_example_count=1,
+                ownership_ready=False,
+                ownership_reason="insufficient_label_examples",
+            )
+        ),
+    )
+
+    assert row.proposed_folder == legacy
+    assert row.neural_label_example_count == 1
+    assert row.neural_ownership_ready is False
+
+
+def test_unready_drum_prediction_cannot_steal_mixed_instrument_ownership(
+    tmp_path: Path,
+) -> None:
+    row = _row(
+        _audio_file(tmp_path),
+        proposed="Instruments/Mixed Musical Loops/Multi Instrument/Loops",
+    )
+
+    apply_neural_runtime_authority(
+        [row],
+        _neural_batch(
+            _neural_prediction(
+                "Drums/Drum Loops/Loops",
+                known=False,
+                ownership_ready=False,
+                ownership_reason="outside_learned_radius",
+            )
+        ),
+    )
+
+    assert row.proposed_folder == "_TO_REVIEW/Measured Role Conflict"
+    assert row.consensus_status == "neural_legacy_owner_conflict_review"
+
+
+def test_unready_altered_voice_prediction_cannot_steal_drum_ownership(
+    tmp_path: Path,
+) -> None:
+    row = _row(
+        _audio_file(tmp_path),
+        proposed="Drums/Drum Loops/Full Drum Loops/Loops",
+    )
+
+    apply_neural_runtime_authority(
+        [row],
+        _neural_batch(
+            _neural_prediction(
+                "FX/Human and Voice FX/Altered Voice/One Shots",
+                known=False,
+                ownership_ready=False,
+                ownership_reason="outside_learned_radius",
+            )
+        ),
+    )
+
+    assert row.proposed_folder == "_TO_REVIEW/Measured Role Conflict"
+    assert row.consensus_status == "neural_legacy_owner_conflict_review"
+
+
+def test_exact_human_training_match_owns_even_for_sparse_label(tmp_path: Path) -> None:
+    label = "Instruments/Voice/Voice Phrase One Shots/One Shots"
+    row = _row(_audio_file(tmp_path), proposed="FX/Human and Voice FX/Altered Voice/Long")
+
+    apply_neural_runtime_authority(
+        [row],
+        _neural_batch(
+            _neural_prediction(
+                label,
+                known=True,
+                margin=0.01,
+                label_example_count=1,
+                exact_training_match=True,
+                ownership_ready=True,
+                ownership_reason="exact_human_training_match",
+            )
+        ),
+    )
+
+    assert row.proposed_folder == label
+    assert row.consensus_status == "neural_known_distribution_owner"
+    assert row.neural_exact_training_match is True
 
 
 def test_unknown_neural_nonvoice_vs_legacy_voice_forces_review(tmp_path: Path) -> None:

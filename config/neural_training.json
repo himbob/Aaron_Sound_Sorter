@@ -10,11 +10,15 @@
   "base_split_path": "neural_artifacts/20260724_real_curation/dataset_splits.csv",
   "inbox_path": "neural_artifacts/gui_training_inbox/current.csv",
   "training_root": "training/locked_curated_v1",
+  "sample_library_root_env": "AARON_SAMPLE_LIBRARY_ROOT",
+  "sample_library_root_pointer_path": "config/runtime/sample_library_root.txt",
   "cache_root": "neural_artifacts/embedding_cache",
   "index_root": "neural_artifacts/prototype_indexes/hf_clap",
   "pointer_path": "config/runtime/neural_clap_index_path.txt",
   "max_prototypes_per_label": 6,
   "keep_fraction": 0.95,
   "production_ownership_enabled": true,
-  "runtime_authority_policy": "known_distribution_owner_else_cross_owner_review"
+  "minimum_ownership_margin": 0.1,
+  "minimum_label_examples_for_ownership": 3,
+  "runtime_authority_policy": "exact_training_or_supported_separated_neighborhood"
 }

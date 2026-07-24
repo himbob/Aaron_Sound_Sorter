@@ -41,6 +41,12 @@ class PreviewRow:
         neural_folder: Source-name-blind neural prototype prediction.
         neural_known_distribution: Whether the prediction falls inside a
             learned neighborhood. ``None`` means neural inference was absent.
+        neural_ownership_ready: Whether neural evidence is strong enough to
+            replace the current proposal.
+        neural_ownership_reason: Stable explanation for the ownership decision.
+        neural_label_example_count: Distinct examples behind the neural label.
+        neural_exact_training_match: Whether the content hash and predicted
+            label exactly match an active human-approved training row.
         neural_similarity: Cosine similarity to the winning prototype.
         neural_margin: Similarity lead over the second label.
         neural_radius_ratio: Distance relative to the learned label radius.
@@ -70,6 +76,10 @@ class PreviewRow:
     candidate_folders: list[str] = field(default_factory=list)
     neural_folder: str = ""
     neural_known_distribution: bool | None = None
+    neural_ownership_ready: bool | None = None
+    neural_ownership_reason: str = ""
+    neural_label_example_count: int = 0
+    neural_exact_training_match: bool = False
     neural_similarity: float = 0.0
     neural_margin: float = 0.0
     neural_radius_ratio: float = 0.0

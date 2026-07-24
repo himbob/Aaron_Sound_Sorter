@@ -194,27 +194,8 @@ class PrototypeIndex:
         self._matrix = np.vstack([proto.vector for proto in self.prototypes]).astype(np.float32)
 
     def predict(self, record: EmbeddingRecord, *, radius_slack: float = 0.08) -> LabelPrediction:
-        if record.provider_id != self.metadata.provider_id or record.model_id != self.metadata.model_id:
-            raise ValueError("embedding provider/model does not match prototype index")
-        if record.dimension != self.metadata.dimension:
-            raise ValueError("embedding dimension does not match prototype index")
-
-        # NumPy's accelerated matmul can emit spurious floating-point warnings
-        # for finite, normalized CLAP vectors on some macOS Accelerate builds.
-        # Element-wise reduction is equally exact for this small index and
-        # avoids that unstable BLAS path.
-        similarities = np.sum(
-            self._matrix.astype(np.float64) * record.vector.astype(np.float64)[None, :],
-            axis=1,
-            dtype=np.float64,
-        )
-        best_per_label: dict[str, tuple[float, int]] = {}
-        for idx, proto in enumerate(self.prototypes):
-            score = float(similarities[idx])
-            current = best_per_label.get(proto.label)
-            if current is None or score > current[0]:
-                best_per_label[proto.label] = (score, idx)
-        ranking = sorted(best_per_label.items(), key=lambda item: (-item[1][0], item[0]))
+        """Return the closest learned label and its neighborhood evidence."""
+        ranking = self._rank_labels(record)
         best_label, (best_score, best_idx) = ranking[0]
         if len(ranking) > 1:
             second_label, (second_score, _) = ranking[1]
@@ -249,6 +230,48 @@ class PrototypeIndex:
                 "trainer_warning_count": "unavailable",
             },
         )
+
+    def label_similarities(self, record: EmbeddingRecord) -> dict[str, float]:
+        """Return the best cosine similarity for every learned label.
+
+        Args:
+            record: Source-name-blind audio embedding from the index provider.
+
+        Returns:
+            Label-to-similarity mapping sorted from strongest to weakest.
+
+        Raises:
+            ValueError: If provider, model, or embedding dimensions differ from
+                the active index.
+
+        Side Effects:
+            None.
+        """
+        return {label: score for label, (score, _) in self._rank_labels(record)}
+
+    def _rank_labels(self, record: EmbeddingRecord) -> list[tuple[str, tuple[float, int]]]:
+        """Return labels ranked by their best prototype similarity."""
+        if record.provider_id != self.metadata.provider_id or record.model_id != self.metadata.model_id:
+            raise ValueError("embedding provider/model does not match prototype index")
+        if record.dimension != self.metadata.dimension:
+            raise ValueError("embedding dimension does not match prototype index")
+
+        # NumPy's accelerated matmul can emit spurious floating-point warnings
+        # for finite, normalized CLAP vectors on some macOS Accelerate builds.
+        # Element-wise reduction is equally exact for this small index and
+        # avoids that unstable BLAS path.
+        similarities = np.sum(
+            self._matrix.astype(np.float64) * record.vector.astype(np.float64)[None, :],
+            axis=1,
+            dtype=np.float64,
+        )
+        best_per_label: dict[str, tuple[float, int]] = {}
+        for idx, proto in enumerate(self.prototypes):
+            score = float(similarities[idx])
+            current = best_per_label.get(proto.label)
+            if current is None or score > current[0]:
+                best_per_label[proto.label] = (score, idx)
+        return sorted(best_per_label.items(), key=lambda item: (-item[1][0], item[0]))
 
     def save(self, directory: Path) -> None:
         directory = Path(directory)

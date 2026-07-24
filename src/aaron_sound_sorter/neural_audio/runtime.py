@@ -24,6 +24,10 @@ class NeuralRuntimePrediction:
     margin: float
     radius_ratio: float
     known_distribution: bool
+    label_example_count: int = 0
+    exact_training_match: bool = False
+    ownership_ready: bool = False
+    ownership_block_reason: str = ""
 
 
 @dataclass(frozen=True)
@@ -200,4 +204,8 @@ def _prediction_from_mapping(payload: Any) -> NeuralRuntimePrediction:
         margin=float(payload["margin"]),
         radius_ratio=float(payload["radius_ratio"]),
         known_distribution=bool(payload["known_distribution"]),
+        label_example_count=int(payload.get("label_example_count", 0)),
+        exact_training_match=bool(payload.get("exact_training_match", False)),
+        ownership_ready=bool(payload.get("ownership_ready", False)),
+        ownership_block_reason=str(payload.get("ownership_block_reason", "")),
     )

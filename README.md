@@ -17,7 +17,7 @@ the heart of it.
 - Separates loops, one-shots, and long effects.
 - Uses decoded audio—not filenames or paths—as evidence.
 - Lets approved GUI corrections teach versioned CLAP prototypes.
-- Uses neural ownership only inside learned neighborhoods.
+- Uses neural ownership for exact training or supported, separated neighborhoods.
 - Sends uncertain or conflicting evidence to Review.
 
 ## Install
@@ -54,6 +54,9 @@ python3 Aaron_Sound_Sorter.py sort \
   "/path/to/samples" "/path/to/output" \
   --brain "/path/to/stage4_folder_brain.json"
 ```
+
+With local CLAP assets installed, CLI sorting also uses neural authority.
+Use `--no-neural` only for diagnostics.
 
 ## Train with the GUI
 
@@ -96,7 +99,7 @@ before AI-assisted changes.
 ## Status
 
 - CLI and GUI: working with local trained assets.
-- CLAP: limited GUI ownership for known learned neighborhoods.
+- CLAP: conservative GUI and CLI ownership with human-memory priority.
 - Cross-family or structural conflict: Review.
 - Legacy classifier: temporary fallback while held-out coverage grows.
 

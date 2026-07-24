@@ -54,6 +54,7 @@ from aaron_sound_sorter.features import (
 from aaron_sound_sorter.infrastructure.audio_repository import AudioInputRepository
 from aaron_sound_sorter.infrastructure.brain_repository import BrainRepository
 from aaron_sound_sorter.infrastructure.report_writer import SortReportWriter
+from aaron_sound_sorter.neural_audio.authority import apply_configured_neural_authority
 from aaron_sound_sorter.role_gate import dynamic_role_gate
 from aaron_sound_sorter.voters.base import Voter
 from aaron_sound_sorter.voters.brain_recall import (
@@ -130,6 +131,19 @@ class SortSamplesUseCase:
                 use_harmonic_brains_in_sort=request.use_harmonic_brains_in_sort,
                 max_workers=request.sort_workers,
             )
+        if request.use_neural_runtime and request.neural_project_root is not None:
+            with self.sort_timing.stage("neural_authority"):
+                classified_results, neural_batch = apply_configured_neural_authority(
+                    project_root=request.neural_project_root,
+                    results=classified_results,
+                    report_dir=request.output_dir / "neural_runtime",
+                )
+                for result in classified_results:
+                    result.facts.evidence["neural_runtime_batch"] = {
+                        "status": neural_batch.status,
+                        "message": neural_batch.message,
+                        "index_path": neural_batch.index_path,
+                    }
         with self.sort_timing.stage("place_files"):
             results = [self.place_classified_file(writer, result) for result in classified_results]
         with self.sort_timing.stage("write_reports"):

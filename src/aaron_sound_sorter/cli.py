@@ -118,6 +118,11 @@ class CommandLineParser:
             help="Disable persistent measured-analysis cache even if the environment enables it.",
         )
         sort_parser.add_argument("--no-zip", action="store_true", help="Do not create Aaron_Sorted_Sounds.zip.")
+        sort_parser.add_argument(
+            "--no-neural",
+            action="store_true",
+            help="Disable configured source-name-blind neural authority for this run.",
+        )
         sort_parser.set_defaults(command_kind="sort")
 
     @staticmethod
@@ -230,4 +235,6 @@ def request_from_args(args: argparse.Namespace) -> SortRequest:
         sort_workers=_sort_workers_from_args(args),
         use_persistent_analysis_cache=_analysis_cache_enabled_from_args(args),
         analysis_cache_dir=_analysis_cache_dir_from_args(args),
+        use_neural_runtime=not bool(getattr(args, "no_neural", False)),
+        neural_project_root=PROJECT_ROOT,
     )
