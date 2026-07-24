@@ -17,11 +17,17 @@ from pathlib import Path
 
 PROTECTED_ROOT_NAMES = {
     "Aaron_Sound_Sorter.py",
+    "AGENTS.md",
     "AI_READ_THIS_FIRST.md",
+    "CURRENT_STATUS.md",
+    "LICENSE",
+    "NOTICE.md",
     "README.md",
     "MASTER_PROJECT_GOALS.md",
     "pyproject.toml",
     "requirements-dev.txt",
+    "requirements-quality.txt",
+    "requirements.txt",
     "Makefile",
     ".gitignore",
 }
@@ -31,7 +37,9 @@ PROTECTED_ROOT_DIRS = {
     "tests",
     "tools",
     "commands",
+    "config",
     "docs",
+    ".github",
     "training",  # huge, but user-controlled source/training data; never delete by default.
     "_models",  # pinned local foundation-model snapshots; expensive but reproducible critical inputs.
     "neural_artifacts",  # compact provenance, registry, quarantine, and held-out evidence.

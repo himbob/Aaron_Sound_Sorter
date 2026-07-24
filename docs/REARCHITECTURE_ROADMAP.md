@@ -5,7 +5,7 @@ See:
 
 - `NEURAL_AUDIO_ARCHITECTURE_V1.md`
 - `NEURAL_AUDIO_MIGRATION_PHASES.md`
-- `ARCHITECTURE_DOCUMENT_STATUS.md`
+- `README.md`
 
 The historical roadmap remains at:
 

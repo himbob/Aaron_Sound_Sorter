@@ -10,10 +10,9 @@ The normal all-case wrapper can be too quiet for some AI sandboxes. A quiet audi
 
 ## Recommended command for AI helpers
 
-Use the one-case-at-a-time runner:
+From the repository root, use the one-case-at-a-time runner:
 
 ```bash
-cd /Volumes/T9/testbed/Aaron_Sound_Sorter
 ./commands/quality/RUN_LOCKED_SMOKE_ACCEPTANCE_ONE_BY_ONE.command
 ```
 
@@ -34,21 +33,18 @@ for each case, with heartbeat output during quiet analysis periods.
 ## Run one case
 
 ```bash
-cd /Volumes/T9/testbed/Aaron_Sound_Sorter
 ./commands/quality/RUN_LOCKED_SMOKE_ACCEPTANCE_ONE_BY_ONE.command --case-id clap_clean_clap2
 ```
 
 ## List case IDs
 
 ```bash
-cd /Volumes/T9/testbed/Aaron_Sound_Sorter
 ./commands/quality/RUN_LOCKED_SMOKE_ACCEPTANCE_ONE_BY_ONE.command --list-cases
 ```
 
 ## Stop on first failure
 
 ```bash
-cd /Volumes/T9/testbed/Aaron_Sound_Sorter
 ./commands/quality/RUN_LOCKED_SMOKE_ACCEPTANCE_ONE_BY_ONE.command --stop-on-fail
 ```
 
@@ -57,7 +53,6 @@ cd /Volumes/T9/testbed/Aaron_Sound_Sorter
 Use the project virtual environment when possible:
 
 ```bash
-cd /Volumes/T9/testbed/Aaron_Sound_Sorter
 PROJECT_ROOT="$PWD" \
 PYTHON_BIN="$PWD/.venv_phase4/bin/python" \
 ./commands/quality/RUN_LOCKED_SMOKE_ACCEPTANCE_ONE_BY_ONE.command
@@ -66,7 +61,6 @@ PYTHON_BIN="$PWD/.venv_phase4/bin/python" \
 For Python 3.13 comparison runs:
 
 ```bash
-cd /Volumes/T9/testbed/Aaron_Sound_Sorter
 PROJECT_ROOT="$PWD" \
 PYTHON_BIN="$PWD/.venv_py313_clean/bin/python" \
 ./commands/quality/RUN_LOCKED_SMOKE_ACCEPTANCE_ONE_BY_ONE.command
@@ -77,7 +71,6 @@ PYTHON_BIN="$PWD/.venv_py313_clean/bin/python" \
 The full wrapper can still be tried first on a local Mac:
 
 ```bash
-cd /Volumes/T9/testbed/Aaron_Sound_Sorter
 PROJECT_ROOT="$PWD" \
 PYTHON_BIN="$PWD/.venv_phase4/bin/python" \
 ./commands/quality/RUN_LOCKED_SMOKE_ACCEPTANCE_AI_SAFE.command

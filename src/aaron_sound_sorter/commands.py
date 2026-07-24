@@ -30,6 +30,60 @@ TRAIN_BRAIN_WEAK_SIMILARITY_FLOOR = 0.20
 TRAIN_BRAIN_STRONG_MARGIN = 1.50
 TRAIN_BRAIN_RISKY_MIN_SIMILARITY = 0.80
 TRAIN_BRAIN_BROAD_CONFLICT_OVERRIDE_GAP = 0.80
+RUNTIME_CONFIG_RELATIVE = Path("config") / "runtime"
+
+
+def runtime_pointer_path(project_dir: Path, filename: str) -> Path:
+    """Return a runtime-pointer path and ensure its parent exists.
+
+    Args:
+        project_dir: Repository root.
+        filename: Lowercase pointer filename.
+
+    Returns:
+        Path under ``config/runtime``.
+
+    Side Effects:
+        Creates the runtime configuration folder when missing.
+    """
+    pointer_path = project_dir / RUNTIME_CONFIG_RELATIVE / filename
+    pointer_path.parent.mkdir(parents=True, exist_ok=True)
+    return pointer_path
+
+
+def portable_project_path(project_dir: Path, target_path: Path) -> str:
+    """Serialize a path relative to the project when possible.
+
+    Args:
+        project_dir: Repository root used as the relative-path anchor.
+        target_path: Local file or folder path.
+
+    Returns:
+        A portable relative path for project-owned targets, otherwise an
+        absolute path.
+    """
+    resolved_project = project_dir.expanduser().resolve()
+    resolved_target = target_path.expanduser().resolve()
+    try:
+        return str(resolved_target.relative_to(resolved_project))
+    except ValueError:
+        return str(resolved_target)
+
+
+def resolve_project_pointer(project_dir: Path, pointer_value: str) -> Path:
+    """Resolve an absolute or project-relative runtime pointer.
+
+    Args:
+        project_dir: Repository root used for relative pointer values.
+        pointer_value: Text read from a runtime pointer.
+
+    Returns:
+        An absolute resolved path.
+    """
+    candidate = Path(pointer_value).expanduser()
+    if not candidate.is_absolute():
+        candidate = project_dir / candidate
+    return candidate.resolve()
 
 
 def shape_memory_starter_output_path(base_brain_path: Path, requested_path: str | None = None) -> Path:
@@ -244,14 +298,14 @@ def extract_safe_audio_zip(input_path: Path, destination_root: Path) -> int:
 
 def resolve_brain_path(project_dir: Path, requested_brain: str) -> Path:
     """Resolve the explicitly requested brain or the latest trained brain pointer."""
-    brain_path = Path(requested_brain or DEFAULT_FOLDER_BRAIN).expanduser().resolve()
+    brain_path = resolve_project_pointer(project_dir, requested_brain or DEFAULT_FOLDER_BRAIN)
     if brain_path.exists():
         return brain_path
-    latest = project_dir / "PHASE4_LATEST_FOLDER_BRAIN_PATH.txt"
+    latest = runtime_pointer_path(project_dir, "phase4_latest_folder_brain_path.txt")
     if latest.exists():
-        candidate = Path(latest.read_text(encoding="utf-8").strip()).expanduser()
+        candidate = resolve_project_pointer(project_dir, latest.read_text(encoding="utf-8").strip())
         if candidate.exists():
-            return candidate.resolve()
+            return candidate
     return brain_path
 
 
@@ -459,8 +513,8 @@ def run_train_brain_command(args: argparse.Namespace) -> int:
     )
     print(f"Saving reusable folder-supervised brain: {save_brain}", flush=True)
     write_json(save_brain, brain)
-    latest = project_dir / "PHASE4_LATEST_FOLDER_BRAIN_PATH.txt"
-    latest.write_text(str(save_brain) + "\n", encoding="utf-8")
+    latest = runtime_pointer_path(project_dir, "phase4_latest_folder_brain_path.txt")
+    latest.write_text(portable_project_path(project_dir, save_brain) + "\n", encoding="utf-8")
     print(f"Saved folder-supervised brain: {save_brain}", flush=True)
     print(f"Latest brain pointer: {latest}", flush=True)
     print(f"Training reports: {run_dir / 'reports'}", flush=True)
@@ -651,7 +705,7 @@ def run_train_brain_family_command(args: argparse.Namespace) -> int:
     if code != 0:
         return code
 
-    latest = project_dir / "PHASE4_LATEST_BRAIN_FAMILY_PATHS.txt"
+    latest = runtime_pointer_path(project_dir, "phase4_latest_brain_family_paths.txt")
     shape_starter_pointer = (
         str(shape_memory_starter_output_path(save_full, str(getattr(args, "save_shape_memory_brain", "") or "")))
         if bool(getattr(args, "train_shape_memory", True))
@@ -660,13 +714,20 @@ def run_train_brain_family_command(args: argparse.Namespace) -> int:
     latest.write_text(
         "\n".join(
             [
-                f"full={save_full}",
-                f"core_baby={save_core}",
-                f"spread_baby={save_spread}",
-                f"outlier_baby={save_outlier}",
-                f"shape_starter_memory={shape_starter_pointer}",
-                f"run_root={run_root}",
-                f"anchor_manifest={trees.manifest_path}",
+                f"full={portable_project_path(project_dir, save_full)}",
+                f"core_baby={portable_project_path(project_dir, save_core)}",
+                f"spread_baby={portable_project_path(project_dir, save_spread)}",
+                f"outlier_baby={portable_project_path(project_dir, save_outlier)}",
+                (
+                    "shape_starter_memory="
+                    + (
+                        portable_project_path(project_dir, Path(shape_starter_pointer))
+                        if shape_starter_pointer != "disabled"
+                        else "disabled"
+                    )
+                ),
+                f"run_root={portable_project_path(project_dir, run_root)}",
+                f"anchor_manifest={portable_project_path(project_dir, trees.manifest_path)}",
             ]
         )
         + "\n",
@@ -862,7 +923,10 @@ def build_argument_parser() -> argparse.ArgumentParser:
     sortp.add_argument(
         "--brain",
         default="",
-        help="Saved folder-supervised brain JSON. Defaults to stage4_folder_brain.json or PHASE4_LATEST_FOLDER_BRAIN_PATH.txt.",
+        help=(
+            "Saved folder-supervised brain JSON. Defaults to stage4_folder_brain.json "
+            "or config/runtime/phase4_latest_folder_brain_path.txt."
+        ),
     )
     sortp.add_argument(
         "--training-root",

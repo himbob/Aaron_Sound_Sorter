@@ -12,6 +12,12 @@ from cleanup_project import collect_candidates  # noqa: E402
 def test_standard_cleanup_preserves_critical_training_neural_and_brain_assets(tmp_path: Path) -> None:
     (tmp_path / "Aaron_Sound_Sorter.py").write_text("# runner\n", encoding="utf-8")
     critical_paths = [
+        tmp_path / "AGENTS.md",
+        tmp_path / "CURRENT_STATUS.md",
+        tmp_path / "LICENSE",
+        tmp_path / "NOTICE.md",
+        tmp_path / ".github" / "SECURITY.md",
+        tmp_path / "config" / "runtime" / "phase4_latest_folder_brain_path.txt",
         tmp_path / "training" / "locked_curated_v1" / "sample.wav",
         tmp_path / "_models" / "pinned_encoder" / "weights.bin",
         tmp_path / "neural_artifacts" / "run" / "neural_model_registry.json",

@@ -1,16 +1,60 @@
-# Aaron Sound Sorter Phase 4
+# Aaron Sound Sorter
 
-Aaron Sound Sorter is a practical sample-library sorter for music production. Give it a ZIP or folder of samples, and it creates a producer-friendly sorted library with reports for review.
+Source-blind audio sample sorting for music producers.
 
-## Phase 4 objective
+Give it a ZIP, folder, or audio file. It builds a cleaner library, keeps
+uncertain sounds in `_TO_REVIEW`, and writes evidence for every decision.
+Because a folder named `final_samples_USE_THIS_ONE_7` is not a filing system.
 
-Phase 4 is the production sorter path. The user-facing goal is simple:
+## What it does
+
+- Sorts drums, instruments, textures, and FX.
+- Separates loops, one-shots, and long FX.
+- Learns from approved GUI corrections.
+- Uses measured audio—not filenames—as evidence.
+- Produces manifests, summaries, and an optional ZIP.
+
+## Project status
+
+- CLI and GUI: working with local trained brains.
+- Neural CLAP/MERT pipeline: real, but shadow-only.
+- Production neural ownership: not enabled yet.
+- Trained brains, sample libraries, model weights, and private evidence: not
+  distributed.
+
+See [current status](CURRENT_STATUS.md) and [documentation](docs/README.md).
+
+## Quick start
+
+Requirements:
+
+- Python 3.9+
+- macOS or Linux
+- `libsndfile` where required by `soundfile`
 
 ```bash
-python3 Aaron_Sound_Sorter.py sort "/path/to/samples.zip" "/path/to/output_folder"
+git clone https://github.com/himbob/Aaron_Sound_Sorter.git
+cd Aaron_Sound_Sorter
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e .
+python Aaron_Sound_Sorter.py self-test
 ```
 
-The output should contain:
+## Sort samples
+
+A trained brain is required for production sorting. It is intentionally not
+included in the public repository.
+
+```bash
+python Aaron_Sound_Sorter.py sort \
+  "/path/to/samples.zip" \
+  "/path/to/output" \
+  --brain "/path/to/stage4_folder_brain.json"
+```
+
+Expected output:
 
 ```text
 Aaron_Sorted_Sounds/
@@ -19,97 +63,38 @@ Aaron_Sorted_Sounds_summary.txt
 Aaron_Sorted_Sounds.zip
 ```
 
-Top-level production folders stay simple:
-
-```text
-Drums
-Instruments
-Textures
-FX
-_TO_REVIEW
-```
-
-The sorter should place obvious sounds, send uncertain sounds to review, and preserve enough manifest evidence to debug mistakes.
-
-## Current project layout
-
-```text
-Aaron_Sound_Sorter.py        Thin runner. Calls the package in src/.
-src/aaron_sound_sorter/      Real Stage 4 application code.
-stage4_folder_brain.json     Current 100-feature Stage 4 folder brain.
-training/                    Locked curated training tree. Mostly symlinks to T9 sample files.
-tests/                       Active pytest tests.
-tests/fixtures/              Small test fixtures only.
-commands/                    Useful shell commands, organized by purpose.
-docs/legacy_docs/            Old status/handoff notes kept out of the root.
-docs/archive/                Older working notes moved out of the active path.
-_archive/                    Local debug/smoke artifacts and macOS sidecars.
-```
-
-## Useful commands
-
-Run the active pytest suite:
+## GUI
 
 ```bash
-./commands/quality/RUN_PYTEST.command
+./commands/gui/RUN_SORTER_GUI.command
 ```
 
-Run the built-in Stage 4 self-test:
+GUI corrections teach dedicated user, role, physics, and shape memories.
+
+## Development
 
 ```bash
-./commands/smoke/RUN_SELF_TEST.command
+python -m pip install -e ".[dev]"
+make ai-preflight
+make ai-check
+make test
 ```
 
-Run a small real percussion ZIP sort on your T9 drive:
+Read [AGENTS.md](AGENTS.md) before AI-assisted changes.
 
-```bash
-./commands/smoke/RUN_REAL_PERCUSSION_SORT.command
-```
+## Data and model policy
 
-Rebuild the brain from the locked curated training symlink tree:
+- Do not commit sample audio, trained brains, model weights, or private paths.
+- Optional neural models are downloaded separately.
+- Third-party assets keep their original licenses.
+- Filename and folder text must never influence runtime classification.
 
-```bash
-./commands/training/RUN_TRAIN_LOCKED_CURATED.command
-```
+## License
 
-## Training folder rule
+Source-available for personal, non-commercial evaluation only.
 
-Do not replace the `training/locked_curated_v1` symlinks with copied audio. Those symlinks point back to the real files on `/Volumes/T9/music_production/samples`. This keeps the project small and avoids duplicating sample libraries.
+- No commercial use.
+- No redistribution.
+- No proprietary training assets or derived model data may be distributed.
 
-## What was removed from the messy working folder
-
-The cleaned bundle intentionally excludes:
-
-- `.git/`
-- `.venv_phase4/`
-- `.pytest_cache/`
-- `__pycache__/`
-- `__MACOSX/` and `.DS_Store`
-- old backup ZIPs
-- old root command scripts
-- `Aaron_Sound_Sorter_Test_Runner.py`
-- old duplicate sorter files such as `_old.py`, `_last.py`, and `.bak` files
-- broken/obsolete compatibility tests
-- one-off debug run folders in the project root
-- root-level Phase 4 patch status notes
-
-Testing is now done through pytest and direct CLI smoke commands only.
-
----
-
-## Absolute blind-sorting rule
-
-Production sorting logic must never use producer filenames, source folder names,
-ZIP member names, path tokens, sample-pack labels, or any other source-name text
-as classification evidence. Names are allowed only for I/O, manifest display,
-post-decision diagnostics, test fixture selection, and human review. Voters,
-roles, eligibility, consensus, conflict resolution, and final placement must use
-audio measurements, learned brain candidates, physics candidates, shape/role
-facts, and explicit manual corrections only.
-
-Every sorter-logic change must preserve this invariant and must pass:
-
-```bash
-./commands/quality/RUN_NO_SOURCE_NAME_SORTING_AUDIT.command
-```
-
+See [LICENSE](LICENSE) and [NOTICE.md](NOTICE.md).

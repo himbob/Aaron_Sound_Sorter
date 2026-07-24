@@ -1,0 +1,21 @@
+Aaron Sound Sorter Source-Available License
+
+Copyright (c) 2026 Aaron. All rights reserved.
+
+Permission is granted to view, clone, modify, and run this source code locally
+for personal, non-commercial evaluation. Changes may be submitted to the
+official repository for review.
+
+No permission is granted to:
+
+- use this project or its outputs commercially;
+- redistribute, republish, sublicense, sell, or host this project;
+- distribute trained brains, model data, embeddings, manifests, or other
+  artifacts derived from proprietary audio;
+- use third-party sample libraries, models, or assets beyond their own license
+  terms.
+
+The software is provided "as is", without warranty of any kind. Third-party
+dependencies and models remain governed by their respective licenses.
+
+Any other use requires prior written permission from the copyright holder.

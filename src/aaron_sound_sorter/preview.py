@@ -13,6 +13,36 @@ from .two_voter import (
 )
 
 
+def write_runtime_pointer(
+    project_dir: Path,
+    filename: str,
+    target_path: Path,
+) -> Path:
+    """Write a portable project runtime pointer.
+
+    Args:
+        project_dir: Repository root.
+        filename: Lowercase pointer filename.
+        target_path: File or folder referenced by the pointer.
+
+    Returns:
+        Written pointer path.
+
+    Side Effects:
+        Creates ``config/runtime`` and writes one text file.
+    """
+    pointer_path = project_dir / "config" / "runtime" / filename
+    pointer_path.parent.mkdir(parents=True, exist_ok=True)
+    resolved_project = project_dir.expanduser().resolve()
+    resolved_target = target_path.expanduser().resolve()
+    try:
+        pointer_value = str(resolved_target.relative_to(resolved_project))
+    except ValueError:
+        pointer_value = str(resolved_target)
+    pointer_path.write_text(pointer_value + "\n", encoding="utf-8")
+    return pointer_path
+
+
 def include_tiny_files() -> bool:
     """Tiny/wavetable inclusion is off by default.
 
@@ -97,7 +127,7 @@ def collect_resolved_training_audio_files(training_root: Path) -> Set[str]:
     """Return resolved audio targets used by the training tree.
 
     The locked corpus is symlink-first. Excluding only the training folder is
-    not enough because a blind preview over ``/Volumes/T9/.../samples`` can
+    not enough because a blind preview over an external sample library can
     still hit the original target file. Exact resolved target exclusion keeps
     the real preview honest without hiding the rest of that source pack.
     """
@@ -1548,8 +1578,8 @@ def run_build_eval(args: argparse.Namespace) -> int:
         encoding="utf-8",
     )
 
-    (project_dir / "PHASE3_LATEST_PURE_BRAIN_RUN.txt").write_text(str(run_dir) + "\n", encoding="utf-8")
-    (project_dir / "PHASE3_LATEST_PURE_BRAIN_PATH.txt").write_text(str(brain_path) + "\n", encoding="utf-8")
+    write_runtime_pointer(project_dir, "phase3_latest_pure_brain_run.txt", run_dir)
+    write_runtime_pointer(project_dir, "phase3_latest_pure_brain_path.txt", brain_path)
 
     print()
     print(f"Brain: {brain_path}")
