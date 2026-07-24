@@ -235,6 +235,7 @@ clean-generated:
 	find . -name '.pytest_cache' -type d -prune -exec rm -rf {} +
 	find . -name '.mypy_cache' -type d -prune -exec rm -rf {} +
 	find . -name '.ruff_cache' -type d -prune -exec rm -rf {} +
+	find . -name '*.egg-info' -type d -prune -exec rm -rf {} +
 	find . -name '*.pyc' -type f -delete
 	rm -rf "$(PYTHON_BYTECODE_CACHE)"
 	rm -f .coverage

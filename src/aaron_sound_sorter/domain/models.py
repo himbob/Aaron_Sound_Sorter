@@ -126,6 +126,8 @@ class SortRequest:
     write_zip: bool = True
     candidate_count: int = 100
     sort_workers: int = 1
+    use_persistent_analysis_cache: bool = False
+    analysis_cache_dir: Path | None = None
 
 
 @dataclass(frozen=True)

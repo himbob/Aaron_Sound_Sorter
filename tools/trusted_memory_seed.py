@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from aaron_sound_sorter.gui.incremental_brain_update import IncrementalBrainUpdater, IncrementalCorrection
+from aaron_sound_sorter.taxonomy_contracts import is_trainable_taxonomy_label
 
 DEFAULT_PANEL = Path("tests/acceptance/locked_smoke_v1/expected_results.json")
 DEFAULT_SAMPLES_DIR = Path("tests/acceptance/locked_smoke_v1/samples")
@@ -123,8 +124,10 @@ def cases_from_records(
     trainable: list[TrustedSeedCase] = []
     skipped: list[dict[str, str]] = []
     for index, record in enumerate(records, start=1):
-        case_id = str(record.get("id") or record.get("case_id") or f"row_{index:04d}")
-        approved_label = str(record.get("training_label") or record.get("approved_label") or "").strip()
+        case_id = str(record.get("id") or record.get("case_id") or record.get("row_id") or f"row_{index:04d}")
+        approved_label = str(
+            record.get("training_label") or record.get("approved_label") or record.get("approved_folder") or ""
+        ).strip()
         if not is_trainable_label(approved_label):
             skipped.append({"case_id": case_id, "status": "skipped", "reason": "missing_explicit_training_label"})
             continue
@@ -137,7 +140,13 @@ def cases_from_records(
                 case_id=case_id,
                 audio_path=audio_path,
                 approved_label=approved_label,
-                source_description=str(record.get("filename") or record.get("audio_path") or audio_path.name),
+                source_description=str(
+                    record.get("filename")
+                    or record.get("display_name")
+                    or record.get("audio_path")
+                    or record.get("source_path")
+                    or audio_path.name
+                ),
             )
         )
     return TrustedSeedLoadResult(trainable_cases=trainable, skipped_rows=skipped)
@@ -145,13 +154,12 @@ def cases_from_records(
 
 def is_trainable_label(label: str) -> bool:
     """Return true for explicit non-review labels."""
-    parts = [part for part in str(label).split("/") if part]
-    return bool(parts and parts[0] in {"Drums", "Instruments", "FX"} and "_TO_REVIEW" not in parts[0])
+    return is_trainable_taxonomy_label(label)
 
 
 def audio_path_from_record(record: dict[str, Any], *, project_root: Path, samples_dir: Path) -> Path | None:
     """Resolve one row's audio path without using the path as evidence."""
-    raw_audio = str(record.get("audio_path") or record.get("path") or "").strip()
+    raw_audio = str(record.get("audio_path") or record.get("source_path") or record.get("path") or "").strip()
     if raw_audio:
         return resolve_project_path(project_root, Path(raw_audio))
     filename = str(record.get("filename") or "").strip()

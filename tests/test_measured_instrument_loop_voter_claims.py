@@ -22,6 +22,7 @@ from aaron_sound_sorter.engine.eligibility_decision import EligibilityDecision
 from aaron_sound_sorter.engine.family_claim_arbiter import FamilyClaimArbiter
 from aaron_sound_sorter.engine.family_claims import claim_from_folder_path, review_claim
 from aaron_sound_sorter.engine.placement_resolver import PlacementResolver
+from aaron_sound_sorter.engine.voice_source_contracts import processed_voice_source_owned
 
 
 def _claim(path: str, *, source: str = "strong_consensus", score: float = 7.0, strength: float = 0.50):
@@ -206,6 +207,153 @@ def _sax_like_decoy_facts() -> SharedAudioFacts:
     )
 
 
+def _sax_with_competing_synth_loop_facts() -> SharedAudioFacts:
+    facts = _sax_like_decoy_facts()
+    facts.evidence["shape_vote"].update(
+        {
+            "primary_shape": "bass_phrase",
+            "confidence": 0.988,
+            "low_event_ratio": 0.56,
+            "mid_event_ratio": 0.34,
+            "high_event_ratio": 0.10,
+            "pitched_event_ratio": 0.93,
+            "sustained_tonal_frame_ratio": 0.88,
+            "percussive_event_ratio": 0.03,
+            "drumlike_frame_ratio": 0.0,
+            "spectral_flatness_mean": 0.18,
+            "pitch_confidence": 0.70,
+        }
+    )
+    facts.evidence["measured_roles"].update(
+        {
+            "pitched_music_loop": 0.92,
+            "pitched_music_phrase": 0.88,
+        }
+    )
+    facts.evidence["physics_subpanels"]["flat"].update(
+        {
+            "woodwind_sax_score": 0.622,
+            "reed_wind_score": 0.61,
+            "reed_wind_authority_score": 0.60,
+            "synth_tonal_source_score": 0.508,
+            "synth_lead_score": 0.620,
+            "synth_pad_score": 0.500,
+            "synth_chord_score": 0.574,
+        }
+    )
+    facts.evidence["physics_vote_result"] = {
+        "top_guesses": [
+            {
+                "label": "Instruments/Woodwinds/Saxophone/Loops",
+                "folder_path": "Instruments/Woodwinds/Saxophone/Loops",
+                "rank": 1,
+                "score": 0.92,
+            }
+        ]
+    }
+    return facts
+
+
+def _synth_pad_with_false_woodwind_branch_facts() -> SharedAudioFacts:
+    facts = _sax_with_competing_synth_loop_facts()
+    facts.evidence["shape_vote"].update(
+        {
+            "primary_shape": "bass_phrase",
+            "confidence": 0.946,
+            "low_event_ratio": 0.554,
+            "mid_event_ratio": 0.443,
+            "high_event_ratio": 0.002,
+            "pitched_event_ratio": 1.0,
+            "sustained_tonal_frame_ratio": 1.0,
+            "non_event_tonal_ratio": 1.0,
+            "percussive_event_ratio": 0.0,
+            "drumlike_frame_ratio": 0.0,
+        }
+    )
+    facts.evidence["physics_subpanels"]["flat"].update(
+        {
+            "woodwind_sax_score": 0.691,
+            "reed_wind_score": 0.619,
+            "reed_wind_authority_score": 0.494,
+            "synth_tonal_source_score": 0.714,
+            "synth_lead_score": 0.743,
+            "synth_pad_score": 0.785,
+            "synth_chord_score": 0.776,
+            "struck_keys_score": 0.514,
+            "struck_keys_authority_score": 0.364,
+            "keys_tonal_decay_score": 0.863,
+        }
+    )
+    return facts
+
+
+def _raw_instrument_loop_with_sax_and_synth_support():
+    return claim_from_folder_path(
+        folder_path="Instruments/Instrument Loops/Loops",
+        source="strong_consensus",
+        reason="test raw broad instrument loop",
+        shared=[
+            {
+                "folder_path": "Instruments/Woodwinds/Saxophone/Loops",
+                "top_family": "Instruments",
+                "combined_rank_score": 2.0,
+                "brain_rank": 1,
+                "physics_rank": 1,
+            },
+            {
+                "folder_path": "Instruments/Synths/Synth Loops",
+                "top_family": "Instruments",
+                "combined_rank_score": 9.0,
+                "brain_rank": 7,
+                "physics_rank": 5,
+            },
+        ],
+        raw_candidate_score=9.0,
+        brain_rank=7,
+        physics_rank=5,
+        shared_winner="Instruments/Instrument Loops/Loops",
+        can_override=False,
+        strength=0.50,
+        is_real_candidate=True,
+    )
+
+
+def _raw_sax_loop_with_synth_support():
+    broad_raw = _raw_instrument_loop_with_sax_and_synth_support()
+    return claim_from_folder_path(
+        folder_path="Instruments/Woodwinds/Saxophone/Loops",
+        source="strong_consensus",
+        reason="test false sax consensus",
+        shared=broad_raw.shared_candidates,
+        raw_candidate_score=2.0,
+        brain_rank=1,
+        physics_rank=1,
+        shared_winner="Instruments/Woodwinds/Saxophone/Loops",
+        can_override=False,
+        strength=0.875,
+        is_real_candidate=True,
+    )
+
+
+def _raw_human_taught_sax_loop_with_synth_support():
+    raw = _raw_sax_loop_with_synth_support()
+    shared = [dict(row) for row in raw.shared_candidates]
+    shared[0]["brain_evidence"] = {"human_override_generalized_audio_match": True}
+    return claim_from_folder_path(
+        folder_path=raw.folder_path,
+        source=raw.source,
+        reason="test human-taught false sax consensus",
+        shared=shared,
+        raw_candidate_score=raw.raw_candidate_score,
+        brain_rank=raw.brain_rank,
+        physics_rank=raw.physics_rank,
+        shared_winner=raw.shared_winner,
+        can_override=raw.can_override,
+        strength=raw.strength,
+        is_real_candidate=raw.is_real_candidate,
+    )
+
+
 def _designed_low_mixed_loop_facts() -> SharedAudioFacts:
     facts = _low_mixed_melody_loop_facts()
     facts.evidence["shape_vote"].update(
@@ -376,6 +524,137 @@ def _processed_voice_loop_facts() -> SharedAudioFacts:
     )
 
 
+def _processed_formant_fx_decoy_facts() -> SharedAudioFacts:
+    """Return formant-like FX facts that old Voice invariants over-believed."""
+    return SharedAudioFacts(
+        is_broken_or_tiny=False,
+        is_loop_like=True,
+        is_single_event_like=False,
+        is_short_hit_like=False,
+        is_long=True,
+        evidence={
+            "shape_vote": {
+                "primary_shape": "pitched_repetition_phrase",
+                "secondary_shape": "designed_tonal_fx",
+                "confidence": 0.926,
+                "duration_sec": 7.71,
+                "onset_count": 18.0,
+                "high_event_ratio": 0.12,
+                "pitched_event_ratio": 0.84,
+                "f0_voiced_ratio": 0.92,
+                "percussive_event_ratio": 0.09,
+                "drumlike_frame_ratio": 0.09,
+                "sustained_tonal_frame_ratio": 0.91,
+            },
+            "measured_roles": {"detected_parent_role": "pitched_music_loop", "pitched_music_loop": 0.88},
+            "brain_ensemble_vote_result": {
+                "top_guesses": [
+                    {
+                        "label": "Instruments/Guitar/Guitar Loops/One Shots",
+                        "folder_path": "Instruments/Guitar/Guitar Loops/One Shots",
+                        "top_family": "Instruments",
+                        "rank": 1,
+                        "score": 0.94,
+                        "confidence": 0.78,
+                    },
+                    {
+                        "label": "Instruments/Voice/Vocal Loops/Loops",
+                        "folder_path": "Instruments/Voice/Vocal Loops/Loops",
+                        "top_family": "Instruments",
+                        "rank": 3,
+                        "score": 1.20,
+                        "confidence": 0.70,
+                    },
+                ]
+            },
+            "physics_vote_1": "Instruments/Voice/Choir/Loops",
+            "physics_subpanels": {
+                "flat": {
+                    "voice_score": 0.62,
+                    "human_spoken_voice_score": 0.78,
+                    "human_breath_mouth_score": 0.47,
+                    "voice_choir_score": 0.55,
+                    "fx_formant_score": 0.65,
+                    "fx_glitch_stutter_score": 0.53,
+                    "fx_motion_score": 0.07,
+                    "fx_transition_authority_score": 0.11,
+                    "drum_loop_source_score": 0.29,
+                    "drum_hit_score": 0.36,
+                }
+            },
+        },
+    )
+
+
+def _rank_one_voice_decoy_melodic_loop_facts() -> SharedAudioFacts:
+    """Return a non-vocal melodic loop where the brain overcalls Voice."""
+    return SharedAudioFacts(
+        is_broken_or_tiny=False,
+        is_loop_like=True,
+        is_single_event_like=False,
+        is_short_hit_like=False,
+        is_long=True,
+        evidence={
+            "shape_vote": {
+                "primary_shape": "pitched_repetition_phrase",
+                "secondary_shape": "repeated_phrase_loop",
+                "confidence": 0.992,
+                "duration_sec": 12.0,
+                "onset_count": 107.0,
+                "pitched_event_ratio": 1.0,
+                "f0_voiced_ratio": 1.0,
+                "percussive_event_ratio": 0.0,
+                "drumlike_frame_ratio": 0.0,
+            },
+            "measured_roles": {"detected_parent_role": "pitched_music_loop", "pitched_music_loop": 0.90},
+            "brain_ensemble_vote_result": {
+                "top_guesses": [
+                    {
+                        "label": "Instruments/Voice/Vocal Loops/Loops",
+                        "folder_path": "Instruments/Voice/Vocal Loops/Loops",
+                        "top_family": "Instruments",
+                        "rank": 1,
+                        "score": 0.22,
+                        "confidence": 1.0,
+                        "support": 4.51,
+                    },
+                    {
+                        "label": "Instruments/Mixed Musical Loops/Multi Instrument/Loops",
+                        "folder_path": "Instruments/Mixed Musical Loops/Multi Instrument/Loops",
+                        "top_family": "Instruments",
+                        "rank": 4,
+                        "score": 0.40,
+                        "confidence": 1.0,
+                        "support": 2.50,
+                    },
+                ]
+            },
+            "physics_vote_1": "Instruments/Woodwinds/Saxophone/Loops",
+            "physics_layer_decision": {
+                "instrument_branch_selected": "Woodwinds",
+                "physics_layer_branch": "Woodwinds",
+                "instrument_branch_selected_confidence": 0.57,
+            },
+            "physics_subpanels": {
+                "flat": {
+                    "voice_score": 0.73,
+                    "human_spoken_voice_score": 0.88,
+                    "human_breath_mouth_score": 0.51,
+                    "fx_formant_score": 0.76,
+                    "reed_wind_score": 0.69,
+                    "woodwind_sax_score": 0.73,
+                    "synth_tonal_source_score": 0.58,
+                    "bowed_string_score": 0.79,
+                    "drum_loop_source_score": 0.10,
+                    "drum_hit_score": 0.18,
+                    "fx_motion_score": 0.29,
+                    "fx_transition_authority_score": 0.38,
+                }
+            },
+        },
+    )
+
+
 def test_low_mixed_melody_loop_emits_broad_instrument_loop_claim_before_arbiter() -> None:
     claims = MeasuredInstrumentBranchClaimProducer().produce(
         _context(
@@ -450,6 +729,81 @@ def test_processed_voice_loop_emits_instrument_voice_claim_before_fx_human_bucke
         claim.source == "final_measured_voice_invariant" and claim.folder_path == "Instruments/Voice/Vocal Loops/Loops"
         for claim in claims
     )
+
+
+def test_processed_formant_fx_decoy_does_not_emit_instrument_voice_claim() -> None:
+    claims = MeasuredMusicStructureClaimProducer().produce(
+        _context(
+            "FX/Human and Voice FX/Spoken Voice/Long FX",
+            _processed_formant_fx_decoy_facts(),
+            role_name="pitched_music_loop",
+        )
+    )
+
+    assert not any(claim.source == "final_measured_voice_invariant" for claim in claims)
+
+
+def test_rank_one_voice_brain_candidate_does_not_own_generic_melodic_loop() -> None:
+    facts = _rank_one_voice_decoy_melodic_loop_facts()
+
+    claims = MeasuredMusicStructureClaimProducer().produce(
+        _context(
+            "Instruments/Woodwinds/Saxophone/Loops",
+            facts,
+            role_name="pitched_music_loop",
+        )
+    )
+
+    assert processed_voice_source_owned(facts) is False
+    assert not any(claim.source == "final_measured_voice_invariant" for claim in claims)
+
+
+def test_processed_formant_fx_decoy_cannot_use_final_voice_invariant() -> None:
+    raw = _claim("Instruments/Instrument Loops/Loops", score=12.0, strength=0.45)
+    voice = claim_from_folder_path(
+        folder_path="Instruments/Voice/Vocal Loops/Loops",
+        source="final_measured_voice_invariant",
+        reason="test overbroad processed voice invariant",
+        shared=[],
+        raw_candidate_score=6.0,
+        brain_rank=3,
+        physics_rank=3,
+        shared_winner="Instruments/Voice/Vocal Loops/Loops",
+        can_override=True,
+        strength=0.99,
+        is_real_candidate=True,
+    )
+
+    winner = FamilyClaimArbiter().pick_winner(raw_claim=raw, claims=[voice], facts=_processed_formant_fx_decoy_facts())
+
+    assert winner.folder_path == "Instruments/Instrument Loops/Loops"
+    assert winner.source == "strong_consensus"
+
+
+def test_rank_one_voice_decoy_cannot_use_final_voice_invariant() -> None:
+    raw = _claim("Instruments/Instrument Loops/Loops", score=12.0, strength=0.45)
+    voice = claim_from_folder_path(
+        folder_path="Instruments/Voice/Vocal Loops/Loops",
+        source="final_measured_voice_invariant",
+        reason="test overbroad rank-one voice invariant",
+        shared=[],
+        raw_candidate_score=6.0,
+        brain_rank=1,
+        physics_rank=12,
+        shared_winner="Instruments/Voice/Vocal Loops/Loops",
+        can_override=True,
+        strength=0.99,
+        is_real_candidate=True,
+    )
+
+    winner = FamilyClaimArbiter().pick_winner(
+        raw_claim=raw,
+        claims=[voice],
+        facts=_rank_one_voice_decoy_melodic_loop_facts(),
+    )
+
+    assert winner.folder_path == "Instruments/Instrument Loops/Loops"
+    assert winner.source == "strong_consensus"
 
 
 def test_processed_voice_candidate_blocks_broad_mixed_loop_claim() -> None:
@@ -583,6 +937,68 @@ def test_reed_woodwind_ensemble_loop_emits_branch_loop_claim_before_arbiter() ->
         and claim.folder_path == "Instruments/Brass and Woodwinds/Loops"
         for claim in claims
     )
+
+
+def test_synth_loop_claim_stands_down_when_brain_and_physics_support_sax() -> None:
+    context = DecisionContext(
+        raw=_raw_instrument_loop_with_sax_and_synth_support(),
+        eligibility=EligibilityDecision(role_name="pitched_reed_or_instrument_loop", confidence=0.95),
+        facts=_sax_with_competing_synth_loop_facts(),
+    )
+
+    claims = MeasuredInstrumentBranchClaimProducer().produce(context)
+
+    assert any(
+        claim.source == "final_measured_sax_loop_invariant"
+        and claim.folder_path == "Instruments/Woodwinds/Saxophone/Loops"
+        and claim.is_real_candidate
+        for claim in claims
+    )
+    assert not any(claim.source == "final_measured_synth_loop_invariant" for claim in claims)
+
+
+def test_strong_synth_pad_body_overrides_false_woodwind_branch() -> None:
+    context = DecisionContext(
+        raw=_raw_sax_loop_with_synth_support(),
+        eligibility=EligibilityDecision(role_name="pitched_music_loop", confidence=0.95),
+        facts=_synth_pad_with_false_woodwind_branch_facts(),
+    )
+
+    claims = MeasuredInstrumentBranchClaimProducer().produce(context)
+
+    assert any(
+        claim.source == "final_measured_synth_loop_invariant" and claim.folder_path == "Instruments/Synths/Pads/Loops"
+        for claim in claims
+    )
+
+
+def test_human_taught_woodwind_vs_measured_synth_pad_goes_to_review() -> None:
+    context = DecisionContext(
+        raw=_raw_human_taught_sax_loop_with_synth_support(),
+        eligibility=EligibilityDecision(role_name="pitched_music_loop", confidence=0.95),
+        facts=_synth_pad_with_false_woodwind_branch_facts(),
+    )
+
+    claims = MeasuredInstrumentBranchClaimProducer().produce(context)
+
+    assert any(
+        claim.source == "measured_memory_owner_conflict_review"
+        and claim.folder_path == "_TO_REVIEW/Measured Owner Conflict"
+        for claim in claims
+    )
+    winner = FamilyClaimArbiter().pick_winner(raw_claim=context.raw, claims=claims, facts=context.facts)
+    assert winner.source == "measured_memory_owner_conflict_review"
+
+
+def test_legacy_synth_loop_predicate_stands_down_to_supported_sax_loop() -> None:
+    raw = _raw_instrument_loop_with_sax_and_synth_support()
+
+    supported = FamilyClaimArbiter()._facts_support_synth_loop(
+        _sax_with_competing_synth_loop_facts(),
+        raw,
+    )
+
+    assert supported is False
 
 
 def test_review_yields_to_measured_mixed_instrument_loop_claim() -> None:

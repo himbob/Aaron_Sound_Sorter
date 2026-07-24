@@ -80,3 +80,58 @@ def test_harmonic_cache_uses_separate_namespace(tmp_path: Path) -> None:
     assert float(full.fingerprint[0]) == 1.0
     assert float(harmonic.fingerprint[0]) == 10.0
     assert float(harmonic_again.fingerprint[0]) == 10.0
+
+
+def test_persistent_audio_cache_reuses_measurement_across_instances(tmp_path: Path) -> None:
+    audio = tmp_path / "sample.wav"
+    audio.write_bytes(b"audio")
+    cache_dir = tmp_path / "analysis_cache"
+    calls = {"first": 0, "second": 0}
+
+    def first_factory(path: Path) -> AudioPhysics:
+        calls["first"] += 1
+        physics = _physics(path, value=7.0)
+        object.__setattr__(physics, "direct_body_profile", {"body": 0.75})
+        object.__setattr__(physics, "third_party_feature_profile", {"flat": {"tone": 0.5}})
+        return physics
+
+    first_cache = AudioAnalysisCache(max_items=8, persistent_dir=cache_dir)
+    first = first_cache.audio_physics(audio, first_factory)
+
+    def second_factory(path: Path) -> AudioPhysics:
+        calls["second"] += 1
+        return _physics(path, value=99.0)
+
+    second_cache = AudioAnalysisCache(max_items=8, persistent_dir=cache_dir)
+    second = second_cache.audio_physics(audio, second_factory)
+
+    assert calls == {"first": 1, "second": 0}
+    assert float(first.fingerprint[0]) == 7.0
+    assert float(second.fingerprint[0]) == 7.0
+    assert second.direct_body_profile == {"body": 0.75}
+    assert second.third_party_feature_profile == {"flat": {"tone": 0.5}}
+    assert second_cache.stats()["disk_hits"] == 1
+    assert second_cache.stats()["misses"] == 0
+
+
+def test_persistent_cache_invalidates_when_file_state_changes(tmp_path: Path) -> None:
+    audio = tmp_path / "sample.wav"
+    audio.write_bytes(b"audio")
+    cache_dir = tmp_path / "analysis_cache"
+
+    first_cache = AudioAnalysisCache(max_items=8, persistent_dir=cache_dir)
+    first_cache.audio_physics(audio, lambda path: _physics(path, value=2.0))
+
+    audio.write_bytes(b"changed audio")
+    calls = {"count": 0}
+
+    def changed_factory(path: Path) -> AudioPhysics:
+        calls["count"] += 1
+        return _physics(path, value=3.0)
+
+    changed_cache = AudioAnalysisCache(max_items=8, persistent_dir=cache_dir)
+    changed = changed_cache.audio_physics(audio, changed_factory)
+
+    assert calls["count"] == 1
+    assert float(changed.fingerprint[0]) == 3.0
+    assert changed_cache.stats()["disk_hits"] == 0

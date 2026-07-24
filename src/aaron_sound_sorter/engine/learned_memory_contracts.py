@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import Any
 
 LEARNED_MEMORY_EVIDENCE_KEYS = ("learned_voter_memory", "learned_physics_memory")
+EXACT_HUMAN_TEACHER_OWNER_CLAIM_SOURCE = "exact_human_teacher_owner_claim"
 
 VOICE_PATH_FRAGMENTS = (
     "voice",
@@ -39,6 +40,8 @@ class LearnedMemoryMatch:
         confidence: Match confidence normalized to the memory lane's scale.
         effective_weight: Human-training support weight.
         nearest_distance: Distance to the nearest stored fingerprint.
+        match_kind: Memory matcher mode, such as ``fingerprint`` or a
+            broader teacher-cloud match.
 
     Returns:
         Immutable learned-memory match value object.
@@ -64,6 +67,7 @@ class LearnedMemoryMatch:
     confidence: float
     effective_weight: int
     nearest_distance: float
+    match_kind: str
 
     @classmethod
     def from_mapping(cls, evidence_key: str, raw_memory: Mapping[str, Any]) -> LearnedMemoryMatch:
@@ -94,6 +98,7 @@ class LearnedMemoryMatch:
             ),
             effective_weight=safe_int(raw_memory.get("effective_weight"), 0),
             nearest_distance=safe_float(raw_memory.get("nearest_distance"), 9999.0),
+            match_kind=str(raw_memory.get("match_kind") or "none").strip().lower(),
         )
 
     @property
@@ -163,6 +168,65 @@ def iter_learned_memory_matches(
     return matches
 
 
+@dataclass(frozen=True)
+class ExactHumanTeacherConsensus:
+    """Two independent learned lanes agreeing on one near-identical correction.
+
+    This is deliberately narrower than ordinary learned-memory recall.  It is
+    reserved for the user training the same audio through the GUI and both the
+    voter-memory and physics-memory lanes independently recovering the same
+    non-review label from a near-identical fingerprint.
+    """
+
+    label: str
+    top_family: str
+    confidence: float
+    effective_weight: int
+    nearest_distance: float
+
+
+def exact_human_teacher_consensus(
+    source: object,
+    *,
+    minimum_confidence: float = 0.90,
+    minimum_effective_weight: int = 32,
+    maximum_nearest_distance: float = 0.08,
+) -> ExactHumanTeacherConsensus | None:
+    """Return authoritative dual-lane evidence for an exact GUI correction.
+
+    Ordinary memory matches remain advisory.  Authority is granted only when
+    both independent trainable lanes report ``fingerprint`` matches for the
+    same concrete non-review label, with high confidence, meaningful human
+    correction weight, and very small fingerprint distance.
+    """
+    matches = {
+        match.evidence_key: match
+        for match in iter_learned_memory_matches(source, minimum_confidence=minimum_confidence)
+    }
+    voter = matches.get("learned_voter_memory")
+    physics = matches.get("learned_physics_memory")
+    if voter is None or physics is None:
+        return None
+    if voter.match_kind != "fingerprint" or physics.match_kind != "fingerprint":
+        return None
+    if not voter.label or voter.label.lower().startswith("_to_review"):
+        return None
+    if voter.label.lower() != physics.label.lower():
+        return None
+    if min(voter.effective_weight, physics.effective_weight) < int(minimum_effective_weight):
+        return None
+    maximum_distance = max(voter.nearest_distance, physics.nearest_distance)
+    if maximum_distance > float(maximum_nearest_distance):
+        return None
+    return ExactHumanTeacherConsensus(
+        label=voter.label,
+        top_family=voter.top_family or physics.top_family or top_family_from_path(voter.label),
+        confidence=min(voter.confidence, physics.confidence),
+        effective_weight=min(voter.effective_weight, physics.effective_weight),
+        nearest_distance=maximum_distance,
+    )
+
+
 def has_non_voice_memory_match(source: object, *, minimum_confidence: float = 0.86) -> bool:
     """Return whether learned memory strongly claims a non-Voice source.
 
@@ -176,6 +240,25 @@ def has_non_voice_memory_match(source: object, *, minimum_confidence: float = 0.
     return any(
         match.is_non_voice_source
         for match in iter_learned_memory_matches(source, minimum_confidence=minimum_confidence)
+    )
+
+
+def has_voice_memory_match(source: object, *, minimum_confidence: float = 0.82) -> bool:
+    """Return whether learned memory strongly claims a Voice source.
+
+    Args:
+        source: ``SharedAudioFacts``-like object or an evidence dictionary.
+        minimum_confidence: Confidence threshold for accepting a Voice memory
+            row as source ownership evidence.
+
+    Returns:
+        ``True`` when a matched learned-memory row owns a Voice-like source.
+
+    Side Effects:
+        None.
+    """
+    return any(
+        match.is_voice_source for match in iter_learned_memory_matches(source, minimum_confidence=minimum_confidence)
     )
 
 

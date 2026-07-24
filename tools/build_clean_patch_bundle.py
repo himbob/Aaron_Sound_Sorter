@@ -21,9 +21,20 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-PATCH_ALLOWED_TOP_LEVEL_DIRECTORIES = {"src", "tests", "tools", "docs", "commands"}
+PATCH_ALLOWED_TOP_LEVEL_DIRECTORIES = {
+    "src",
+    "tests",
+    "tools",
+    "docs",
+    "commands",
+    "neural_artifacts",
+}
+PATCH_PERSISTENT_EVIDENCE_DIRECTORIES = {"neural_artifacts"}
 PATCH_ALLOWED_ROOT_FILES = {
+    ".gitignore",
     "AGENTS.md",
+    "AI_READ_THIS_FIRST.md",
+    "CURRENT_STATUS.md",
     "Makefile",
     "README.md",
     "pyproject.toml",
@@ -218,6 +229,17 @@ def read_environment_changed_files(project_root: Path) -> list[Path]:
     return sorted(set(paths), key=lambda path: path.as_posix())
 
 
+def discover_persistent_evidence_files(project_root: Path) -> list[Path]:
+    """Return local evidence explicitly included even when Git ignores it."""
+    evidence_paths: list[Path] = []
+    for directory_name in PATCH_PERSISTENT_EVIDENCE_DIRECTORIES:
+        evidence_root = project_root / directory_name
+        if not evidence_root.is_dir():
+            continue
+        evidence_paths.extend(path.relative_to(project_root) for path in evidence_root.rglob("*") if path.is_file())
+    return sorted(set(evidence_paths), key=lambda path: path.as_posix())
+
+
 def discover_changed_files(project_root: Path, base_ref: str) -> tuple[Path, ...]:
     """Discover changed files for bundle packaging.
 
@@ -235,8 +257,9 @@ def discover_changed_files(project_root: Path, base_ref: str) -> tuple[Path, ...
         No intentional exceptions.
     """
     explicit_paths = read_environment_changed_files(project_root)
+    evidence_paths = discover_persistent_evidence_files(project_root)
     if explicit_paths:
-        return tuple(explicit_paths)
+        return tuple(sorted(set([*explicit_paths, *evidence_paths]), key=lambda path: path.as_posix()))
 
     raw_paths: list[Path] = []
     changed_lines = run_git_lines(project_root, ["diff", "--name-only", "--diff-filter=ACMR", base_ref, "--"])
@@ -247,7 +270,7 @@ def discover_changed_files(project_root: Path, base_ref: str) -> tuple[Path, ...
             continue
         if (project_root / relative_path).is_file():
             raw_paths.append(relative_path)
-    return tuple(sorted(set(raw_paths), key=lambda path: path.as_posix()))
+    return tuple(sorted(set([*raw_paths, *evidence_paths]), key=lambda path: path.as_posix()))
 
 
 def is_generated_or_blocked_path(relative_path: Path) -> bool:
@@ -270,6 +293,8 @@ def is_generated_or_blocked_path(relative_path: Path) -> bool:
         return True
     if any(part in PATCH_BLOCKED_ANYWHERE_DIRECTORIES for part in relative_path.parts):
         return True
+    if any(part.endswith(".egg-info") for part in relative_path.parts):
+        return True
     if relative_path.name in PATCH_BLOCKED_FILE_NAMES:
         return True
     if relative_path.name.startswith("._"):
@@ -285,7 +310,7 @@ def is_allowed_patch_file(relative_path: Path) -> bool:
 
     Returns:
         ``True`` when the path lives in an allowed source, test, tool, command,
-        or documentation location.
+        documentation, or persistent neural-evidence location.
 
     Side Effects:
         None.

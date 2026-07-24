@@ -14,6 +14,17 @@ from typing import Any
 
 import numpy as np
 
+from aaron_audio_intelligence.adaptive_teacher_metric import (
+    DEFAULT_BASELINE_SCALE,
+    DEFAULT_MAX_STABLE_UPPER_RMS,
+    DEFAULT_MAX_STABLE_VIOLATION_FRACTION,
+    adaptive_teacher_metric,
+    adaptive_teacher_ranking_score,
+)
+from aaron_audio_intelligence.learned_memory_features import (
+    PITCH_REGISTER_SENSITIVE_MEMORY_FEATURES,
+    weighted_normalized_signature_vector,
+)
 from aaron_sound_sorter.engine.learned_memory_contracts import (
     memory_conflicts_with_candidate_top_family,
     normalize_internal_path,
@@ -33,8 +44,9 @@ class HumanOverrideRecallMatch:
         generalized_match: True when the current audio is close to a supported
             human-taught label neighborhood, but not close enough to be called
             the same measured fingerprint region.
-        match_kind: Diagnostic match type.  Expected values are ``none``,
-            ``fingerprint``, ``teacher_prototype``, and ``teacher_cloud``.
+        match_kind: Diagnostic match type. Expected values are ``none``,
+            ``fingerprint``, ``adaptive_teacher_cloud``, and
+            ``adaptive_teacher_neighbor``.
         nearest_distance: Weighted feature distance to the nearest human-taught
             fingerprint.
         effective_weight: Human override support weight stored for the label.
@@ -44,6 +56,18 @@ class HumanOverrideRecallMatch:
         threshold: Active maximum distance accepted for this match.
         exact_threshold: Maximum distance for exact fingerprint recall.
         generalized_threshold: Maximum distance for broader teacher recall.
+        adaptive_distance: Robust category-specific distance learned from the
+            target's own correction cloud.
+        adaptive_threshold: Maximum accepted robust learned distance.
+        adaptive_stable_violation_fraction: Fraction of low-variance identity
+            dimensions that exceeded the safety guardrail.
+        adaptive_stable_upper_rms: RMS deviation across the worst-changing
+            stable identity dimensions.
+        adaptive_stable_feature_count: Number of learned stable dimensions.
+        adaptive_variable_feature_count: Number of learned flexible dimensions.
+        identity_neighbor_distance: Register-invariant RMS distance to the
+            nearest individual human teacher.
+        identity_neighbor_threshold: Maximum accepted teacher-neighbor distance.
 
     Side Effects:
         None.
@@ -68,6 +92,14 @@ class HumanOverrideRecallMatch:
     threshold: float
     exact_threshold: float
     generalized_threshold: float
+    adaptive_distance: float
+    adaptive_threshold: float
+    adaptive_stable_violation_fraction: float
+    adaptive_stable_upper_rms: float
+    adaptive_stable_feature_count: int
+    adaptive_variable_feature_count: int
+    identity_neighbor_distance: float
+    identity_neighbor_threshold: float
 
     def evidence(self) -> dict[str, Any]:
         """Return flat diagnostics suitable for voter evidence dictionaries."""
@@ -83,11 +115,21 @@ class HumanOverrideRecallMatch:
             "human_override_distance_threshold": round(float(self.threshold), 6),
             "human_override_exact_distance_threshold": round(float(self.exact_threshold), 6),
             "human_override_generalized_distance_threshold": round(float(self.generalized_threshold), 6),
+            "human_override_adaptive_distance": round(float(self.adaptive_distance), 6),
+            "human_override_adaptive_threshold": round(float(self.adaptive_threshold), 6),
+            "human_override_adaptive_stable_violation_fraction": round(
+                float(self.adaptive_stable_violation_fraction), 6
+            ),
+            "human_override_adaptive_stable_upper_rms": round(float(self.adaptive_stable_upper_rms), 6),
+            "human_override_adaptive_stable_feature_count": int(self.adaptive_stable_feature_count),
+            "human_override_adaptive_variable_feature_count": int(self.adaptive_variable_feature_count),
+            "human_override_identity_neighbor_distance": round(float(self.identity_neighbor_distance), 6),
+            "human_override_identity_neighbor_threshold": round(float(self.identity_neighbor_threshold), 6),
             "human_override_effective_weight": int(self.effective_weight),
             "human_override_example_count": int(self.example_count),
             "human_override_confirmation_count": int(self.confirmation_count),
             "human_override_ranking_score": round(float(self.ranking_score), 6),
-            "human_override_recall_policy": "weighted_fingerprint_and_teacher_cloud_match",
+            "human_override_recall_policy": ("exact_fingerprint_plus_register_invariant_adaptive_teacher_metric"),
         }
 
 
@@ -95,6 +137,7 @@ def human_override_recall_match(
     brain: dict[str, Any],
     label: str,
     *,
+    raw_query_vector: np.ndarray,
     weighted_query_vector: np.ndarray,
     scaler_mean: np.ndarray,
     scaler_std: np.ndarray,
@@ -105,6 +148,7 @@ def human_override_recall_match(
     Args:
         brain: Active brain dictionary.
         label: Candidate label being scored.
+        raw_query_vector: Current unscaled audio fingerprint.
         weighted_query_vector: Current audio fingerprint after the same
             scaler/weight transform used by the voter score.
         scaler_mean: Label-specific or global scaler mean.
@@ -139,6 +183,14 @@ def human_override_recall_match(
     effective_weight = label_human_override_weight(brain, label)
     confirmation_count = 0
     valid_count = 0
+    identity_query = weighted_normalized_signature_vector(
+        brain,
+        raw_query_vector,
+        include_feature_names=set(str(name) for name in brain.get("feature_names", [])),
+        exclude_feature_names=PITCH_REGISTER_SENSITIVE_MEMORY_FEATURES,
+        minimum_feature_count=24,
+    )
+    identity_examples: list[np.ndarray] = []
     for example in examples:
         if not isinstance(example, dict):
             continue
@@ -156,37 +208,63 @@ def human_override_recall_match(
         if math.isfinite(distance):
             valid_count += 1
             nearest = min(nearest, distance)
+            identity_example = weighted_normalized_signature_vector(
+                brain,
+                example_vector,
+                include_feature_names=set(str(name) for name in brain.get("feature_names", [])),
+                exclude_feature_names=PITCH_REGISTER_SENSITIVE_MEMORY_FEATURES,
+                minimum_feature_count=24,
+            )
+            if identity_example.size == identity_query.size and identity_example.size > 0:
+                identity_examples.append(identity_example)
 
     if valid_count <= 0:
         return no_human_override_match(example_count=len(examples), effective_weight=effective_weight)
 
     exact_threshold = human_override_distance_threshold(effective_weight)
-    support_count = max(valid_count, confirmation_count)
-    prototype_threshold = human_override_prototype_distance_threshold(effective_weight)
-    cloud_threshold = human_override_teacher_cloud_distance_threshold(
-        effective_weight,
-        example_count=valid_count,
-        support_count=support_count,
+    adaptive_match = adaptive_teacher_metric(
+        identity_query,
+        identity_examples,
+        effective_weight=effective_weight,
     )
-    generalized_threshold = cloud_threshold if valid_count >= 2 else prototype_threshold
+    identity_neighbor_distance = nearest_identity_neighbor_distance(
+        identity_query,
+        identity_examples,
+    )
+    identity_neighbor_threshold = human_override_identity_neighbor_threshold(effective_weight)
+    adaptive_guardrail_pass = bool(
+        not adaptive_match.available
+        or (
+            adaptive_match.stable_violation_fraction <= DEFAULT_MAX_STABLE_VIOLATION_FRACTION
+            and adaptive_match.stable_upper_rms <= DEFAULT_MAX_STABLE_UPPER_RMS
+        )
+    )
 
     exact_match = bool(nearest <= exact_threshold)
-    cloud_match = bool(valid_count >= 2 and nearest <= cloud_threshold)
-    prototype_match = bool(valid_count == 1 and nearest <= prototype_threshold)
-    generalized_match = bool(not exact_match and (cloud_match or prototype_match))
+    adaptive_cloud_match = bool(valid_count >= 2 and adaptive_match.matched)
+    identity_neighbor_match = bool(
+        identity_neighbor_distance <= identity_neighbor_threshold and adaptive_guardrail_pass
+    )
+    generalized_match = bool(not exact_match and (adaptive_cloud_match or identity_neighbor_match))
     matched = bool(exact_match or generalized_match)
     if exact_match:
         match_kind = "fingerprint"
         threshold = exact_threshold
         ranking_score = human_override_ranking_score(effective_weight, nearest)
-    elif cloud_match:
-        match_kind = "teacher_cloud"
-        threshold = cloud_threshold
-        ranking_score = human_override_teacher_cloud_ranking_score(effective_weight, support_count, nearest)
-    elif prototype_match:
-        match_kind = "teacher_prototype"
-        threshold = prototype_threshold
-        ranking_score = human_override_teacher_prototype_ranking_score(effective_weight, nearest)
+    elif adaptive_cloud_match:
+        match_kind = "adaptive_teacher_cloud"
+        threshold = adaptive_match.threshold
+        ranking_score = adaptive_teacher_ranking_score(
+            effective_weight=effective_weight,
+            metric=adaptive_match,
+        )
+    elif identity_neighbor_match:
+        match_kind = "adaptive_teacher_neighbor"
+        threshold = identity_neighbor_threshold
+        ranking_score = human_override_teacher_neighbor_ranking_score(
+            effective_weight,
+            identity_neighbor_distance,
+        )
     else:
         match_kind = "none"
         threshold = exact_threshold
@@ -203,7 +281,18 @@ def human_override_recall_match(
         ranking_score=ranking_score,
         threshold=threshold,
         exact_threshold=exact_threshold,
-        generalized_threshold=generalized_threshold,
+        generalized_threshold=max(
+            identity_neighbor_threshold,
+            adaptive_match.threshold if adaptive_match.available else 0.0,
+        ),
+        adaptive_distance=adaptive_match.adjusted_distance,
+        adaptive_threshold=adaptive_match.threshold,
+        adaptive_stable_violation_fraction=adaptive_match.stable_violation_fraction,
+        adaptive_stable_upper_rms=adaptive_match.stable_upper_rms,
+        adaptive_stable_feature_count=adaptive_match.stable_feature_count,
+        adaptive_variable_feature_count=adaptive_match.variable_feature_count,
+        identity_neighbor_distance=identity_neighbor_distance,
+        identity_neighbor_threshold=identity_neighbor_threshold,
     )
 
 
@@ -280,65 +369,80 @@ def numeric_fingerprint(value: Any) -> np.ndarray:
     return vector
 
 
-def human_override_distance_threshold(effective_weight: int) -> float:
-    """Return the accepted weighted distance for human correction recall."""
-    weight = max(1, int(effective_weight or 0))
-    return min(2.25, max(0.35, 0.35 + math.log1p(weight) / 7.0))
-
-
-def human_override_prototype_distance_threshold(effective_weight: int) -> float:
-    """Return the accepted distance for a single human-taught prototype.
-
-    A single GUI correction should help near neighbors, but it should not become
-    a broad class override.  This threshold is intentionally wider than exact
-    recall and narrower than the multi-example teacher cloud.
-    """
-    exact = human_override_distance_threshold(effective_weight)
-    weight = max(1, int(effective_weight or 0))
-    return min(2.85, exact + 0.30 + math.log1p(weight) / 16.0)
-
-
-def human_override_teacher_cloud_distance_threshold(
-    effective_weight: int,
-    *,
-    example_count: int,
-    support_count: int,
-) -> float:
-    """Return the accepted distance for multi-example human-taught recall."""
-    exact = human_override_distance_threshold(effective_weight)
-    support = max(2, int(example_count or 0), int(support_count or 0))
-    return min(3.65, exact + 0.45 + math.log1p(support) / 3.5)
-
-
 def human_override_ranking_score(effective_weight: int, nearest_distance: float) -> float:
-    """Return a lower-is-better score for a matched GUI correction."""
+    """Return a lower-is-better score for a same-fingerprint correction."""
     weight = max(1, int(effective_weight or 0))
     authority = min(2.4, 0.45 + math.log1p(weight) / 3.0)
     distance_cost = min(0.35, max(0.0, float(nearest_distance)) * 0.08)
     return -max(0.25, authority - distance_cost)
 
 
-def human_override_teacher_prototype_ranking_score(effective_weight: int, nearest_distance: float) -> float:
-    """Return a conservative score for one nearby human-taught prototype."""
-    exact = human_override_distance_threshold(effective_weight)
-    weight = max(1, int(effective_weight or 0))
-    authority = min(1.65, 0.30 + math.log1p(weight) / 5.0)
-    distance_cost = min(0.65, max(0.0, float(nearest_distance) - exact) * 0.22)
-    return -max(0.10, authority - distance_cost)
-
-
-def human_override_teacher_cloud_ranking_score(
-    effective_weight: int,
-    support_count: int,
-    nearest_distance: float,
+def nearest_identity_neighbor_distance(
+    query: np.ndarray,
+    examples: list[np.ndarray],
+    *,
+    baseline_scale: float = DEFAULT_BASELINE_SCALE,
 ) -> float:
-    """Return a lower-is-better score for a supported correction cloud."""
+    """Return register-invariant RMS distance to the nearest human teacher.
+
+    This is a bounded local-neighborhood fallback for multimodal categories. It
+    does not infer category-wide variability; it only says that a new sample is
+    near one approved teacher after absolute pitch-register coordinates are
+    removed.
+    """
+    q = np.asarray(query, dtype=np.float32).reshape(-1)
+    if q.size <= 0 or not examples:
+        return float("inf")
+    scale = max(1e-6, float(baseline_scale))
+    distances: list[float] = []
+    for example in examples:
+        row = np.asarray(example, dtype=np.float32).reshape(-1)
+        usable = min(int(q.size), int(row.size))
+        if usable <= 0:
+            continue
+        residual = np.abs((q[:usable] - row[:usable]) / scale)
+        full_rms = float(np.sqrt(np.mean(np.square(residual))))
+        upper_count = min(
+            usable,
+            max(4, int(math.ceil(0.15 * float(usable)))),
+        )
+        upper = np.partition(residual, -upper_count)[-upper_count:]
+        upper_rms = float(np.sqrt(np.mean(np.square(upper))))
+        distance = 0.65 * full_rms + 0.35 * upper_rms
+        if math.isfinite(distance):
+            distances.append(distance)
+    return min(distances) if distances else float("inf")
+
+
+def human_override_identity_neighbor_threshold(effective_weight: int) -> float:
+    """Return a bounded radius around each individual approved teacher."""
     exact = human_override_distance_threshold(effective_weight)
     weight = max(1, int(effective_weight or 0))
-    support = max(2, int(support_count or 0))
-    authority = min(1.9, 0.35 + math.log1p(weight) / 4.5 + math.log1p(support) / 8.0)
-    distance_cost = min(0.65, max(0.0, float(nearest_distance) - exact) * 0.18)
-    return -max(0.15, authority - distance_cost)
+    return min(1.45, exact + 0.30 + math.log1p(weight) / 16.0)
+
+
+def human_override_teacher_neighbor_ranking_score(
+    effective_weight: int,
+    neighbor_distance: float,
+) -> float:
+    """Return conservative rank evidence for one nearby approved teacher."""
+    threshold = human_override_identity_neighbor_threshold(effective_weight)
+    weight = max(1, int(effective_weight or 0))
+    authority = min(1.35, 0.28 + math.log1p(weight) / 5.6)
+    normalized_distance = max(0.0, float(neighbor_distance)) / max(threshold, 1e-6)
+    distance_cost = min(0.75, 0.62 * normalized_distance)
+    return -max(0.08, authority - distance_cost)
+
+
+def human_override_distance_threshold(effective_weight: int) -> float:
+    """Return the narrow distance for same-fingerprint correction recall.
+
+    Repeating a correction may increase trust, but it must not turn the exact
+    lane into a broad category cloud.  Generalization is handled separately by
+    the adaptive teacher metric.
+    """
+    weight = max(1, int(effective_weight or 0))
+    return min(0.42, max(0.16, 0.12 + math.log1p(weight) / 42.0))
 
 
 def no_human_override_match(
@@ -359,7 +463,15 @@ def no_human_override_match(
         ranking_score=float("inf"),
         threshold=human_override_distance_threshold(effective_weight),
         exact_threshold=human_override_distance_threshold(effective_weight),
-        generalized_threshold=human_override_prototype_distance_threshold(effective_weight),
+        generalized_threshold=human_override_identity_neighbor_threshold(effective_weight),
+        adaptive_distance=float("inf"),
+        adaptive_threshold=0.0,
+        adaptive_stable_violation_fraction=1.0,
+        adaptive_stable_upper_rms=float("inf"),
+        adaptive_stable_feature_count=0,
+        adaptive_variable_feature_count=0,
+        identity_neighbor_distance=float("inf"),
+        identity_neighbor_threshold=human_override_identity_neighbor_threshold(effective_weight),
     )
 
 

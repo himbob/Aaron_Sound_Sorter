@@ -17,6 +17,7 @@ from aaron_sound_sorter.infrastructure.brain_lane_validation import write_brain_
 
 SORTED_ROOT_NAME = "Aaron_Sorted_Sounds"
 DEBUG_PACKET_SIDECAR_NAME = f"{SORTED_ROOT_NAME}_debug_packets.jsonl"
+DEBUG_PACKET_ENV_VAR = "AARON_WRITE_DEBUG_PACKETS"
 
 CATEGORY_PANEL_MANIFEST_FIELDS = [spec.score_key for spec in ALL_CATEGORY_SPECS]
 
@@ -210,9 +211,21 @@ class SortReportWriter:
         """Write manifest, summary, optional ZIP, and return summary."""
         manifest_path = self.output_dir / f"{SORTED_ROOT_NAME}_manifest.csv"
         summary_path = self.output_dir / f"{SORTED_ROOT_NAME}_summary.txt"
+        debug_packet_path = self.output_dir / DEBUG_PACKET_SIDECAR_NAME
         write_manifest(manifest_path, file_results)
-        write_debug_packets(self.output_dir / DEBUG_PACKET_SIDECAR_NAME, file_results)
-        write_audio_intelligence_sidecars(self.output_dir / AUDIO_INTELLIGENCE_SIDECAR_NAME, file_results)
+        if debug_packets_enabled():
+            write_debug_packets(debug_packet_path, file_results)
+            debug_packet_name = DEBUG_PACKET_SIDECAR_NAME
+        elif debug_packet_path.exists():
+            debug_packet_path.unlink()
+            debug_packet_name = ""
+        else:
+            debug_packet_name = ""
+        write_audio_intelligence_sidecars(
+            self.output_dir / AUDIO_INTELLIGENCE_SIDECAR_NAME,
+            file_results,
+            debug_packet_name=debug_packet_name,
+        )
         write_summary(summary_path, file_results)
         write_brain_ensemble_audit(self.output_dir / "Aaron_Brain_Ensemble_Audit.csv", file_results)
         write_brain_lane_validation_reports(self.output_dir, file_results)
@@ -421,10 +434,16 @@ def compact_shared_facts(facts_evidence: dict[str, Any]) -> dict[str, Any]:
     Numbers, Excel, and quick Python scripts. Full evidence is written to the
     JSONL sidecar instead.
     """
+    debug_sidecar = DEBUG_PACKET_SIDECAR_NAME if debug_packets_enabled() else ""
     if not isinstance(facts_evidence, dict):
-        return {"debug_packet_sidecar": DEBUG_PACKET_SIDECAR_NAME}
+        return {
+            "debug_packet_sidecar": debug_sidecar,
+            "debug_packets_enabled": debug_packets_enabled(),
+        }
     digest: dict[str, Any] = {
-        "debug_packet_sidecar": DEBUG_PACKET_SIDECAR_NAME,
+        "debug_packet_sidecar": debug_sidecar,
+        "debug_packets_enabled": debug_packets_enabled(),
+        "debug_packets_enable_hint": f"set {DEBUG_PACKET_ENV_VAR}=1 before sorting",
         "measured_roles": facts_evidence.get("measured_roles", {}),
         "shape_vote": facts_evidence.get("shape_vote", {}),
         "parent_role_audit": compact_parent_role_audit(facts_evidence),
@@ -447,6 +466,17 @@ def compact_shared_facts(facts_evidence: dict[str, Any]) -> dict[str, Any]:
         if key in facts_evidence:
             digest[key] = facts_evidence[key]
     return digest
+
+
+def debug_packets_enabled() -> bool:
+    """Return whether normal sort runs should write full evidence packets.
+
+    The compact manifest and audio-intelligence sidecar are always written. The
+    full debug packet sidecar is intentionally opt-in because it can grow to
+    multiple gigabytes on large panels.
+    """
+    value = str(os.environ.get(DEBUG_PACKET_ENV_VAR, "")).strip().lower()
+    return value in {"1", "true", "yes", "on", "debug", "full"}
 
 
 def write_debug_packets(path: Path, file_results: list[SortFileResult]) -> None:

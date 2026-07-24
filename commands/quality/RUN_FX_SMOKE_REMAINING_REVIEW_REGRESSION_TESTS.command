@@ -16,4 +16,9 @@ echo
 echo "Project: $PROJECT_ROOT"
 echo
 "$PYTHON_BIN" -m py_compile   src/aaron_sound_sorter/engine/decision_core_v2.py   tools/audit_manifest_no_review.py
-"$PYTHON_BIN" -m pytest -q   tests/test_decision_core_fx_smoke_remaining_review_rows.py   tests/test_decision_core_fx_smoke_no_review_v2.py   tests/test_decision_core_fx_smoke_no_review_guard.py   tests/test_decision_core_ground_truth_true_bucket_tdd.py   tests/test_decision_core_ground_truth_samples_tdd.py   tests/test_decision_core_v2.py
+"$PYTHON_BIN" -m pytest -q \
+  tests/test_decision_core_fx_smoke_remaining_review_rows.py \
+  tests/test_decision_core_fx_smoke_no_review_v2.py \
+  tests/test_decision_core_fx_smoke_no_review_guard.py \
+  tests/test_decision_core_ground_truth_true_bucket_tdd.py \
+  tests/test_decision_core_v2.py

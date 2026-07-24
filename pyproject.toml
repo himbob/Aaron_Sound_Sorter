@@ -14,6 +14,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+neural = [
+  "torch>=2.4,<3",
+  "transformers>=4.51,<6",
+  "scikit-learn>=1.4,<2",
+  "safetensors>=0.4,<1",
+]
 quality = [
   "pytest>=8,<9",
   "pytest-cov>=5,<8",
@@ -123,6 +129,11 @@ ignore = [
 # Tests and a few CLI audit tools intentionally alter sys.path before imports so
 # they can run directly from a checkout without installing the package.
 "tests/**/*.py" = ["E402"]
+"tools/audit_adaptive_teacher_memory.py" = ["E402"]
+"tools/build_neural_vocal_experiment.py" = ["E402"]
+"tools/build_neural_vocal_supplement.py" = ["E402"]
+"tools/neural_audio_lab.py" = ["E402"]
+"tools/neural_vocal_experiment_report.py" = ["E402"]
 "tools/run_fx_aaron2_one_by_one_golden_audit.py" = ["E402"]
 
 [tool.ruff.format]

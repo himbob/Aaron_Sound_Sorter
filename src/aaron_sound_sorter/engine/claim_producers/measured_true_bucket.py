@@ -29,6 +29,7 @@ from aaron_sound_sorter.engine.decision_helpers import (
 )
 from aaron_sound_sorter.engine.eligibility import EligibilityDecision
 from aaron_sound_sorter.engine.family_claims import ConsensusClaim, claim_from_folder_path
+from aaron_sound_sorter.engine.numeric_evidence import numeric_evidence_value
 
 
 class MeasuredTrueBucketClaimProducer(
@@ -124,7 +125,23 @@ class MeasuredTrueBucketClaimProducer(
         dark_reed = bool(layer.get("instrument_dark_low_mid_reed_loop_signal"))
         sax_subpanel = str(layer.get("instrument_Woodwinds_subpanel_selected") or "") == "Sax"
         sax_subpanel_confidence = self._number(layer.get("instrument_Woodwinds_subpanel_confidence"), 0.0)
-        sax_score = self._number(facts.evidence.get("woodwind_sax_score"), 0.0)
+        sax_score = self._evidence_score(facts, "woodwind_sax_score", "reed_wind_score")
+        reed_score = self._evidence_score(facts, "reed_wind_authority_score", "reed_wind_score")
+        synth_score = self._evidence_score(
+            facts,
+            "synth_tonal_source_score",
+            "synth_lead_score",
+            "synth_pad_score",
+            "synth_chord_score",
+        )
+        keys_score = self._evidence_score(facts, "struck_keys_score", "keys_tonal_decay_score")
+        voice_score = self._evidence_score(facts, "voice_score", "human_spoken_voice_score")
+        string_score = self._evidence_score(facts, "bowed_string_score", "string_cello_score", "string_violin_score")
+        neighbor_pressure = max(synth_score, keys_score, voice_score, string_score)
+        if neighbor_pressure >= max(sax_score, reed_score) + 0.08 and not (
+            sax_subpanel and sax_subpanel_confidence >= 0.80 and sax_score >= 0.70 and reed_score >= 0.62
+        ):
+            return None
         if not (
             (dark_reed and sax_score >= 0.58)
             or (woodwind_branch >= 0.86 and sax_subpanel and sax_subpanel_confidence >= 0.74 and sax_score >= 0.60)
@@ -165,3 +182,8 @@ class MeasuredTrueBucketClaimProducer(
         except Exception:
             return default
         return default if number != number else number
+
+    @staticmethod
+    def _evidence_score(facts: SharedAudioFacts, *keys: str) -> float:
+        """Return strongest source-blind numeric evidence value."""
+        return max((numeric_evidence_value(facts, key, 0.0) for key in keys), default=0.0)

@@ -11,12 +11,12 @@ def _run_neutralized_audio(sample_name: str) -> dict[str, str]:
     )
 
 
-def test_uploaded_pad_loop_is_not_stolen_by_sax_invariant() -> None:
+def test_uploaded_pad_loop_memory_conflict_goes_to_review() -> None:
     row = _run_neutralized_audio("CS_NJ2_135bpm_Pad_Aster_Am.wav")
     label = row_label(row)
     low = label.lower()
 
-    assert label.startswith("Instruments/Synths/"), label
-    assert "pad" in low, label
+    assert label.startswith("_TO_REVIEW/"), label
+    assert "owner conflict" in low, label
     assert "sax" not in low and "woodwind" not in low, label
-    assert row.get("consensus_status") == "final_measured_synth_loop_invariant"
+    assert row.get("consensus_status") == "measured_memory_owner_conflict_review"

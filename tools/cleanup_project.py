@@ -33,6 +33,8 @@ PROTECTED_ROOT_DIRS = {
     "commands",
     "docs",
     "training",  # huge, but user-controlled source/training data; never delete by default.
+    "_models",  # pinned local foundation-model snapshots; expensive but reproducible critical inputs.
+    "neural_artifacts",  # compact provenance, registry, quarantine, and held-out evidence.
 }
 
 ACTIVE_BRAIN_PATTERNS = [

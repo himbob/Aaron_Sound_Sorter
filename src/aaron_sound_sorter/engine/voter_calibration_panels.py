@@ -21,6 +21,7 @@ from typing import Any
 
 from aaron_sound_sorter.domain.models import SharedAudioFacts
 from aaron_sound_sorter.engine.family_claims import ConsensusClaim
+from aaron_sound_sorter.engine.numeric_evidence import add_direct_numeric_children, add_finite_numeric
 
 
 @dataclass(frozen=True)
@@ -198,6 +199,12 @@ CALIBRATION_TARGETS: tuple[CalibrationTargetSpec, ...] = (
     ),
 )
 
+CALIBRATION_FACT_KEYS = frozenset(
+    key
+    for spec in CALIBRATION_TARGETS
+    for key in (*spec.source_specific_keys, *spec.decoy_keys, *spec.role_structure_keys)
+)
+
 
 def build_voter_calibration_panels(
     *,
@@ -269,12 +276,12 @@ def build_one_panel(
 
 
 def flatten_fact_values(facts: SharedAudioFacts | None) -> dict[str, float]:
-    """Flatten numeric evidence values from SharedAudioFacts.
+    """Return numeric evidence values needed by calibration panels.
 
     This can be called many times while the arbiter compares candidate claims for
     one file.  The facts object is immutable for the duration of that decision,
-    so cache the flattened numeric map on the facts instance instead of walking
-    large nested diagnostic dictionaries repeatedly.
+    so cache the numeric map on the facts instance instead of walking diagnostic
+    dictionaries repeatedly.
     """
     if facts is None:
         return {}
@@ -284,17 +291,43 @@ def flatten_fact_values(facts: SharedAudioFacts | None) -> dict[str, float]:
     output: dict[str, float] = {}
     for key, value in getattr(facts, "feature_values_by_name", {}).items():
         add_numeric(output, str(key), value)
-    for key, value in getattr(facts, "evidence", {}).items():
-        # Private/cache entries are diagnostics for Python runtime, not audio
-        # evidence.  Do not recursively flatten them into panel facts.
-        if str(key).startswith("_"):
-            continue
-        flatten_value(output, str(key), value)
+    evidence = getattr(facts, "evidence", {})
+    if isinstance(evidence, dict):
+        add_targeted_evidence_values(output, evidence)
     try:
         object.__setattr__(facts, "_voter_calibration_flat_values_cache", output)
     except Exception:
         pass
     return output
+
+
+def add_targeted_evidence_values(output: dict[str, float], evidence: dict[str, Any]) -> None:
+    """Add only calibration-relevant evidence values to ``output``.
+
+    Older builds recursively flattened every debug packet field, including
+    large voter digests and shared candidate traces.  The calibration panels
+    only need named low-level facts, so this targeted pass keeps the decision
+    path fast while preserving the same panel inputs.
+    """
+    for key, value in evidence.items():
+        key_name = str(key)
+        if key_name.startswith("_"):
+            continue
+        if key_name in CALIBRATION_FACT_KEYS:
+            add_numeric(output, key_name, value)
+        elif not isinstance(value, (dict, list, tuple)):
+            add_numeric(output, key_name, value)
+
+    for container_name in ("physics_subpanels", "shape_vote", "measured_roles", "wetness_profile"):
+        container = evidence.get(container_name, {})
+        if isinstance(container, dict):
+            add_direct_numeric_children(output, container, clamp_to_unit=True)
+            flat = container.get("flat", {})
+            if isinstance(flat, dict):
+                add_direct_numeric_children(output, flat, clamp_to_unit=True)
+            role_evidence = container.get("evidence", {})
+            if isinstance(role_evidence, dict):
+                add_direct_numeric_children(output, role_evidence, clamp_to_unit=True)
 
 
 def flatten_value(output: dict[str, float], prefix: str, value: Any) -> None:
@@ -314,15 +347,7 @@ def flatten_value(output: dict[str, float], prefix: str, value: Any) -> None:
 
 def add_numeric(output: dict[str, float], key: str, value: Any) -> None:
     """Add a finite numeric or boolean value to a flat fact map."""
-    if isinstance(value, bool):
-        output[key] = 1.0 if value else 0.0
-        return
-    try:
-        numeric = float(value)
-    except Exception:
-        return
-    if numeric == numeric and numeric not in {float("inf"), float("-inf")}:
-        output[key] = clamp01(numeric)
+    add_finite_numeric(output, key, value, clamp_to_unit=True)
 
 
 def best_key_scores(values: dict[str, float], keys: tuple[str, ...]) -> tuple[tuple[str, float], ...]:

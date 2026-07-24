@@ -2,6 +2,8 @@
 # This is a component module, not a legacy wrapper.
 from __future__ import annotations
 
+from aaron_sound_sorter.engine.brain_runtime_cache import get_brain_runtime_cache
+
 from .core import *
 
 
@@ -1812,40 +1814,33 @@ def label_model_distance_score(brain: dict, label: str, xw: np.ndarray) -> Tuple
        label. This made anchor-rescued predictions look more confident than they
        were. Anchors should improve recall, not manufacture high confidence.
     """
-    weights = np.asarray(brain.get("feature_weights", FEATURE_WEIGHTS), dtype=np.float32)
-    label_models = brain.get("label_models_by_label", {})
-    model_info = label_models.get(label, {}) if isinstance(label_models, dict) else {}
-    mode = str(model_info.get("model_mode", "centroid")) if isinstance(model_info, dict) else "centroid"
+    runtime = get_brain_runtime_cache(brain)
+    model_info = runtime.model_by_label.get(label)
+    if model_info is None:
+        return float("inf"), float("inf"), "missing_runtime_label_model"
+    xw = np.asarray(xw, dtype=np.float32).reshape(-1)
+    if xw.size < FP_SIZE:
+        xw = np.pad(xw, (0, FP_SIZE - xw.size), mode="constant", constant_values=0.0)
+    xw = np.nan_to_num(xw[:FP_SIZE], nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32, copy=False)
+    mode = str(model_info.model_mode)
 
     # Spread-scaled rescue gap: scales with the label's own learned spread so
     # dense labels get a tight gap and diffuse labels get a looser one.
     # 0.08 is the base scale. Clamp keeps extreme labels from breaking the contest.
-    spread = float(model_info.get("spread_mean", 1.0) or 1.0) if isinstance(model_info, dict) else 1.0
+    spread = float(model_info.spread_mean or 1.0)
     rescue_gap = float(np.clip(0.08 * spread, 0.03, 0.35))
 
     centroid_score = float("inf")
-    c = np.asarray(brain.get("centroids", {}).get(label, []), dtype=np.float32)
-    if c.ndim == 1 and c.size:
-        c = c.reshape(1, -1)
-    if c.size:
-        cw = c * weights[None, :]
-        centroid_score = label_distance_score(cw, xw)
+    if model_info.centroids_weighted.size:
+        centroid_score = label_distance_score(model_info.centroids_weighted, xw)
 
     exemplar_score = float("inf")
-    e = np.asarray(brain.get("exemplars_by_label", {}).get(label, []), dtype=np.float32)
-    if e.ndim == 1 and e.size:
-        e = e.reshape(1, -1)
-    if e.size:
-        ew = e * weights[None, :]
-        exemplar_score = float(np.min(np.linalg.norm(ew - xw[None, :], axis=1)))
+    if model_info.exemplars_weighted.size:
+        exemplar_score = float(np.min(np.linalg.norm(model_info.exemplars_weighted - xw[None, :], axis=1)))
 
     anchor_score = float("inf")
-    a = np.asarray(brain.get("anchors_by_label", {}).get(label, []), dtype=np.float32)
-    if a.ndim == 1 and a.size:
-        a = a.reshape(1, -1)
-    if a.size:
-        aw = a * weights[None, :]
-        ad = np.sort(np.linalg.norm(aw - xw[None, :], axis=1).astype(np.float32))
+    if model_info.anchors_weighted.size:
+        ad = np.sort(np.linalg.norm(model_info.anchors_weighted - xw[None, :], axis=1).astype(np.float32))
         # v0.4.65 product reset: do not let a large folder win from one lucky
         # nearest anchor.  Tiny labels still use their closest teacher.  Larger
         # labels need a small neighborhood of similar teachers, which is the
@@ -1858,9 +1853,7 @@ def label_model_distance_score(brain: dict, label: str, xw: np.ndarray) -> Tuple
         # are already controlled by stricter support/margin gates, so their distance
         # should be nearest-teacher distance. Larger folders still require a local
         # neighborhood so one lucky anchor cannot swallow unrelated sounds.
-        train_count = (
-            int(model_info.get("training_count", ad.size) or ad.size) if isinstance(model_info, dict) else int(ad.size)
-        )
+        train_count = int(model_info.training_count or ad.size)
         if train_count <= SMALL_LABEL_COUNT or ad.size <= SMALL_LABEL_COUNT:
             anchor_score = float(ad[0])
         else:
@@ -1875,7 +1868,7 @@ def label_model_distance_score(brain: dict, label: str, xw: np.ndarray) -> Tuple
     # brain should see that distance directly. The stricter small-label support
     # gates still decide whether an unseen file is safe to auto-place. Larger
     # folders keep the rescue-gap rule so one lucky anchor cannot dominate.
-    train_count_for_model = int(model_info.get("training_count", 0) or 0) if isinstance(model_info, dict) else 0
+    train_count_for_model = int(model_info.training_count or 0)
     if mode == "exemplar_only" or train_count_for_model <= SMALL_LABEL_COUNT:
         return nearest_teacher_score, nearest_teacher_score, mode
 

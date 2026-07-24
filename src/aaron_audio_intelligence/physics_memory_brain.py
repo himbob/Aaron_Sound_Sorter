@@ -16,15 +16,17 @@ from typing import Any
 
 import numpy as np
 
-from aaron_audio_intelligence.shape_memory_brain import (
+from aaron_audio_intelligence.learned_memory_features import (
     PITCH_REGISTER_SENSITIVE_MEMORY_FEATURES,
-    example_fingerprint,
     pad_vector,
-    safe_int,
     scaled_vector_distance,
-    shape_target_for_label,
     weighted_normalized_signature_vector,
     weighted_normalized_vector,
+)
+from aaron_audio_intelligence.shape_memory_brain import (
+    example_fingerprint,
+    safe_int,
+    shape_target_for_label,
 )
 from aaron_audio_intelligence.voter_memory_brain import VOTER_MEMORY_KEY
 from aaron_sound_sorter.core import FP_SIZE, FeatureRow

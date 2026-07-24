@@ -58,6 +58,7 @@ DEFAULT_TARGETS = [
     "src/aaron_sound_sorter/engine",
     "src/aaron_sound_sorter/domain",
     "src/aaron_sound_sorter/voters",
+    "src/aaron_sound_sorter/neural_audio",
     "src/aaron_sound_sorter/committee.py",
 ]
 

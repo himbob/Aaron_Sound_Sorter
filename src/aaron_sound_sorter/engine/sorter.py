@@ -103,6 +103,7 @@ class SortSamplesUseCase:
             Timing and cache data are diagnostics only and must not change
             category decisions.
         """
+        self.configure_analysis_cache(request)
         self.analysis_cache.reset()
         self.sort_timing.reset()
         with self.sort_timing.stage("load_brains"):
@@ -136,6 +137,23 @@ class SortSamplesUseCase:
         with self.sort_timing.stage("write_timing_profile"):
             write_sort_timing_reports(request.output_dir, self.sort_timing.snapshot())
         return summary
+
+    def configure_analysis_cache(self, request: SortRequest) -> None:
+        """Configure measured-analysis cache policy for one sort request.
+
+        Args:
+            request: Sort request containing cache enablement and directory.
+
+        Side Effects:
+            May create the request cache directory. Does not cache or load final
+            folder decisions.
+
+        Important Constraints:
+            Persistent cache entries are measured audio evidence only. They must
+            remain safe to reuse when voters, arbiters, or brains change.
+        """
+        cache_dir = request.analysis_cache_dir if request.use_persistent_analysis_cache else None
+        self.analysis_cache.configure_persistent(cache_dir)
 
     def load_baby_brains_if_available(self, request: SortRequest) -> dict[str, dict[str, Any] | None]:
         """Load optional baby brains by job. Missing baby brains are allowed."""

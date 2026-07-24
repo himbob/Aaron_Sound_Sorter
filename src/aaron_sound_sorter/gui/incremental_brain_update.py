@@ -1,9 +1,8 @@
 """Incremental brain updates for GUI-approved corrections.
 
-The updater in this module is intentionally conservative.  It does not rebuild
-global router heads from a sparse training tree, and it does not infer labels
-from filenames.  It only adds measured audio fingerprints from human-approved
-GUI corrections to the active brain JSON prototypes.
+Human-approved corrections are deliberate supervised evidence.  The updater
+does not infer labels from filenames or folders; it fingerprints the approved
+audio and merges that measured evidence into the active GUI brain family.
 """
 
 from __future__ import annotations
@@ -58,24 +57,22 @@ from aaron_sound_sorter.features import (
     make_fingerprint_safe,
     select_deterministic_exemplars,
 )
+from aaron_sound_sorter.gui.brain_family_files import incremental_training_brain_names
 from aaron_sound_sorter.infrastructure.brain_repository import BrainRepository
 from aaron_sound_sorter.io_utils import source_pack_key_for_path
+from aaron_sound_sorter.taxonomy_contracts import canonicalize_taxonomy_label
 from aaron_sound_sorter.training_labels import (
     label_default_structure,
     public_label,
     top_for_public_label,
 )
 
-# GUI corrections are high-trust but sparse.  Keep them in dedicated memory
-# lanes so a few examples can help nearby sounds without distorting the stable
-# full/core/spread/outlier brains that are rebuilt from curated training data.
-DEFAULT_INCREMENTAL_BRAIN_NAMES = (
-    USER_MEMORY_BRAIN_NAME,
-    SHAPE_MEMORY_BRAIN_NAME,
-    VOTER_MEMORY_BRAIN_NAME,
-    PHYSICS_MEMORY_BRAIN_NAME,
-)
+# GUI corrections are high-trust supervised labels.  Train every active GUI
+# brain lane so a deliberate override affects direct memory recall, low-level
+# voter memory, and the full/core/spread/outlier prototype brains.
+DEFAULT_INCREMENTAL_BRAIN_NAMES = incremental_training_brain_names()
 MAX_INCREMENTAL_EXAMPLES_PER_LABEL = 120
+MAX_MODEL_REPEATS_PER_INCREMENTAL_EXAMPLE = 16
 DEFAULT_MAX_CENTROIDS = 6
 DEFAULT_HUMAN_OVERRIDE_EVIDENCE_WEIGHT = 32
 MAX_HUMAN_OVERRIDE_EVIDENCE_WEIGHT = 1200
@@ -189,7 +186,8 @@ class IncrementalBrainUpdater:
 
     Args:
         project_root: Repository root containing active brain files.
-        brain_names: Brain filenames to update when present.
+        brain_names: Brain filenames to update when present. By default this is
+            the full active GUI brain family.
 
     Side Effects:
         ``apply`` backs up active brain JSON files, rewrites updated brain JSONs,
@@ -460,7 +458,7 @@ def update_brain_label_with_row(
         brain,
         label,
         row,
-        effective_label_count=len(raw_vectors),
+        effective_label_count=effective_example_weight_sum(examples),
         unique_label_count=count_unique_examples(examples),
     )
     update_label_fact_profile(brain, label, examples)
@@ -562,7 +560,7 @@ def supersede_conflicting_shape_examples(brain: dict[str, Any], row: FeatureRow,
 
 
 def supersede_conflicting_voter_examples(brain: dict[str, Any], row: FeatureRow, target_role: str) -> list[str]:
-    """Remove same-audio voter-memory examples outside ``target_role``."""
+    """Remove same-audio voter examples with a superseded approved label."""
     if not target_role:
         return []
     payload = ensure_voter_memory_payload(brain)
@@ -586,7 +584,7 @@ def supersede_conflicting_voter_examples(brain: dict[str, Any], row: FeatureRow,
 
 
 def supersede_conflicting_physics_examples(brain: dict[str, Any], row: FeatureRow, target_key: str) -> list[str]:
-    """Remove same-audio physics-memory examples outside ``target_key``."""
+    """Remove same-audio physics examples with a superseded approved label."""
     if not target_key:
         return []
     payload = ensure_physics_memory_payload(brain)
@@ -619,16 +617,34 @@ def supersede_conflicting_payload_examples(
     examples_map_key: str,
     metadata_keys: tuple[str, ...],
 ) -> list[str]:
-    """Remove same-audio examples from non-target memory groups."""
+    """Remove same-audio examples contradicted by the newest correction.
+
+    Broad voter roles and physics targets intentionally contain many public
+    leaf labels. Therefore a new correction can conflict with an old example
+    even when both labels map to the same broad target. Matching audio is kept
+    only when its stored approved label agrees with the new label.
+    """
     examples_by_target = payload.get(examples_map_key)
     if not isinstance(examples_by_target, dict):
         return []
     removed_targets: list[str] = []
+    approved_label = normalize_public_label(row.label)
     for existing_key, examples in list(examples_by_target.items()):
         existing_key = str(existing_key)
-        if existing_key == target_key or not isinstance(examples, list):
+        if not isinstance(examples, list):
             continue
-        kept_examples, removed_examples = split_superseded_examples(examples, row)
+        kept_examples: list[dict[str, Any]] = []
+        removed_examples: list[dict[str, Any]] = []
+        for example in examples:
+            if not isinstance(example, dict):
+                continue
+            same_audio = example_matches_correction_audio(example, row)
+            stored_label = normalize_public_label(example.get("approved_label", ""))
+            conflicts = existing_key != target_key or stored_label != approved_label
+            if same_audio and conflicts:
+                removed_examples.append(example)
+            else:
+                kept_examples.append(example)
         if not removed_examples:
             continue
         removed_targets.append(existing_key)
@@ -717,7 +733,7 @@ def refresh_label_from_remaining_examples(
         brain,
         label,
         row,
-        effective_label_count=len(raw_vectors),
+        effective_label_count=effective_example_weight_sum(examples),
         unique_label_count=count_unique_examples(examples),
     )
     update_label_fact_profile(brain, label, examples)
@@ -939,7 +955,7 @@ def update_label_fact_profile(
         vector = example_fingerprint(example)
         if vector.size != FP_SIZE:
             continue
-        for _ in range(example_evidence_weight(example)):
+        for _ in range(example_model_repeat_count(example)):
             rows.append(
                 FeatureRow(
                     path=str(example.get("source_path", "")),
@@ -957,6 +973,7 @@ def update_label_fact_profile(
         return
     profile = compute_category_fact_profiles(rows, list(FEATURE_NAMES)).get(label)
     if isinstance(profile, dict):
+        profile["raw_count"] = effective_example_weight_sum(examples)
         ensure_mapping(brain, "category_fact_profiles")[label] = profile
 
 
@@ -1099,7 +1116,7 @@ def corrections_from_import_manifest(manifest_path: Path) -> list[IncrementalCor
 
 def normalize_public_label(label: str) -> str:
     """Normalize a public taxonomy label for brain storage."""
-    return public_label("/".join(part.strip() for part in str(label).replace("\\", "/").split("/") if part.strip()))
+    return public_label(canonicalize_taxonomy_label(label))
 
 
 def bounded_human_override_weight(value: object) -> int:
@@ -1277,14 +1294,34 @@ def example_evidence_weight(example: dict[str, Any]) -> int:
     return bounded_human_override_weight(example.get("human_override_evidence_weight", 1))
 
 
+def example_model_repeat_count(example: dict[str, Any]) -> int:
+    """Return a compressed repeat count for model fitting.
+
+    Human override weights can be large enough to beat stale competing labels,
+    but cloning one fingerprint hundreds of times makes centroid/exemplar
+    fitting painfully slow.  The full weight is preserved in counts and
+    reliability; model fitting receives a capped square-root repeat so the
+    teacher still nudges prototype geometry without blowing up matrix size.
+    """
+
+    weight = example_evidence_weight(example)
+    return max(1, min(MAX_MODEL_REPEATS_PER_INCREMENTAL_EXAMPLE, int(round(float(np.sqrt(weight))))))
+
+
+def effective_example_weight_sum(examples: list[dict[str, Any]]) -> int:
+    """Return the full bounded support weight for stored examples."""
+
+    return sum(example_evidence_weight(example) for example in examples if isinstance(example, dict))
+
+
 def weighted_example_fingerprints(examples: list[dict[str, Any]]) -> list[np.ndarray]:
-    """Return example fingerprints repeated by bounded evidence weight."""
+    """Return example fingerprints with compressed training-time repeats."""
     vectors: list[np.ndarray] = []
     for example in examples:
         vector = example_fingerprint(example)
         if vector.size != FP_SIZE:
             continue
-        vectors.extend(vector.copy() for _ in range(example_evidence_weight(example)))
+        vectors.extend(vector.copy() for _ in range(example_model_repeat_count(example)))
     return vectors
 
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from aaron_sound_sorter.domain.models import SharedAudioFacts
+from aaron_sound_sorter.domain.physics_subpanels import build_low_level_physics_subpanels
 from aaron_sound_sorter.score_math import average_score
 from aaron_sound_sorter.voters.physics_drum_layer import PhysicsDrumLayer
 from aaron_sound_sorter.voters.physics_fx_layer import PhysicsFXRoleLayer
@@ -312,6 +313,50 @@ def test_layered_physics_promotes_repeated_organic_percussion_loop_parent() -> N
     assert decision.top_family == "Drums"
     assert decision.branch in {"DrumLoop", "ShakerTambourine", "ScrapeGuiro", "TomOrConga"}
     assert decision.evidence["physics_top_layer_source"] == "organic_percussion_loop_source_layer"
+
+
+def test_low_tuned_snare_physics_is_not_suppressed_as_tonal_decoy() -> None:
+    values = {
+        "log_transient_count": 0.6931471805599453,
+        "event_rate_hz": 2.0,
+        "onset_span_ratio": 0.0,
+        "temporal_centroid_ratio": 0.04,
+        "attack_rise_time_norm": 0.004,
+        "tail_energy_ratio": 0.06,
+        "pitch_confidence": 0.72,
+        "attack_pitch_confidence": 0.62,
+        "body_pitch_confidence": 0.74,
+        "f0_voiced_ratio": 0.80,
+        "harmonic_energy_ratio": 0.50,
+        "fundamental_dominance_ratio": 0.35,
+        "spectral_flatness_mean": 0.38,
+        "spectral_entropy_mean": 0.48,
+        "attack_flatness": 0.34,
+        "body_flatness": 0.36,
+        "attack_noise_ratio": 0.36,
+        "body_noise_ratio": 0.34,
+        "noise_burst_duration_ms": 120.0,
+        "sub_bass_ratio_lt_150hz": 0.12,
+        "bass_ratio_150_500hz": 0.42,
+        "mid_ratio_500_2000hz": 0.35,
+        "presence_ratio_2000_8000hz": 0.13,
+        "air_ratio_gt_8000hz": 0.03,
+        "attack_high_ratio": 0.16,
+        "body_high_ratio": 0.11,
+        "loop_pitched_event_ratio": 0.90,
+        "loop_percussive_event_ratio": 0.04,
+        "loop_drumlike_frame_ratio": 0.08,
+        "loop_sustained_tonal_frame_ratio": 0.78,
+        "loop_non_event_tonal_ratio": 0.76,
+        "low_peak_frequency_hz": 220.0,
+    }
+
+    subpanels = build_low_level_physics_subpanels(values)["flat"]
+
+    assert subpanels["tonal_voiced_non_drum_hit_guard"] is True
+    assert subpanels["struck_percussion_guard_exception"] is True
+    assert subpanels["drum_snare_source_score"] > 0.62
+    assert subpanels["drum_snare_source_score"] > 0.36
 
 
 def test_measured_voice_branch_penalizes_non_instrument_candidates() -> None:

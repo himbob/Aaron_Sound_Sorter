@@ -769,7 +769,7 @@ def build_low_level_physics_subpanels(feature_values: dict[str, float]) -> dict[
         + 0.12 * fast_attack
         + 0.10 * inverse_ramp(low_total, 0.06, 0.44)
     )
-    if tonal_voiced_non_drum_hit_guard:
+    if tonal_voiced_non_drum_hit_guard and not struck_percussion_guard_exception:
         snare_source_score = min(snare_source_score, 0.36)
         clap_source_score = min(clap_source_score, 0.34)
     if clear_transient_drum_hit:

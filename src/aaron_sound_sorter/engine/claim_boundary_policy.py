@@ -18,7 +18,13 @@ from enum import Enum
 
 from aaron_sound_sorter.domain.models import SharedAudioFacts
 from aaron_sound_sorter.engine.family_claims import ConsensusClaim
-from aaron_sound_sorter.engine.measured_source_contracts import supports_measured_drum_loop_owner
+from aaron_sound_sorter.engine.learned_memory_contracts import (
+    EXACT_HUMAN_TEACHER_OWNER_CLAIM_SOURCE,
+)
+from aaron_sound_sorter.engine.measured_source_contracts import (
+    supports_measured_drum_loop_owner,
+    supports_synth_pad_over_woodwind,
+)
 
 
 class ClaimEvidenceKind(str, Enum):
@@ -41,6 +47,7 @@ class ClaimBoundaryDecision:
     allowed: bool
     evidence_kind: ClaimEvidenceKind
     reason: str = ""
+    authoritative: bool = False
 
 
 class ClaimBoundaryPolicy:
@@ -57,6 +64,20 @@ class ClaimBoundaryPolicy:
         kind = self.evidence_kind(claim)
         if claim.is_review:
             return ClaimBoundaryDecision(True, ClaimEvidenceKind.REVIEW_REASON)
+        if claim.source == EXACT_HUMAN_TEACHER_OWNER_CLAIM_SOURCE:
+            return ClaimBoundaryDecision(
+                True,
+                ClaimEvidenceKind.SOURCE_IDENTITY,
+                "dual_memory_exact_human_teacher_authority",
+                authoritative=True,
+            )
+        if claim.source == "final_measured_synth_loop_invariant" and supports_synth_pad_over_woodwind(facts):
+            return ClaimBoundaryDecision(
+                True,
+                ClaimEvidenceKind.SOURCE_IDENTITY,
+                "measured_synth_pad_contradicts_woodwind_branch",
+                authoritative=True,
+            )
         if self._drum_loop_over_clean_bass_loop(claim, facts):
             return ClaimBoundaryDecision(False, kind, "drum_loop_claim_conflicts_with_clean_bass_loop")
         if self._drum_loop_over_clean_synth_loop(claim, facts):

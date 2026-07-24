@@ -14,9 +14,12 @@ bounded calibrated confidence that future measured panels can validate.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from functools import lru_cache
 
 from aaron_sound_sorter.domain.models import CategoryGuess
 from aaron_sound_sorter.voters.brain_ensemble_policy import brain_lane_vote_weight, rank_support
+
+_PATH_HELPER_CACHE_SIZE = 8192
 
 
 @dataclass(frozen=True)
@@ -228,7 +231,9 @@ def calibration_reason(lane: str, lane_weight: float, rank_gap: float) -> str:
     return "lane authority is reduced for this role profile"
 
 
+@lru_cache(maxsize=_PATH_HELPER_CACHE_SIZE)
 def parent_path(path: str) -> str:
+    """Return an internal category path's parent path."""
     parts = [part for part in normalize_path(path).split("/") if part]
     if not parts:
         return ""
@@ -239,12 +244,21 @@ def parent_path(path: str) -> str:
     return "/".join(parts[:-1])
 
 
+@lru_cache(maxsize=_PATH_HELPER_CACHE_SIZE)
 def top_family(path: str) -> str:
+    """Return an internal category path's top family."""
     return normalize_path(path).split("/", 1)[0]
 
 
 def normalize_path(value: object) -> str:
-    return str(value or "").replace("\\", "/").strip("/")
+    """Return a normalized internal category path."""
+    return _normalize_path_text(str(value or ""))
+
+
+@lru_cache(maxsize=_PATH_HELPER_CACHE_SIZE)
+def _normalize_path_text(value: str) -> str:
+    """Return cached normalized text for internal category paths."""
+    return value.replace("\\", "/").strip("/")
 
 
 def clamp01(value: float) -> float:

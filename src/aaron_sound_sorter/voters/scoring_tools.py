@@ -7,11 +7,13 @@ from typing import Any
 
 import numpy as np
 
-from aaron_sound_sorter.core import FEATURE_NAMES, FEATURE_WEIGHTS, FP_SIZE
+from aaron_sound_sorter.core import FEATURE_NAMES, FP_SIZE
 from aaron_sound_sorter.domain.facts import fingerprint_array
 from aaron_sound_sorter.domain.models import SharedAudioFacts
 from aaron_sound_sorter.domain.policies import PhysicsVoterPolicy
 from aaron_sound_sorter.domain.roles import measured_roles_from_features
+from aaron_sound_sorter.engine.brain_runtime_cache import get_brain_runtime_cache
+from aaron_sound_sorter.taxonomy_contracts import taxonomy_label_contract
 from aaron_sound_sorter.training_labels import label_default_structure, public_label, top_for_public_label
 
 PROFILE_FEATURES = tuple(str(name) for name in FEATURE_NAMES[:FP_SIZE])
@@ -43,36 +45,50 @@ def label_parts(label: str) -> list[str]:
 
 def label_maps(brain: dict[str, Any]) -> tuple[dict[str, str], dict[str, str]]:
     """Return folder and top maps for every known label."""
-    labels = [str(label) for label in brain.get("labels", []) if str(label)]
-    return (
-        {label: label_folder_path(label) for label in labels},
-        {label: label_top_family(brain, label) for label in labels},
-    )
+    runtime = get_brain_runtime_cache(brain)
+    return runtime.folder_map, runtime.top_map
+
+
+def canonical_candidate_labels(labels: list[str]) -> list[str]:
+    """Return valid canonical labels from a brain candidate list.
+
+    Args:
+        labels: Raw labels from an active brain JSON.
+
+    Returns:
+        Candidate labels whose internal taxonomy grammar is valid and already
+        canonical.
+
+    Side Effects:
+        None.
+
+    Important Constraints:
+        This inspects only internal trained labels. It never reads source audio
+        filenames or sample-pack paths.
+    """
+    candidates: list[str] = []
+    seen: set[str] = set()
+    for label in labels:
+        contract = taxonomy_label_contract(label)
+        if not contract.valid:
+            continue
+        if contract.canonical_label != contract.normalized_label:
+            continue
+        if contract.canonical_label in seen:
+            continue
+        seen.add(contract.canonical_label)
+        candidates.append(contract.canonical_label)
+    return candidates
 
 
 def feature_weights(brain: dict[str, Any]) -> np.ndarray:
     """Return finite feature weights."""
-    weights = np.asarray(brain.get("feature_weights", FEATURE_WEIGHTS), dtype=np.float32).reshape(-1)
-    if weights.size < FP_SIZE:
-        weights = np.pad(weights, (0, FP_SIZE - weights.size), mode="constant", constant_values=1.0)
-    return np.nan_to_num(weights[:FP_SIZE], nan=1.0, posinf=1.0, neginf=1.0)
+    return get_brain_runtime_cache(brain).feature_weights
 
 
 def scaler_for_label(brain: dict[str, Any], label: str) -> tuple[np.ndarray, np.ndarray]:
     """Return mean/std scaler for a label's structure lane."""
-    structure = label_structure(brain, label)
-    scalers = brain.get("scalers_by_structure", {}) if isinstance(brain.get("scalers_by_structure", {}), dict) else {}
-    scaler = scalers.get(structure) if isinstance(scalers, dict) else None
-    if isinstance(scaler, dict) and "mean" in scaler and "std" in scaler:
-        mean = np.asarray(scaler.get("mean", []), dtype=np.float32)
-        std = np.asarray(scaler.get("std", []), dtype=np.float32)
-    else:
-        mean = np.asarray(brain.get("scaler_mean", np.zeros((FP_SIZE,), dtype=np.float32)), dtype=np.float32)
-        std = np.asarray(brain.get("scaler_std", np.ones((FP_SIZE,), dtype=np.float32)), dtype=np.float32)
-    mean = pad_vector(mean, 0.0)
-    std = pad_vector(std, 1.0)
-    std = np.where(np.abs(std) < 1e-6, 1.0, std)
-    return mean, std
+    return get_brain_runtime_cache(brain).scaler_for_label(label)
 
 
 def pad_vector(values: np.ndarray, fill: float) -> np.ndarray:

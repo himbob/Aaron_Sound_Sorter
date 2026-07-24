@@ -90,6 +90,18 @@ def test_audio_intelligence_sidecar_writer_outputs_jsonl(tmp_path: Path) -> None
     assert rows[0]["debug_refs"]["debug_packet"] == "Aaron_Sorted_Sounds_debug_packets.jsonl:1"
 
 
+def test_audio_intelligence_sidecar_writer_can_omit_debug_packet_ref(tmp_path: Path) -> None:
+    """Fast normal sorts can skip full debug packets without stale references."""
+    audio_path = tmp_path / "sample.wav"
+    audio_path.write_bytes(b"stable bytes")
+    output_path = tmp_path / "sidecars.jsonl"
+
+    write_audio_intelligence_sidecars(output_path, [fake_sort_result(audio_path)], debug_packet_name="")
+    rows = [json.loads(line) for line in output_path.read_text(encoding="utf-8").splitlines()]
+
+    assert rows[0]["debug_refs"] == {}
+
+
 def fake_sort_result(audio_path: Path) -> SortFileResult:
     """Return a minimal sorter result with useful evidence values."""
     facts = SharedAudioFacts(

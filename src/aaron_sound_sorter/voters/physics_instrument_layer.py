@@ -505,6 +505,76 @@ class PhysicsInstrumentLayer:
                 min(sub_human_spoken, max(sub_fx_formant, sub_human_breath) + 0.12),
             )
         )
+        measured_human_voice_texture_owner = bool(
+            human_voice_texture >= 0.66
+            and max(sub_voice, sub_human_spoken) >= 0.62
+            and f0_voiced >= 0.55
+            and phrase_structure >= 0.62
+            and max(percussive_loop, drumlike_loop, drum_role) <= 0.26
+            and sub_reed_authority <= human_voice_texture + 0.02
+            and sub_plucked_authority <= human_voice_texture + 0.06
+            and sub_synth_tonal < 0.58
+            and shape_name
+            in {
+                "vocal_phrase",
+                "pitched_phrase",
+                "mixed_instrument_loop",
+                "compound_musical_loop",
+                "repeated_phrase_loop",
+                "sustained_pad",
+                "bass_phrase",
+                "",
+            }
+        )
+        articulated_rap_voice_texture_owner = bool(
+            rap_voice_texture >= 0.58
+            and f0_voiced >= 0.74
+            and event_count >= 12.0
+            and fa_formant_std >= 220.0
+            and fa_stochastic >= 0.36
+            and fa_presence >= 18.0
+            and max(percussive_loop, drumlike_loop, drum_role) <= 0.22
+            and sub_synth_tonal < 0.58
+            and sub_reed_authority < 0.68
+            and sub_plucked_authority < 0.52
+            and sub_metallic < 0.56
+            and shape_name
+            in {
+                "vocal_phrase",
+                "pitched_phrase",
+                "mixed_instrument_loop",
+                "compound_musical_loop",
+                "repeated_phrase_loop",
+                "sustained_pad",
+                "bass_phrase",
+                "",
+            }
+        )
+        explicit_vocal_shape = bool(
+            shape_name in {"vocal_phrase", "vocal_one_shot"}
+            and shape_confidence >= 0.72
+            and max(percussive_loop, drumlike_loop, drum_role) <= 0.24
+        )
+        voice_source_owner_score = clamp01(
+            max(
+                vocal_role,
+                0.86 * api_voice if api_voice >= 0.62 else 0.0,
+                min(human_voice_texture, max(sub_voice, sub_human_spoken)) if explicit_vocal_shape else 0.0,
+                human_voice_texture if measured_human_voice_texture_owner else 0.0,
+                rap_voice_texture if articulated_rap_voice_texture_owner else 0.0,
+            )
+        )
+        voice_source_owner_confirmed = bool(
+            voice_source_owner_score >= 0.50
+            or measured_human_voice_texture_owner
+            or articulated_rap_voice_texture_owner
+            or (
+                vocal_role >= 0.42
+                and human_voice_texture >= 0.70
+                and sub_synth_tonal < 0.58
+                and sub_reed_authority < 0.68
+            )
+        )
         non_voice_tonal_loop_voice_decoy = bool(
             shape_name
             in {
@@ -534,7 +604,29 @@ class PhysicsInstrumentLayer:
                 and sub_metallic < 0.52
                 and sub_synth_tonal < 0.54
             )
+            and not measured_human_voice_texture_owner
+            and not articulated_rap_voice_texture_owner
         )
+        if (
+            non_voice_tonal_loop_voice_decoy
+            and not (
+                vocal_role >= 0.86
+                and sub_voice >= 0.76
+                and sub_human_spoken >= 0.76
+                and sub_metallic < 0.52
+                and sub_synth_tonal < 0.54
+            )
+            and not (measured_human_voice_texture_owner or articulated_rap_voice_texture_owner)
+        ):
+            voice_source_owner_score = min(voice_source_owner_score, 0.42)
+            voice_source_owner_confirmed = False
+        if not voice_source_owner_confirmed:
+            human_voice_texture = min(human_voice_texture, 0.58)
+            rap_voice_texture = min(rap_voice_texture, 0.56)
+            voice_core = min(
+                voice_core,
+                max(0.36, max(reed_core, synth_core, plucked_core, keys_core, mallet_bell_core) - 0.035),
+            )
         human_voice_phrase_signal = bool(
             human_voice_texture >= 0.66
             and pitch_strength >= 0.55
@@ -544,6 +636,7 @@ class PhysicsInstrumentLayer:
             and sub_reed_authority <= human_voice_texture - 0.08
             and sub_plucked_authority <= human_voice_texture + 0.04
             and not non_voice_tonal_loop_voice_decoy
+            and voice_source_owner_confirmed
             and shape_name
             in {
                 "vocal_phrase",
@@ -557,7 +650,7 @@ class PhysicsInstrumentLayer:
                 "",
             }
         )
-        if sub_voice >= 0.66 and vocal_role >= 0.42 and sub_reed < sub_voice + 0.08:
+        if voice_source_owner_confirmed and sub_voice >= 0.66 and vocal_role >= 0.42 and sub_reed < sub_voice + 0.08:
             voice_core = max(voice_core, min(0.94, 0.50 + 0.42 * sub_voice))
         if human_voice_phrase_signal:
             voice_core = max(voice_core, min(0.94, 0.50 + 0.42 * human_voice_texture))
@@ -582,7 +675,12 @@ class PhysicsInstrumentLayer:
                 instrument_anchor,
                 min(0.94, 0.46 + 0.28 * api_clean_tonal + 0.16 * api_eventful_tonal),
             )
-        if api_voice >= 0.56 and sub_reed_authority <= api_voice + 0.12 and not non_voice_tonal_loop_voice_decoy:
+        if (
+            api_voice >= 0.56
+            and voice_source_owner_confirmed
+            and sub_reed_authority <= api_voice + 0.12
+            and not non_voice_tonal_loop_voice_decoy
+        ):
             voice_core = max(voice_core, min(0.94, 0.48 + 0.42 * api_voice))
             reed_core = min(reed_core, max(0.42, voice_core - 0.05))
             brass_core = min(brass_core, max(0.42, voice_core - 0.08))
@@ -1536,7 +1634,7 @@ class PhysicsInstrumentLayer:
             )
             branch_scores["Strings"] = min(branch_scores["Strings"], branch_scores["Voice"] - 0.03)
             branch_scores["Woodwinds"] = min(branch_scores["Woodwinds"], branch_scores["Voice"] - 0.04)
-        if rap_voice_texture >= 0.58 and not woodwind_source_signal:
+        if rap_voice_texture >= 0.58 and voice_source_owner_confirmed and not woodwind_source_signal:
             branch_scores["Voice"] = max(
                 branch_scores["Voice"],
                 clamp01(branch_gate * (0.62 + 0.30 * ramp(rap_voice_texture, 0.58, 0.78))),
@@ -1762,7 +1860,8 @@ class PhysicsInstrumentLayer:
         # identity, and voice must remain the selected branch when its measured
         # vocal texture is the clearest identity.
         if (
-            (rap_voice_texture >= 0.58 or human_voice_phrase_signal)
+            voice_source_owner_confirmed
+            and (rap_voice_texture >= 0.58 or human_voice_phrase_signal)
             and not woodwind_source_signal
             and branch_scores["Voice"] >= 0.50
         ):
@@ -1849,6 +1948,8 @@ class PhysicsInstrumentLayer:
             "instrument_subpanel_texture_bed_score": round(float(sub_texture_bed), 6),
             "instrument_rap_voice_texture": round(float(rap_voice_texture), 6),
             "instrument_human_voice_texture": round(float(human_voice_texture), 6),
+            "instrument_voice_source_owner_score": round(float(voice_source_owner_score), 6),
+            "instrument_voice_source_owner_confirmed": bool(voice_source_owner_confirmed),
             "instrument_human_voice_phrase_signal": bool(human_voice_phrase_signal),
             "instrument_wide_formant_voice_decoy": bool(wide_formant_voice_decoy),
             "instrument_keys_reed_decoy_body": bool(keys_reed_decoy_body),

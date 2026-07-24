@@ -3438,6 +3438,21 @@ class ProfileInstrumentClaimMixin:
             return False
         roles = facts.evidence.get("measured_roles", {}) if isinstance(getattr(facts, "evidence", None), dict) else {}
         nested_roles = roles.get("evidence", {}) if isinstance(roles, dict) else {}
+        repeated_phrase_is_loop = bool(
+            facts.is_loop_like
+            and not facts.is_single_event_like
+            and max(
+                _shape_metric_from_facts(facts, "onset_count"),
+                _feature_number_from_facts(facts, "event_count_estimate"),
+            )
+            >= 4.0
+            and _shape_metric_from_facts(facts, "onset_span_ratio") >= 0.45
+            and _shape_metric_from_facts(facts, "true_repetition_score") >= 0.45
+        )
+        pitched_phrase_owner = max(
+            _safe_float(roles.get("pitched_music_phrase")) if isinstance(roles, dict) else 0.0,
+            _safe_float(nested_roles.get("pitched_music_phrase")) if isinstance(nested_roles, dict) else 0.0,
+        )
         role_owner = max(
             _safe_float(roles.get("bass_loop")) if isinstance(roles, dict) else 0.0,
             _safe_float(roles.get("pitched_music_loop")) if isinstance(roles, dict) else 0.0,
@@ -3445,6 +3460,7 @@ class ProfileInstrumentClaimMixin:
             _safe_float(nested_roles.get("bass_loop")) if isinstance(nested_roles, dict) else 0.0,
             _safe_float(nested_roles.get("pitched_music_loop")) if isinstance(nested_roles, dict) else 0.0,
             _safe_float(nested_roles.get("low_rhythmic_drum_loop")) if isinstance(nested_roles, dict) else 0.0,
+            pitched_phrase_owner if repeated_phrase_is_loop else 0.0,
         )
         low_body = max(
             _feature_number_from_facts(facts, "low_total"),

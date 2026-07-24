@@ -197,6 +197,68 @@ def supports_clean_low_bass_phrase_owner(facts: SharedAudioFacts | None) -> bool
     return bool(drum_material <= 0.44 and fx_motion <= 0.42)
 
 
+def supports_synth_pad_over_woodwind(facts: SharedAudioFacts | None) -> bool:
+    """Return whether a clean synth-pad body contradicts woodwind ownership.
+
+    Args:
+        facts: Shared measured audio facts from the current sort.
+
+    Returns:
+        True when sustained synth-pad evidence decisively exceeds sax and reed
+        evidence while the direct reed-authority signal remains weak.
+
+    Side Effects:
+        None.
+
+    Raises:
+        None.
+
+    Constraints:
+        This narrow owner contract uses measured audio facts only. It must not
+        inspect source filenames, folders, ZIP paths, or sample-pack labels.
+    """
+    if facts is None:
+        return False
+    shape = _shape_vote_from_facts(facts)
+    synth_pad = _subpanel_score(facts, "synth_pad_score")
+    synth_source = _subpanel_score(facts, "synth_tonal_source_score")
+    synth_siblings = max(
+        _subpanel_score(facts, "synth_chord_score"),
+        _subpanel_score(facts, "synth_lead_score"),
+    )
+    reed_identity = max(
+        _subpanel_score(facts, "woodwind_sax_score"),
+        _subpanel_score(facts, "reed_wind_score"),
+    )
+    return bool(
+        shape
+        in {
+            "bass_phrase",
+            "pitched_phrase",
+            "pitched_phrase_shape",
+            "repeated_phrase_loop",
+            "sustained_pad",
+            "vocal_phrase",
+        }
+        and _shape_confidence_from_facts(facts) >= 0.78
+        and synth_pad >= 0.74
+        and synth_source >= 0.68
+        and synth_pad >= reed_identity + 0.06
+        and synth_pad >= synth_siblings - 0.04
+        and _subpanel_score(facts, "reed_wind_authority_score") <= 0.58
+        and _shape_metric_from_facts(facts, "pitched_event_ratio") >= 0.88
+        and max(
+            _shape_metric_from_facts(facts, "sustained_tonal_frame_ratio"),
+            _shape_metric_from_facts(facts, "non_event_tonal_ratio"),
+        )
+        >= 0.86
+        and _shape_metric_from_facts(facts, "low_event_ratio") >= 0.45
+        and _shape_metric_from_facts(facts, "high_event_ratio") <= 0.03
+        and _shape_metric_from_facts(facts, "percussive_event_ratio") <= 0.12
+        and _shape_metric_from_facts(facts, "drumlike_frame_ratio") <= 0.12
+    )
+
+
 def _subpanel_score(facts: SharedAudioFacts, key: str) -> float:
     subpanels = (
         facts.evidence.get("physics_subpanels", {}) if isinstance(getattr(facts, "evidence", None), dict) else {}

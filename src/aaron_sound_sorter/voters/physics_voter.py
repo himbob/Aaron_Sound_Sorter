@@ -15,6 +15,7 @@ import numpy as np
 
 from aaron_sound_sorter.domain.models import AudioPhysics, SharedAudioFacts, VoterResult
 from aaron_sound_sorter.domain.policies import ConsensusPolicy, PhysicsVoterPolicy
+from aaron_sound_sorter.engine.numeric_evidence import numeric_evidence_value
 from aaron_sound_sorter.features import (
     HOP,
     TARGET_SR,
@@ -31,6 +32,7 @@ from aaron_sound_sorter.voters.human_override_recall import (
 )
 from aaron_sound_sorter.voters.physics_layers import LayeredPhysicsScorer
 from aaron_sound_sorter.voters.scoring_tools import (
+    canonical_candidate_labels,
     feature_weights,
     label_maps,
     profile_residual_score,
@@ -54,7 +56,8 @@ class PhysicsVoter(Voter):
     def vote(self, physics: AudioPhysics, facts: SharedAudioFacts, brain: dict[str, Any]) -> VoterResult:
         if facts.is_broken_or_tiny:
             return self.review_result(ConsensusPolicy().broken_or_tiny_label, "broken_or_tiny")
-        labels = [str(label) for label in brain.get("labels", []) if str(label)]
+        raw_labels = [str(label) for label in brain.get("labels", []) if str(label)]
+        labels = canonical_candidate_labels(raw_labels)
         role_gate = facts.evidence.get("dynamic_role_gate", {}) if isinstance(facts.evidence, dict) else {}
         gate_can_filter = bool(isinstance(role_gate, dict) and role_gate.get("final_effects_enabled"))
         allowed = set(role_gate.get("allowed_labels", []) or []) if gate_can_filter else set()
@@ -76,6 +79,7 @@ class PhysicsVoter(Voter):
         )
         diagnostics = {
             "candidate_count": len(labels),
+            "discarded_noncanonical_label_count": max(0, len(raw_labels) - len(labels)),
             "profile_count": len(profiles),
             "returned_count": len(guesses),
             "role_gate_applied": bool(gate_can_filter and allowed),
@@ -1038,32 +1042,8 @@ class PhysicsVoter(Voter):
 
     @staticmethod
     def fact_value_from_evidence(facts: SharedAudioFacts, key: str, default: float = 0.0) -> float:
-        """Search voter evidence blobs for a previously emitted metric."""
-        if not isinstance(getattr(facts, "evidence", None), dict):
-            return float(default)
-
-        def walk(obj: Any) -> float | None:
-            if isinstance(obj, dict):
-                if key in obj:
-                    try:
-                        number = float(obj.get(key, default) or default)
-                        if math.isfinite(number):
-                            return number
-                    except Exception:
-                        return None
-                for value in obj.values():
-                    found = walk(value)
-                    if found is not None:
-                        return found
-            elif isinstance(obj, list):
-                for item in obj:
-                    found = walk(item)
-                    if found is not None:
-                        return found
-            return None
-
-        found = walk(facts.evidence)
-        return float(default) if found is None else float(found)
+        """Return a cached numeric metric from prior measured evidence."""
+        return numeric_evidence_value(facts, key, default)
 
     def apply_reed_sax_identity_adjustment(
         self,
@@ -1664,6 +1644,7 @@ class PhysicsVoter(Voter):
             human_override = human_override_recall_match(
                 brain,
                 label,
+                raw_query_vector=full_vector,
                 weighted_query_vector=weighted_vector,
                 scaler_mean=mean,
                 scaler_std=std,

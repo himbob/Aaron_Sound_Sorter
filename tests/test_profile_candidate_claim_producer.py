@@ -6,6 +6,7 @@ from aaron_sound_sorter.domain.models import CategoryGuess, SharedAudioFacts, Vo
 from aaron_sound_sorter.engine.claim_producers.profile_candidates import ProfileCandidateClaimProducer
 from aaron_sound_sorter.engine.decision_context import DecisionContext
 from aaron_sound_sorter.engine.eligibility import EligibilityDecision
+from aaron_sound_sorter.engine.family_claim_arbiter import FamilyClaimArbiter
 from aaron_sound_sorter.engine.family_claims import claim_from_folder_path
 
 
@@ -354,6 +355,66 @@ def test_profile_candidate_bass_claim_beats_mallet_leaf_when_low_body_is_clean()
     assert any(claim.source == "profile_candidate_bass_claim" for claim in claims)
     bass_claim = [claim for claim in claims if claim.source == "profile_candidate_bass_claim"][0]
     assert bass_claim.folder_path == "Instruments/Bass/Bass Loops"
+
+
+def test_profile_candidate_promotes_repeated_low_bass_phrase_one_shot_witness_to_loop() -> None:
+    producer = ProfileCandidateClaimProducer()
+    measured = facts(
+        "solo_phrase",
+        0.90,
+        role_evidence={
+            "pitched_music_phrase": 0.89,
+            "low_total": 0.99,
+        },
+    )
+    measured.evidence["shape_vote"].update(
+        {
+            "onset_count": 9.0,
+            "onset_span_ratio": 0.70,
+            "true_repetition_score": 0.63,
+            "low_event_ratio": 0.98,
+            "pitch_confidence": 0.92,
+            "pitched_event_ratio": 1.0,
+            "percussive_event_ratio": 0.0,
+            "drumlike_frame_ratio": 0.0,
+        }
+    )
+    context = DecisionContext(
+        raw=raw_claim("FX/Designed Noise FX/Blip/One Shots", score=14.0),
+        eligibility=eligibility("pitched_music_phrase"),
+        facts=measured,
+        brain_result=VoterResult(
+            voter_name="brain",
+            guesses=[guess("Instruments/Bass/Electric Bass/One Shots", 1)],
+        ),
+    )
+
+    claims = producer.produce(context)
+
+    bass_claim = [claim for claim in claims if claim.source == "profile_candidate_bass_claim"][0]
+    assert bass_claim.folder_path == "Instruments/Bass/Bass Loops"
+    broad_loop_claim = claim_from_folder_path(
+        folder_path="Instruments/Instrument Loops/Loops",
+        source="candidate_true_bucket_rescue",
+        reason="unit test broad fallback",
+        shared=[],
+        raw_candidate_score=9999.0,
+        brain_rank=4,
+        physics_rank=10,
+        shared_winner="",
+        can_override=True,
+        strength=0.90,
+        is_real_candidate=False,
+    )
+
+    decision = FamilyClaimArbiter().adjudicate(
+        raw_claim=context.raw,
+        consensus_claims=[broad_loop_claim],
+        eligibility_claims=[bass_claim],
+        facts=measured,
+    )
+
+    assert decision.folder_path == "Instruments/Bass/Bass Loops"
 
 
 def test_profile_candidate_bass_claim_stands_down_for_crowded_mixed_loop() -> None:

@@ -39,6 +39,14 @@ from aaron_sound_sorter.infrastructure.report_writer import (
     safe_folder_path,
     unique_path,
 )
+from aaron_sound_sorter.taxonomy_contracts import (
+    STRUCTURE_TERMINALS,
+    TOP_LEVEL_TAXONOMY_FAMILIES,
+    canonicalize_taxonomy_label,
+    is_valid_taxonomy_contract_label,
+    normalize_taxonomy_path,
+    taxonomy_label_contract,
+)
 from aaron_sound_sorter.voters.base import Voter
 from aaron_sound_sorter.voters.brain_recall import BalancedRecallBrainVoter, FullBrainVoter
 from aaron_sound_sorter.voters.physics_voter import PhysicsVoter
@@ -65,7 +73,6 @@ REVIEW_LABELS = [
     "_TO_REVIEW/Measured Role Conflict",
     "_TO_REVIEW/No Strong Voter Consensus",
 ]
-TOP_LEVEL_TAXONOMY_FAMILIES = {"Drums", "Instruments", "FX", "_TO_REVIEW"}
 TRAINING_STRUCTURE_FOLDER_NAMES = {
     "_ONE_SHOTS": "One Shots",
     "_LOOPS": "Loops",
@@ -238,10 +245,14 @@ class SortPreviewService:
             write_zip=False,
             candidate_count=int(candidate_count),
             sort_workers=max(1, int(sort_workers)),
+            use_persistent_analysis_cache=gui_analysis_cache_enabled(),
+            analysis_cache_dir=gui_analysis_cache_dir(self.project_root),
         )
         try:
             _raise_if_preview_cancelled(cancel_requested)
             sorter = build_product_sorter(candidate_count=request.candidate_count)
+            sorter.configure_analysis_cache(request)
+            sorter.analysis_cache.reset()
             brain = sorter.brain_repository.load(request.brain_path)
             baby_brains = sorter.load_baby_brains_if_available(request)
             harmonic_baby_brains = sorter.load_harmonic_baby_brains_if_available(request)
@@ -668,7 +679,7 @@ class TrainingCorrectionImporter:
         for row in session.rows:
             if not row.is_corrected:
                 continue
-            row_record = self.import_row(row)
+            row_record = self.import_row(row, conflict_archive_dir=report_dir / "superseded_training_conflicts")
             manifest_rows.append(row_record)
             if row_record["status"] == "staged":
                 staged_paths.append(Path(row_record["staged_path"]))
@@ -692,7 +703,7 @@ class TrainingCorrectionImporter:
             errors=errors,
         )
 
-    def import_row(self, row: PreviewRow) -> dict[str, str]:
+    def import_row(self, row: PreviewRow, *, conflict_archive_dir: Path | None = None) -> dict[str, str]:
         """Copy one corrected row into its approved training slot."""
         record = training_import_base_record(row)
         try:
@@ -705,6 +716,12 @@ class TrainingCorrectionImporter:
                 {"status": "skipped", "training_slot": str(slot_path), "message": "source audio file not found"}
             )
             return record
+        superseded_paths = supersede_conflicting_training_audio(
+            self.training_root,
+            approved_slot_path=slot_path,
+            source_path=row.source_path,
+            archive_root=conflict_archive_dir,
+        )
         slot_path.mkdir(parents=True, exist_ok=True)
         duplicate_path = existing_training_audio_match(slot_path, row.source_path)
         if duplicate_path is not None:
@@ -714,6 +731,8 @@ class TrainingCorrectionImporter:
                     "training_slot": str(slot_path),
                     "staged_path": str(duplicate_path),
                     "message": "matching audio is already staged in this training slot",
+                    "superseded_conflicting_training_count": str(len(superseded_paths)),
+                    "superseded_conflicting_training_paths": json.dumps([str(path) for path in superseded_paths]),
                 }
             )
             return record
@@ -725,6 +744,8 @@ class TrainingCorrectionImporter:
                 "training_slot": str(slot_path),
                 "staged_path": str(target_path),
                 "message": "copied corrected audio into trusted training slot",
+                "superseded_conflicting_training_count": str(len(superseded_paths)),
+                "superseded_conflicting_training_paths": json.dumps([str(path) for path in superseded_paths]),
             }
         )
         return record
@@ -755,6 +776,64 @@ def existing_training_audio_match(slot_path: Path, source_path: Path) -> Path | 
     return None
 
 
+def supersede_conflicting_training_audio(
+    training_root: Path,
+    *,
+    approved_slot_path: Path,
+    source_path: Path,
+    archive_root: Path | None,
+) -> list[Path]:
+    """Archive exact same-audio teachers from non-approved training slots.
+
+    Args:
+        training_root: Curated training root to scan.
+        approved_slot_path: Slot selected by the latest human correction.
+        source_path: Audio file approved by the user.
+        archive_root: Report folder where superseded files are moved.
+
+    Returns:
+        Original paths removed from conflicting training slots.
+
+    Side Effects:
+        Moves exact byte-identical conflicting audio files into ``archive_root``
+        when provided.
+
+    Important Constraints:
+        This is training-data hygiene, not runtime sorting evidence. It compares
+        audio file bytes only and does not use names or folders to classify
+        unknown audio.
+    """
+    root = Path(training_root).expanduser().resolve()
+    approved_slot = Path(approved_slot_path).expanduser().resolve()
+    source = Path(source_path).expanduser().resolve()
+    if not root.exists() or not source.is_file():
+        return []
+    try:
+        source_size = source.stat().st_size
+    except OSError:
+        return []
+    moved: list[Path] = []
+    for candidate_path in sorted(root.rglob("*")):
+        if not candidate_path.is_file() or candidate_path.suffix.lower() not in AUDIO_LABEL_SUFFIXES:
+            continue
+        try:
+            resolved_candidate = candidate_path.resolve()
+            if resolved_candidate == source or approved_slot in resolved_candidate.parents:
+                continue
+            if candidate_path.stat().st_size != source_size:
+                continue
+            if not filecmp.cmp(candidate_path, source, shallow=False):
+                continue
+        except OSError:
+            continue
+        moved.append(candidate_path)
+        if archive_root is not None:
+            archive_target = unique_path(Path(archive_root).expanduser().resolve() / candidate_path.relative_to(root))
+            archive_target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(candidate_path), str(archive_target))
+    return moved
+
+
 def training_slot_path(training_root: Path, approved_folder: str) -> Path:
     """Return the training slot folder for an approved GUI taxonomy label.
 
@@ -772,9 +851,11 @@ def training_slot_path(training_root: Path, approved_folder: str) -> Path:
     Side Effects:
         None.
     """
-    normalized = normalize_taxonomy_label(approved_folder)
+    contract = taxonomy_label_contract(approved_folder)
+    normalized = contract.canonical_label
     if not is_valid_taxonomy_label(normalized):
-        raise ValueError(f"approved folder is not a valid training label: {approved_folder}")
+        reason = ", ".join(contract.reasons) if contract.reasons else "invalid_taxonomy_label"
+        raise ValueError(f"approved folder is not a valid training label ({reason}): {approved_folder}")
     parts = normalized.split("/")
     if parts[0] == "_TO_REVIEW":
         raise ValueError("review folders are not trainable brain labels")
@@ -799,6 +880,8 @@ def training_import_base_record(row: PreviewRow) -> dict[str, str]:
         "staged_path": "",
         "status": "",
         "message": "",
+        "superseded_conflicting_training_count": "0",
+        "superseded_conflicting_training_paths": "[]",
     }
 
 
@@ -814,6 +897,8 @@ def training_import_manifest_fields() -> list[str]:
         "staged_path",
         "status",
         "message",
+        "superseded_conflicting_training_count",
+        "superseded_conflicting_training_paths",
     ]
 
 
@@ -1077,7 +1162,101 @@ def detected_candidate_folders(result: SortFileResult, *, limit: int = 40) -> li
         trace_value = authority_trace.get(trace_key, {})
         if isinstance(trace_value, dict):
             add_candidate(trace_value.get("path") or trace_value.get("folder_path") or trace_value.get("label"))
+    if has_decisive_loop_structure(result):
+        candidates = [
+            candidate
+            for candidate in candidates
+            if taxonomy_label_contract(candidate).structure_terminal != "One Shots"
+        ]
     return candidates
+
+
+def has_decisive_loop_structure(result: SortFileResult) -> bool:
+    """Return True when measured structure rules out one-shot GUI suggestions.
+
+    Duration alone is not decisive because impacts, risers, and reverberant
+    hits can be long one-shots. This display gate requires the shared loop fact
+    plus a repeated-event, loop-role, or sustained tonal-loop contract.
+    """
+    facts = result.facts
+    if not facts.is_loop_like or facts.is_single_event_like:
+        return False
+    evidence = facts.evidence if isinstance(facts.evidence, dict) else {}
+    shape = evidence.get("shape_vote") if isinstance(evidence.get("shape_vote"), dict) else {}
+    roles = evidence.get("measured_roles") if isinstance(evidence.get("measured_roles"), dict) else {}
+    structure = evidence.get("structure_facts") if isinstance(evidence.get("structure_facts"), dict) else {}
+
+    shape_name = str(shape.get("primary_shape") or "")
+    shape_confidence = _preview_number(shape.get("confidence"))
+    event_count = max(
+        _preview_number(shape.get("onset_count")),
+        _preview_number(structure.get("event_count_estimate")),
+        _preview_number(evidence.get("event_count_estimate")),
+    )
+    onset_span = max(
+        _preview_number(shape.get("onset_span_ratio")),
+        _preview_number(structure.get("onset_span_ratio")),
+        _preview_number(evidence.get("onset_span_ratio")),
+    )
+    repetition = _preview_number(shape.get("true_repetition_score"))
+    loop_population = max(
+        _preview_number(shape.get("pitched_event_ratio")),
+        _preview_number(shape.get("percussive_event_ratio")),
+        _preview_number(shape.get("drumlike_frame_ratio")),
+    )
+    loop_role = max(
+        *(
+            _preview_number(roles.get(role_name))
+            for role_name in (
+                "bass_loop",
+                "pitched_music_loop",
+                "bright_drum_loop",
+                "percussive_drum_loop",
+                "low_rhythmic_drum_loop",
+            )
+        ),
+        0.0,
+    )
+    repeated_shape_names = {
+        "bass_phrase",
+        "beat_loop",
+        "compound_musical_loop",
+        "designed_motion_fx_loop",
+        "instrument_plus_fx_loop",
+        "layered_phrase",
+        "mixed_instrument_loop",
+        "pitched_phrase",
+        "pitched_phrase_shape",
+        "pitched_repetition_phrase",
+        "repeated_phrase_loop",
+        "solo_phrase",
+        "vocal_phrase",
+    }
+    repeated_shape = bool(
+        shape_name in repeated_shape_names
+        and shape_confidence >= 0.70
+        and event_count >= 4.0
+        and onset_span >= 0.45
+        and (repetition >= 0.45 or loop_population >= 0.72)
+    )
+    measured_loop_role = bool(loop_role >= 0.74 and event_count >= 4.0 and onset_span >= 0.40)
+    sustained_loop = bool(
+        facts.is_long
+        and shape_name == "sustained_pad"
+        and shape_confidence >= 0.80
+        and _preview_number(shape.get("pitched_event_ratio")) >= 0.72
+        and _preview_number(shape.get("sustained_tonal_frame_ratio")) >= 0.72
+        and _preview_number(shape.get("percussive_event_ratio")) <= 0.25
+    )
+    return bool(repeated_shape or measured_loop_role or sustained_loop)
+
+
+def _preview_number(value: object) -> float:
+    """Return one finite-enough GUI diagnostic number or zero."""
+    try:
+        return float(value or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def add_guess_folders(
@@ -1305,8 +1484,7 @@ def normalize_taxonomy_label(value: object) -> str:
     Side Effects:
         None.
     """
-    text = str(value or "").replace("\\", "/").strip()
-    return "/".join(part.strip() for part in text.split("/") if part.strip())
+    return canonicalize_taxonomy_label(normalize_taxonomy_path(value))
 
 
 def is_valid_taxonomy_label(label: str) -> bool:
@@ -1332,7 +1510,11 @@ def is_valid_taxonomy_label(label: str) -> bool:
         return False
     if Path(parts[-1]).suffix.lower() in AUDIO_LABEL_SUFFIXES:
         return False
-    return True
+    if parts[0] == "_TO_REVIEW":
+        return True
+    if parts[-1] not in STRUCTURE_TERMINALS:
+        return True
+    return is_valid_taxonomy_contract_label(normalized)
 
 
 def write_preview_manifest(path: Path, session: SortPreviewSession) -> None:
@@ -1464,3 +1646,17 @@ def gui_worker_count() -> int:
             return 1
     available_cpus = max(1, os.cpu_count() or 2)
     return max(1, min(10, available_cpus))
+
+
+def gui_analysis_cache_enabled() -> bool:
+    """Return whether GUI preview should reuse measured analysis across runs."""
+    raw = str(os.environ.get("AARON_GUI_DISABLE_ANALYSIS_CACHE", "")).strip().lower()
+    return raw not in {"1", "true", "yes", "on"}
+
+
+def gui_analysis_cache_dir(project_root: Path) -> Path:
+    """Return the GUI persistent measured-analysis cache directory."""
+    configured = str(os.environ.get("AARON_GUI_ANALYSIS_CACHE_DIR", "")).strip()
+    if configured:
+        return Path(configured).expanduser()
+    return Path(project_root).expanduser() / "_reports" / "analysis_cache" / "gui_v1"

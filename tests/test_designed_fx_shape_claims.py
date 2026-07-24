@@ -127,6 +127,75 @@ def test_designed_tonal_shape_can_rehome_instrument_decoy_to_broad_fx() -> None:
     assert final.consensus_status == "final_measured_transition_fx_invariant"
 
 
+def test_nonhuman_formant_fx_decoy_can_beat_broad_instrument_loop() -> None:
+    """Formant-like FX is not real Voice, but it may still own broad FX."""
+    raw = _claim(
+        "Instruments/Instrument Loops/Loops",
+        shared=[
+            _shared_row("Instruments/Mixed Musical Loops/Multi Instrument/Loops", 16.0, brain_rank=15, physics_rank=1),
+            _shared_row("FX/Hybrid Designed FX", 18.0, brain_rank=10, physics_rank=8),
+            _shared_row(
+                "FX/Digital Mechanical Industrial Transport/Glitches and Stutters/Generic Stutter/Long FX", 20.0
+            ),
+            _shared_row("FX/Human and Voice FX/Mouth Sounds/Long FX", 21.0),
+        ],
+    )
+    facts = _facts(
+        "pitched_repetition_phrase",
+        confidence=0.93,
+        flat={
+            "voice_score": 0.62,
+            "human_spoken_voice_score": 0.78,
+            "human_breath_mouth_score": 0.47,
+            "fx_formant_score": 0.65,
+            "fx_glitch_stutter_score": 0.53,
+            "fx_motion_score": 0.07,
+            "fx_transition_authority_score": 0.11,
+            "synth_tonal_source_score": 0.46,
+            "woodwind_sax_score": 0.65,
+            "reed_wind_authority_score": 0.36,
+            "plucked_string_authority_score": 0.38,
+            "bass_electric_score": 0.64,
+            "drum_hit_score": 0.34,
+            "drum_loop_source_score": 0.29,
+        },
+        metrics={
+            "shape_scores": [
+                ["pitched_repetition_phrase", 0.93],
+                ["repeated_phrase_loop", 0.83],
+                ["pitched_phrase_shape", 0.80],
+                ["designed_tonal_fx", 0.58],
+                ["glitch_stutter", 0.56],
+                ["siren_alarm_tone", 0.51],
+            ],
+            "onset_count": 48.0,
+            "onset_span_ratio": 0.69,
+            "true_repetition_score": 0.83,
+            "pitch_confidence": 0.21,
+            "f0_voiced_ratio": 0.93,
+            "pitched_event_ratio": 0.84,
+            "percussive_event_ratio": 0.09,
+            "drumlike_frame_ratio": 0.04,
+            "sustained_tonal_frame_ratio": 0.92,
+            "non_event_tonal_ratio": 0.90,
+            "spectral_flatness_mean": 0.11,
+            "spectral_entropy_mean": 0.54,
+        },
+    )
+    facts.evidence["physics_layer_decision"] = {
+        "instrument_branch_selected": "MixedInstrument",
+        "instrument_branch_selected_confidence": 0.72,
+        "instrument_voice_source_owner_confirmed": False,
+    }
+
+    claims = MeasuredTransitionFxClaimProducer().produce(DecisionContext(raw, _instrument_only_eligibility(), facts))
+    final = FamilyClaimArbiter().adjudicate(raw_claim=raw, consensus_claims=[], eligibility_claims=claims, facts=facts)
+
+    assert claims
+    assert claims[0].folder_path == "FX/Hybrid Designed FX"
+    assert final.folder_path == "FX/Hybrid Designed FX"
+
+
 def test_brain_and_physics_fx_owner_beats_stale_instrument_parent_role() -> None:
     """Brain+physics FX ownership may pass an outdated pitched-loop parent role."""
     raw = _claim(

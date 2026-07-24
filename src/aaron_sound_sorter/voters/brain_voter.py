@@ -16,6 +16,7 @@ from aaron_sound_sorter.voters.human_override_recall import (
     human_override_recall_match,
 )
 from aaron_sound_sorter.voters.scoring_tools import (
+    canonical_candidate_labels,
     centroid_distance,
     feature_weights,
     label_maps,
@@ -37,7 +38,8 @@ class BrainVoter(Voter):
     def vote(self, physics: AudioPhysics, facts: SharedAudioFacts, brain: dict[str, Any]) -> VoterResult:
         if facts.is_broken_or_tiny:
             return self.review_result(ConsensusPolicy().broken_or_tiny_label, "broken_or_tiny")
-        labels = [str(label) for label in brain.get("labels", []) if str(label)]
+        raw_labels = [str(label) for label in brain.get("labels", []) if str(label)]
+        labels = canonical_candidate_labels(raw_labels)
         role_gate = facts.evidence.get("dynamic_role_gate", {}) if isinstance(facts.evidence, dict) else {}
         gate_can_filter = bool(isinstance(role_gate, dict) and role_gate.get("final_effects_enabled"))
         allowed = set(role_gate.get("allowed_labels", []) or []) if gate_can_filter else set()
@@ -59,6 +61,7 @@ class BrainVoter(Voter):
             guesses=guesses,
             diagnostics={
                 "candidate_count": len(labels),
+                "discarded_noncanonical_label_count": max(0, len(raw_labels) - len(labels)),
                 "returned_count": len(guesses),
                 "role_gate_applied": bool(gate_can_filter and allowed),
                 "role_gate_mode": str(role_gate.get("mode", "missing")) if isinstance(role_gate, dict) else "missing",
@@ -116,6 +119,7 @@ class BrainVoter(Voter):
             human_override = human_override_recall_match(
                 brain,
                 label,
+                raw_query_vector=vector,
                 weighted_query_vector=weighted_vector,
                 scaler_mean=mean,
                 scaler_std=std,

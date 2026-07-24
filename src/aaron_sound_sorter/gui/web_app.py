@@ -20,10 +20,7 @@ from pathlib import Path
 from typing import Any, BinaryIO, Callable
 from urllib.parse import parse_qs, urlparse
 
-from aaron_audio_intelligence.physics_memory_brain import PHYSICS_MEMORY_BRAIN_NAME
-from aaron_audio_intelligence.shape_memory_brain import SHAPE_MEMORY_BRAIN_NAME, SHAPE_STARTER_MEMORY_BRAIN_NAME
-from aaron_audio_intelligence.user_memory_brain import USER_MEMORY_BRAIN_NAME
-from aaron_audio_intelligence.voter_memory_brain import VOTER_MEMORY_BRAIN_NAME
+from aaron_sound_sorter.gui.brain_family_files import active_gui_brain_file_names
 from aaron_sound_sorter.gui.incremental_brain_update import (
     IncrementalBrainUpdater,
     corrections_from_import_manifest,
@@ -830,25 +827,6 @@ def backup_active_brain_family(project_root: Path, backup_dir: Path) -> Path:
         if source_path.exists() and source_path.is_file():
             shutil.copy2(source_path, backup_dir / brain_name)
     return backup_dir
-
-
-def active_gui_brain_file_names() -> list[str]:
-    """Return brain JSON filenames that the GUI may use or overwrite."""
-    return [
-        "stage4_folder_brain.json",
-        "stage4_folder_brain_baby.json",
-        "stage4_folder_brain_core_baby.json",
-        "stage4_folder_brain_spread_baby.json",
-        "stage4_folder_brain_outlier_baby.json",
-        USER_MEMORY_BRAIN_NAME,
-        PHYSICS_MEMORY_BRAIN_NAME,
-        VOTER_MEMORY_BRAIN_NAME,
-        SHAPE_STARTER_MEMORY_BRAIN_NAME,
-        SHAPE_MEMORY_BRAIN_NAME,
-        "stage4_folder_brain_harmonic_core_baby.json",
-        "stage4_folder_brain_harmonic_spread_baby.json",
-        "stage4_folder_brain_harmonic_outlier_baby.json",
-    ]
 
 
 def reveal_path_in_finder(path: Path) -> Path:
@@ -2105,7 +2083,7 @@ def render_index_html(
         <div id="trainingPanelBody" class="panel-body">
           <div class="teach-grid">
             <div>
-              <div class="small">Copies changed rows into <code>training/locked_curated_v1</code>, backs up active brains, then applies a fast measured-evidence update.</div>
+              <div class="small">Copies changed rows into <code>training/locked_curated_v1</code>, backs up active brains, then updates every active brain lane with measured evidence.</div>
             </div>
             <button class="primary" id="trainCorrectionsButton" disabled>Train Brains From Corrections</button>
             <button id="openTrainingReportButton" disabled>Open Training Report</button>

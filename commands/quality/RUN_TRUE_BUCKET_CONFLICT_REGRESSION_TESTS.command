@@ -25,7 +25,6 @@ echo
 echo
 "$PYTHON_BIN" -m pytest -q \
   tests/test_no_source_name_sorting_invariant.py \
-  tests/test_decision_core_ground_truth_samples_tdd.py \
   tests/test_decision_core_ground_truth_true_bucket_tdd.py \
   tests/test_decision_core_second_conflict_resolver_tdd.py \
   tests/test_decision_core_conflict_resolver_tdd.py \

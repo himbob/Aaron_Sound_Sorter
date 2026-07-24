@@ -121,6 +121,7 @@ class MeasuredTransitionFxClaimProducer:
             and not self._facts_support_measured_transition_owner(facts)
             and not self._facts_support_shape_only_transition_rehome(facts, raw)
             and not self._facts_support_strong_designed_motion_fx(facts)
+            and not self._facts_support_measured_fx_decoy_shape_body(facts, raw)
             and not self._facts_support_measured_impact_tail_body(facts, raw)
             and not self._facts_support_learned_or_brain_fx_role_owner(facts)
         ):
@@ -179,9 +180,7 @@ class MeasuredTransitionFxClaimProducer:
         return claim_from_folder_path(
             folder_path=folder_path,
             source="final_measured_transition_fx_invariant",
-            reason=(
-                f"measured transition-FX claim: broad FX motion was established before final arbitration; {reason_tail}"
-            ),
+            reason=(f"measured FX role claim: broad FX body was established before final arbitration; {reason_tail}"),
             shared=raw.shared_candidates,
             raw_candidate_score=raw.raw_candidate_score,
             brain_rank=raw.brain_rank,
@@ -415,7 +414,11 @@ class MeasuredTransitionFxClaimProducer:
         measured_designed_body = self._facts_support_measured_designed_fx_body(facts, raw)
         measured_fx_decoy_body = self._facts_support_measured_fx_decoy_shape_body(facts, raw)
         measured_impact_tail_body = self._facts_support_measured_impact_tail_body(facts, raw)
-        if self._facts_support_protected_loop_owner_over_fx(facts) and not measured_impact_tail_body:
+        if (
+            self._facts_support_protected_loop_owner_over_fx(facts)
+            and not measured_impact_tail_body
+            and not self._facts_support_nonhuman_formant_fx_decoy(facts)
+        ):
             return False
         if raw.family == "Drums" and not (
             measured_transition_body or measured_designed_body or measured_fx_decoy_body or measured_impact_tail_body
@@ -972,7 +975,9 @@ class MeasuredTransitionFxClaimProducer:
         """
         if facts is None:
             return False
-        if self._facts_support_protected_loop_owner_over_fx(facts):
+        if self._facts_support_protected_loop_owner_over_fx(
+            facts
+        ) and not self._facts_support_nonhuman_formant_fx_decoy(facts):
             return False
         shape = _shape_vote_from_facts(facts)
         if shape in DESIGNED_FX_SHAPES or shape in {
@@ -1074,7 +1079,8 @@ class MeasuredTransitionFxClaimProducer:
             and self._shape_number(facts, "f0_voiced_ratio") <= 0.25
         )
         if not (strong_texture_motion or strong_tonal_fx_decoy or strong_loop_fx_decoy):
-            return False
+            if not self._facts_support_nonhuman_formant_fx_decoy(facts):
+                return False
         # Clean stable instruments should keep ownership.  This is deliberately
         # narrower than "is pitched" because many designed FX are tonal.
         instrument_identity = max(
@@ -1103,6 +1109,94 @@ class MeasuredTransitionFxClaimProducer:
             if not (fx_shape_pressure >= 0.80 and fx_physics_pressure >= 0.72):
                 return False
         return True
+
+    def _facts_support_nonhuman_formant_fx_decoy(self, facts: SharedAudioFacts | None) -> bool:
+        """Return True for designed/formant FX that only looks voice-like.
+
+        Real speech uses time-varying vocal ownership: vocal roles, human
+        correction memory, or a Voice branch that has source ownership.  This
+        guard catches the opposite case: formant/speech-like panels fire, but
+        the measured role is a generic pitched phrase and no real voice,
+        instrument, or drum owner is strong enough to claim the sound.
+        """
+        if facts is None:
+            return False
+        if self._facts_support_true_voice_role(facts):
+            return False
+        layer = facts.evidence.get("physics_layer_decision") if isinstance(facts.evidence, dict) else {}
+        if isinstance(layer, dict) and layer.get("instrument_voice_source_owner_confirmed"):
+            return False
+        shape = _shape_vote_from_facts(facts)
+        if shape not in {
+            "pitched_repetition_phrase",
+            "repeated_phrase_loop",
+            "pitched_phrase",
+            "solo_phrase",
+            "bass_phrase",
+            "hit_with_tail",
+            "single_hit",
+            "echo_tail_hit",
+        }:
+            return False
+        if _shape_confidence_from_facts(facts) < 0.70:
+            return False
+        formant_fx_pressure = max(
+            self._subpanel_score(facts, "fx_formant_score"),
+            0.82 * self._subpanel_score(facts, "human_spoken_voice_score"),
+            self._subpanel_score(facts, "animal_voice_score"),
+            self._shape_score(facts, "designed_tonal_fx"),
+            self._shape_score(facts, "siren_alarm_tone"),
+        )
+        designed_fx_pressure = max(
+            formant_fx_pressure,
+            self._subpanel_score(facts, "fx_glitch_stutter_score"),
+            self._subpanel_score(facts, "fx_alarm_score"),
+            self._subpanel_score(facts, "fx_siren_score"),
+            self._subpanel_score(facts, "fx_radio_electrical_score"),
+            self._shape_score(facts, "glitch_stutter"),
+            self._shape_score(facts, "designed_motion_fx_loop"),
+        )
+        if formant_fx_pressure < 0.62 or designed_fx_pressure < 0.62:
+            return False
+        instrument_identity = max(
+            self._subpanel_score(facts, "synth_tonal_source_score"),
+            self._subpanel_score(facts, "synth_lead_score"),
+            self._subpanel_score(facts, "synth_pad_score"),
+            self._subpanel_score(facts, "synth_chord_score"),
+            self._subpanel_score(facts, "struck_keys_score"),
+            self._subpanel_score(facts, "keys_tonal_decay_score"),
+            self._subpanel_score(facts, "woodwind_sax_score"),
+            self._subpanel_score(facts, "reed_wind_authority_score"),
+            self._subpanel_score(facts, "plucked_string_authority_score"),
+            self._subpanel_score(facts, "bass_electric_score"),
+            self._subpanel_score(facts, "bass_synth_score"),
+        )
+        tonal_certainty = max(
+            self._shape_number(facts, "pitch_confidence"),
+            0.82 * self._shape_number(facts, "f0_voiced_ratio"),
+            0.72 * self._shape_number(facts, "pitched_event_ratio"),
+        )
+        clean_instrument_owner = bool(
+            instrument_identity >= 0.68
+            and tonal_certainty >= 0.52
+            and max(
+                self._shape_number(facts, "sustained_tonal_frame_ratio"),
+                self._shape_number(facts, "non_event_tonal_ratio"),
+            )
+            >= 0.78
+        )
+        drum_owner = max(
+            self._subpanel_score(facts, "drum_hit_score"),
+            self._subpanel_score(facts, "drum_loop_source_score"),
+            self._shape_number(facts, "percussive_event_ratio"),
+            self._shape_number(facts, "drumlike_frame_ratio"),
+        )
+        pitched_but_uncertain = bool(
+            self._shape_number(facts, "pitch_confidence") <= 0.50
+            or self._shape_score(facts, "designed_tonal_fx") >= 0.54
+            or self._shape_score(facts, "glitch_stutter") >= 0.54
+        )
+        return bool(not clean_instrument_owner and drum_owner < 0.52 and pitched_but_uncertain)
 
     def _facts_support_real_drum_material_over_designed_fx(self, facts: SharedAudioFacts | None) -> bool:
         """Return True for real drum material strong enough to block designed-FX rescue."""

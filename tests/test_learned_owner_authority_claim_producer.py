@@ -260,7 +260,7 @@ def test_learned_owner_claim_stands_down_for_incompatible_family_body() -> None:
     assert claims == []
 
 
-def test_learned_owner_rehomes_internal_human_voice_fx_to_instrument_voice() -> None:
+def test_learned_owner_preserves_supervised_human_voice_fx_label() -> None:
     producer = LearnedOwnerAuthorityClaimProducer()
     context = DecisionContext(
         raw=raw_claim("Instruments/Mixed Musical Loops/Multi Instrument/Loops"),
@@ -278,7 +278,7 @@ def test_learned_owner_rehomes_internal_human_voice_fx_to_instrument_voice() -> 
     claims = producer.produce(context)
 
     assert len(claims) == 1
-    assert claims[0].folder_path == "Instruments/Voice/Vocal Loops/Loops"
+    assert claims[0].folder_path == "FX/Human and Voice FX/Spoken Voice/Long FX"
 
 
 def test_learned_owner_voice_claim_stands_down_for_hard_drum_body() -> None:
@@ -381,3 +381,105 @@ def test_arbiter_prefers_learned_non_voice_owner_over_generic_loop_fallback() ->
 
     assert final.source == LEARNED_OWNER_CLAIM_SOURCE
     assert final.folder_path == learned_path
+
+
+def test_exact_dual_memory_teacher_claim_bypasses_ordinary_woodwind_leaf_margin_review() -> None:
+    from aaron_sound_sorter.engine.claim_producers.learned_owner_authority import (
+        EXACT_HUMAN_TEACHER_OWNER_CLAIM_SOURCE,
+    )
+
+    producer = LearnedOwnerAuthorityClaimProducer()
+    learned_path = "Instruments/Woodwinds/Saxophone/Loops"
+    facts = voice_facts(shape="pitched_repetition_phrase", voice_score=0.18, woodwind_sax_score=0.62)
+    facts.evidence["shape_vote"].update(
+        {
+            "pitched_event_ratio": 0.92,
+            "sustained_tonal_frame_ratio": 0.84,
+            "percussive_event_ratio": 0.10,
+            "drumlike_frame_ratio": 0.08,
+        }
+    )
+    facts.evidence["physics_subpanels"]["flat"].update(
+        {
+            "woodwind_sax_score": 0.62,
+            "reed_wind_score": 0.58,
+            "reed_wind_authority_score": 0.48,
+            "synth_tonal_source_score": 0.78,
+            "synth_lead_score": 0.81,
+            "synth_pad_score": 0.34,
+            "synth_chord_score": 0.42,
+        }
+    )
+    memory_common = {
+        "matched": True,
+        "top_family": "Instruments",
+        "label": learned_path,
+        "confidence": 0.94,
+        "effective_weight": 720,
+        "nearest_distance": 0.000002,
+        "match_kind": "fingerprint",
+    }
+    facts.evidence["learned_voter_memory"] = {
+        **memory_common,
+        "role": "instrument_wind_loop",
+    }
+    facts.evidence["learned_physics_memory"] = {
+        **memory_common,
+        "confidence": 0.96,
+        "branch": "Woodwinds",
+    }
+    raw = raw_claim(learned_path, score=3.0)
+    learned_claim = producer.produce(
+        DecisionContext(
+            raw=raw,
+            eligibility=eligibility(),
+            facts=facts,
+            brain_result=VoterResult(voter_name="brain", guesses=[]),
+        )
+    )[0]
+
+    final = FamilyClaimArbiter().pick_winner(raw_claim=raw, claims=[learned_claim], facts=facts)
+
+    assert learned_claim.source == EXACT_HUMAN_TEACHER_OWNER_CLAIM_SOURCE
+    assert final.source == EXACT_HUMAN_TEACHER_OWNER_CLAIM_SOURCE
+    assert final.folder_path == learned_path
+    assert not final.is_review
+
+
+def test_single_lane_learned_owner_still_obeys_ordinary_boundary_policy() -> None:
+    producer = LearnedOwnerAuthorityClaimProducer()
+    learned_path = "Instruments/Woodwinds/Saxophone/Loops"
+    facts = voice_facts(shape="pitched_repetition_phrase", voice_score=0.18, woodwind_sax_score=0.54)
+    facts.evidence["physics_subpanels"]["flat"].update(
+        {
+            "woodwind_sax_score": 0.54,
+            "reed_wind_score": 0.52,
+            "reed_wind_authority_score": 0.42,
+            "synth_tonal_source_score": 0.78,
+            "synth_lead_score": 0.81,
+        }
+    )
+    facts.evidence["learned_physics_memory"] = {
+        "matched": True,
+        "top_family": "Instruments",
+        "branch": "Woodwinds",
+        "label": learned_path,
+        "confidence": 0.96,
+        "effective_weight": 1200,
+        "nearest_distance": 0.000002,
+        "match_kind": "fingerprint",
+    }
+    raw = raw_claim(learned_path, score=3.0)
+    learned_claim = producer.produce(
+        DecisionContext(
+            raw=raw,
+            eligibility=eligibility(),
+            facts=facts,
+            brain_result=VoterResult(voter_name="brain", guesses=[]),
+        )
+    )[0]
+
+    final = FamilyClaimArbiter().pick_winner(raw_claim=raw, claims=[learned_claim], facts=facts)
+
+    assert learned_claim.source == LEARNED_OWNER_CLAIM_SOURCE
+    assert final.source != learned_claim.source

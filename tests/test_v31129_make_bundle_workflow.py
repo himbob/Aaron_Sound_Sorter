@@ -35,11 +35,13 @@ def make_tiny_project(tmp_path: Path) -> Path:
     (project_root / "tools").mkdir()
     (project_root / "docs").mkdir()
     (project_root / "commands" / "build").mkdir(parents=True)
+    (project_root / "neural_artifacts" / "verified_run").mkdir(parents=True)
     (project_root / "src" / "aaron_sound_sorter" / "example.py").write_text('"""Example module."""\nVALUE = 1\n')
     (project_root / "tests" / "test_example.py").write_text("def test_example():\n    assert True\n")
     (project_root / "tools" / "example_tool.py").write_text('"""Example tool."""\n')
     (project_root / "docs" / "NOTE.md").write_text("# Note\n")
     (project_root / "commands" / "build" / "EXAMPLE.command").write_text("#!/bin/bash\necho ok\n")
+    (project_root / "neural_artifacts" / "verified_run" / "summary.json").write_text("{}\n")
     return project_root
 
 
@@ -56,7 +58,12 @@ def test_bundle_tool_dry_run_selects_safe_changed_files(tmp_path: Path) -> None:
 
     completed = run_bundle_tool(
         project_root,
-        "src/aaron_sound_sorter/example.py\ntests/test_example.py\ndocs/NOTE.md",
+        (
+            "src/aaron_sound_sorter/example.py\n"
+            "tests/test_example.py\n"
+            "docs/NOTE.md\n"
+            "neural_artifacts/verified_run/summary.json"
+        ),
         "--dry-run",
     )
 
@@ -65,6 +72,7 @@ def test_bundle_tool_dry_run_selects_safe_changed_files(tmp_path: Path) -> None:
     assert "src/aaron_sound_sorter/example.py" in completed.stdout
     assert "tests/test_example.py" in completed.stdout
     assert "docs/NOTE.md" in completed.stdout
+    assert "neural_artifacts/verified_run/summary.json" in completed.stdout
     assert "Dry run:" in completed.stdout
 
 
@@ -84,6 +92,7 @@ def test_bundle_tool_creates_clean_zip_with_installer(tmp_path: Path) -> None:
 
     assert "Aaron_Sound_Sorter_test_patch/files/src/aaron_sound_sorter/example.py" in names
     assert "Aaron_Sound_Sorter_test_patch/files/commands/build/EXAMPLE.command" in names
+    assert "Aaron_Sound_Sorter_test_patch/files/neural_artifacts/verified_run/summary.json" in names
     assert "Aaron_Sound_Sorter_test_patch/INSTALL_NO_BACKUP.command" in names
     assert "Aaron_Sound_Sorter_test_patch/AI_BUNDLE_MANIFEST.md" in names
     assert not any("__pycache__" in name for name in names)

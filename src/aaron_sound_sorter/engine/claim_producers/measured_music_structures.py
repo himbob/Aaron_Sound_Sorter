@@ -32,6 +32,8 @@ from aaron_sound_sorter.engine.decision_helpers import (
     _top_physics_guess_path_from_facts,
 )
 from aaron_sound_sorter.engine.family_claims import ConsensusClaim, claim_from_folder_path
+from aaron_sound_sorter.engine.learned_memory_contracts import has_voice_memory_match
+from aaron_sound_sorter.engine.voice_source_contracts import processed_voice_source_owned
 from aaron_sound_sorter.voters.scoring_tools import role_strength
 
 
@@ -167,17 +169,18 @@ class MeasuredMusicStructureClaimProducer:
 
     def _facts_have_matched_voice_memory(self, facts: SharedAudioFacts | None) -> bool:
         """Return True when learned user memory explicitly matches Voice."""
-        if facts is None or not isinstance(getattr(facts, "evidence", None), dict):
-            return False
-        for key in ("learned_voter_memory", "learned_physics_memory"):
-            memory = facts.evidence.get(key)
-            if not isinstance(memory, dict) or not memory.get("matched"):
-                continue
-            label = _norm_path(str(memory.get("label") or ""))
-            branch = _norm_path(str(memory.get("branch") or memory.get("role") or ""))
-            if label.startswith("instruments/voice") or branch in {"voice", "instrument_voice_loop"}:
-                return True
-        return False
+        return has_voice_memory_match(facts)
+
+    def _facts_have_processed_voice_source_owner(self, facts: SharedAudioFacts | None) -> bool:
+        """Return True when processed-formant evidence is owned by Voice.
+
+        Processed tonal FX, sax-like material, and spoken/rap vocals can all
+        share formant-like panels.  This method is the source-ownership contract:
+        broad processed shapes may become Instruments/Voice only when a vocal
+        role, human correction memory, or a decisive rank-one Voice brain lane
+        owns the source first.
+        """
+        return processed_voice_source_owned(facts)
 
     def _compatible_instrument_branch_score(self, facts: SharedAudioFacts | None, branches: set[str]) -> float:
         """Return measured branch support for a broad instrument branch set."""
@@ -591,9 +594,34 @@ class MeasuredMusicStructureClaimProducer:
             "human_breath_mouth_score",
             "voice_choir_score",
         )
+        layer = self._physics_layer(facts)
+        if isinstance(layer, dict):
+            branch = str(layer.get("instrument_branch_selected") or layer.get("physics_layer_branch") or "")
+            branch_confidence = self._safe_float(
+                layer.get("instrument_branch_selected_confidence", layer.get("physics_layer_branch_confidence")),
+                0.0,
+            )
+            rap_voice_texture = self._safe_float(layer.get("instrument_rap_voice_texture"), 0.0)
+            human_voice_texture = self._safe_float(layer.get("instrument_human_voice_texture"), 0.0)
+            source_owner = bool(layer.get("instrument_voice_source_owner_confirmed"))
+            layer_voice_loop = bool(
+                branch == "Voice"
+                and branch_confidence >= 0.56
+                and (source_owner or rap_voice_texture >= 0.58 or human_voice_texture >= 0.66)
+                and self._shape_number(facts, "f0_voiced_ratio") >= 0.58
+                and self._shape_number(facts, "pitched_event_ratio") >= 0.54
+                and self._shape_number(facts, "percussive_event_ratio") <= 0.45
+                and self._shape_number(facts, "drumlike_frame_ratio") <= 0.45
+                and self._measured_score(facts, "drum_loop_source_score") <= 0.45
+                and self._measured_score(facts, "drum_hit_score") <= 0.58
+                and self._measured_score(facts, "fx_motion_score", "fx_transition_authority_score") <= 0.62
+            )
+            if layer_voice_loop:
+                return True
         human_spoken = self._measured_score(facts, "human_spoken_voice_score")
         processed_spoken_voice_loop = bool(
             self._facts_have_internal_voice_candidate(facts, max_rank=4, max_score=1.35)
+            and self._facts_have_processed_voice_source_owner(facts)
             and human_spoken >= 0.74
             and voice_panel >= 0.66
             and self._shape_number(facts, "pitched_event_ratio") >= 0.54

@@ -43,6 +43,7 @@ from aaron_audio_intelligence.voter_memory_brain import (
 from aaron_sound_sorter.core import FEATURE_NAMES, FEATURE_WEIGHTS, FP_SIZE, FeatureRow
 from aaron_sound_sorter.domain.models import AudioPhysics, SharedAudioFacts
 from aaron_sound_sorter.gui import incremental_brain_update as updater_module
+from aaron_sound_sorter.gui.brain_family_files import incremental_training_brain_names
 from aaron_sound_sorter.gui.incremental_brain_update import (
     DEFAULT_HUMAN_OVERRIDE_EVIDENCE_WEIGHT,
     MAX_HUMAN_OVERRIDE_EVIDENCE_WEIGHT,
@@ -52,11 +53,14 @@ from aaron_sound_sorter.gui.incremental_brain_update import (
     bounded_human_override_weight,
     corrections_from_import_manifest,
     dynamic_human_override_weight,
+    effective_example_weight_sum,
+    example_model_repeat_count,
     supersede_conflicting_label_examples,
     supersede_conflicting_physics_examples,
     supersede_conflicting_shape_examples,
     supersede_conflicting_voter_examples,
     update_brain_label_with_row,
+    weighted_example_fingerprints,
 )
 from aaron_sound_sorter.voters.brain_voter import BrainVoter
 from aaron_sound_sorter.voters.layered_physics_scorer import LayeredPhysicsScorer
@@ -234,6 +238,19 @@ def test_human_override_weight_is_bounded_and_reinforced(tmp_path: Path) -> None
     assert len(examples) == 1
     assert examples[0]["human_override_confirmation_count"] == 2
     assert examples[0]["human_override_evidence_weight"] == MAX_HUMAN_OVERRIDE_EVIDENCE_WEIGHT
+
+
+def test_high_weight_examples_use_compressed_model_repeats(tmp_path: Path) -> None:
+    label = "Drums/Snares/Acoustic Snare/One Shots"
+    brain = _base_brain()
+    row = _row(label, tmp_path / "snare.wav")
+
+    examples = append_training_example(brain, row, evidence_weight=999_999)
+    vectors = weighted_example_fingerprints(examples)
+
+    assert effective_example_weight_sum(examples) == MAX_HUMAN_OVERRIDE_EVIDENCE_WEIGHT
+    assert example_model_repeat_count(examples[0]) < MAX_HUMAN_OVERRIDE_EVIDENCE_WEIGHT
+    assert len(vectors) == example_model_repeat_count(examples[0])
 
 
 def test_dynamic_human_override_weight_beats_competing_label_support() -> None:
@@ -547,16 +564,17 @@ def test_incremental_updater_creates_dedicated_physics_memory_brain(
     assert PHYSICS_MEMORY_BRAIN_NAME in updated_names
 
 
-def test_default_incremental_updater_does_not_mutate_shape_starter_memory() -> None:
-    assert "stage4_folder_brain.json" not in updater_module.DEFAULT_INCREMENTAL_BRAIN_NAMES
-    assert "stage4_folder_brain_core_baby.json" not in updater_module.DEFAULT_INCREMENTAL_BRAIN_NAMES
-    assert "stage4_folder_brain_spread_baby.json" not in updater_module.DEFAULT_INCREMENTAL_BRAIN_NAMES
-    assert "stage4_folder_brain_outlier_baby.json" not in updater_module.DEFAULT_INCREMENTAL_BRAIN_NAMES
+def test_default_incremental_updater_targets_only_dedicated_memory_brains() -> None:
+    assert updater_module.DEFAULT_INCREMENTAL_BRAIN_NAMES == incremental_training_brain_names()
     assert USER_MEMORY_BRAIN_NAME in updater_module.DEFAULT_INCREMENTAL_BRAIN_NAMES
     assert SHAPE_MEMORY_BRAIN_NAME in updater_module.DEFAULT_INCREMENTAL_BRAIN_NAMES
     assert VOTER_MEMORY_BRAIN_NAME in updater_module.DEFAULT_INCREMENTAL_BRAIN_NAMES
     assert PHYSICS_MEMORY_BRAIN_NAME in updater_module.DEFAULT_INCREMENTAL_BRAIN_NAMES
     assert SHAPE_STARTER_MEMORY_BRAIN_NAME not in updater_module.DEFAULT_INCREMENTAL_BRAIN_NAMES
+    assert "stage4_folder_brain.json" not in updater_module.DEFAULT_INCREMENTAL_BRAIN_NAMES
+    assert "stage4_folder_brain_core_baby.json" not in updater_module.DEFAULT_INCREMENTAL_BRAIN_NAMES
+    assert "stage4_folder_brain_spread_baby.json" not in updater_module.DEFAULT_INCREMENTAL_BRAIN_NAMES
+    assert "stage4_folder_brain_outlier_baby.json" not in updater_module.DEFAULT_INCREMENTAL_BRAIN_NAMES
 
 
 def test_shape_memory_target_uses_broad_taxonomy_structure() -> None:
@@ -974,7 +992,7 @@ def test_brain_voter_generalizes_multiple_human_corrections_to_nearby_audio(tmp_
     assert ordered[0]["label"] == label
     assert ordered[0]["evidence"]["human_override_exact_audio_match"] is False
     assert ordered[0]["evidence"]["human_override_generalized_audio_match"] is True
-    assert ordered[0]["evidence"]["human_override_match_kind"] == "teacher_cloud"
+    assert ordered[0]["evidence"]["human_override_match_kind"] == "adaptive_teacher_cloud"
     assert ordered[0]["score"] < 0.0
 
 
@@ -1039,3 +1057,355 @@ def test_physics_voter_honors_exact_human_override_fingerprint(tmp_path: Path) -
     assert ordered[0]["label"] == label
     assert ordered[0]["evidence"]["human_override_exact_audio_match"] is True
     assert ordered[0]["score"] < 0.0
+
+
+def _install_gui_teacher_cloud(brain: dict, label: str, fingerprints: list[list[float]], weight: int = 240) -> None:
+    """Install a small source-blind GUI teacher cloud for one unit-test label."""
+    brain["training_examples_detailed_by_label"][label] = [
+        {
+            "incremental_gui_correction": True,
+            "human_override_evidence_weight": weight,
+            "human_override_confirmation_count": 1,
+            "fingerprint": fingerprint,
+        }
+        for fingerprint in fingerprints
+    ]
+    brain["label_reliability_by_label"][label] = {"human_override_effective_weight": weight}
+
+
+def test_brain_voter_learns_sax_tolerance_across_register_brightness_and_articulation(tmp_path: Path) -> None:
+    label = "Instruments/Woodwinds/Saxophone/Loops"
+    competitor = "Instruments/Synths and Electronic/Synth Loops/Loops"
+    common = {
+        "pitch_confidence": 0.90,
+        "f0_voiced_ratio": 0.86,
+        "harmonic_to_noise_ratio": 0.74,
+        "harmonic_energy_ratio": 0.79,
+        "formant_like_peak_spacing": 0.53,
+        "spectral_envelope_slope": -0.17,
+        "loop_pitched_event_ratio": 0.82,
+        "loop_percussive_event_ratio": 0.07,
+        "loop_sustained_tonal_frame_ratio": 0.70,
+        "onset_interval_regularity": 0.62,
+    }
+    teachers = [
+        _named_fingerprint(
+            {
+                **common,
+                "f0_median_hz": 146.8,
+                "log_rolloff85_hz": 0.38,
+                "attack_noise_ratio": 0.18,
+                "body_noise_ratio": 0.13,
+                "mfcc_mu_1": 0.24,
+                "mfcc_mu_2": -0.16,
+            }
+        ),
+        _named_fingerprint(
+            {
+                **common,
+                "f0_median_hz": 293.7,
+                "log_rolloff85_hz": 0.58,
+                "attack_noise_ratio": 0.28,
+                "body_noise_ratio": 0.19,
+                "mfcc_mu_1": 0.39,
+                "mfcc_mu_2": -0.06,
+            }
+        ),
+        _named_fingerprint(
+            {
+                **common,
+                "f0_median_hz": 440.0,
+                "log_rolloff85_hz": 0.76,
+                "attack_noise_ratio": 0.38,
+                "body_noise_ratio": 0.24,
+                "mfcc_mu_1": 0.52,
+                "mfcc_mu_2": 0.05,
+            }
+        ),
+    ]
+    query = _named_fingerprint(
+        {
+            **common,
+            "f0_median_hz": 587.3,
+            "top1_peak_frequency_hz": 1174.6,
+            "log_rolloff85_hz": 0.84,
+            "attack_noise_ratio": 0.43,
+            "body_noise_ratio": 0.27,
+            "mfcc_mu_1": 0.58,
+            "mfcc_mu_2": 0.10,
+        }
+    )
+    brain = _base_brain_with_real_feature_names([label, competitor])
+    brain["structure_by_label"][label] = "loop"
+    brain["structure_by_label"][competitor] = "loop"
+    brain["centroids"][label] = [teachers[0]]
+    brain["centroids"][competitor] = [query]
+    _install_gui_teacher_cloud(brain, label, teachers)
+
+    rows = BrainVoter().score_labels(
+        _audio_physics_for_vector(tmp_path, query),
+        _facts_for_vector(query),
+        brain,
+        [label, competitor],
+    )
+    ordered = sorted(rows, key=lambda row: float(row["score"]))
+    evidence = ordered[0]["evidence"]
+
+    assert ordered[0]["label"] == label
+    assert evidence["human_override_exact_audio_match"] is False
+    assert evidence["human_override_generalized_audio_match"] is True
+    assert evidence["human_override_match_kind"] == "adaptive_teacher_cloud"
+    assert evidence["human_override_adaptive_variable_feature_count"] > 0
+    assert evidence["human_override_adaptive_stable_violation_fraction"] <= 0.08
+
+
+def test_brain_voter_learns_snare_tolerance_across_tuning_body_and_decay(tmp_path: Path) -> None:
+    label = "Drums/Snares/Acoustic Snare/One Shots"
+    competitor = "FX/Impacts and Hits/Generic Impact/One Shots"
+    common = {
+        "log_crest": 0.84,
+        "attack_rise_time_norm": 0.05,
+        "temporal_centroid_ratio": 0.14,
+        "pitch_confidence": 0.20,
+        "attack_noise_ratio": 0.78,
+        "body_noise_ratio": 0.46,
+        "tail_noise_ratio": 0.34,
+        "spectral_flux_mean": 0.72,
+        "log_transient_count": 0.10,
+        "loop_percussive_event_ratio": 0.92,
+        "loop_drumlike_frame_ratio": 0.90,
+    }
+    teachers = [
+        _named_fingerprint(
+            {
+                **common,
+                "low_peak_frequency_hz": 150.0,
+                "log_decay_ratio": 0.24,
+                "noise_burst_duration_ms": 34.0,
+                "high_band_decay_slope": -0.82,
+                "spectral_flatness_mean": 0.46,
+            }
+        ),
+        _named_fingerprint(
+            {
+                **common,
+                "low_peak_frequency_hz": 205.0,
+                "log_decay_ratio": 0.42,
+                "noise_burst_duration_ms": 52.0,
+                "high_band_decay_slope": -0.60,
+                "spectral_flatness_mean": 0.58,
+            }
+        ),
+        _named_fingerprint(
+            {
+                **common,
+                "low_peak_frequency_hz": 260.0,
+                "log_decay_ratio": 0.64,
+                "noise_burst_duration_ms": 74.0,
+                "high_band_decay_slope": -0.38,
+                "spectral_flatness_mean": 0.68,
+            }
+        ),
+    ]
+    query = _named_fingerprint(
+        {
+            **common,
+            "low_peak_frequency_hz": 310.0,
+            "log_decay_ratio": 0.76,
+            "noise_burst_duration_ms": 86.0,
+            "high_band_decay_slope": -0.28,
+            "spectral_flatness_mean": 0.73,
+        }
+    )
+    brain = _base_brain_with_real_feature_names([label, competitor])
+    brain["centroids"][label] = [teachers[0]]
+    brain["centroids"][competitor] = [query]
+    _install_gui_teacher_cloud(brain, label, teachers)
+
+    rows = BrainVoter().score_labels(
+        _audio_physics_for_vector(tmp_path, query),
+        _facts_for_vector(query),
+        brain,
+        [label, competitor],
+    )
+    ordered = sorted(rows, key=lambda row: float(row["score"]))
+
+    assert ordered[0]["label"] == label
+    assert ordered[0]["evidence"]["human_override_match_kind"] == "adaptive_teacher_cloud"
+    assert ordered[0]["evidence"]["human_override_generalized_audio_match"] is True
+
+
+def test_brain_voter_learns_riser_tolerance_across_width_brightness_and_motion_rate(tmp_path: Path) -> None:
+    label = "FX/Transitions/Risers and Builds/Risers/Long FX"
+    competitor = "Instruments/Synths and Electronic/Synth Loops/Loops"
+    common = {
+        "centroid_slope_norm": 0.74,
+        "spectral_flux_mean": 0.62,
+        "spectral_entropy_mean": 0.66,
+        "tail_energy_ratio": 0.72,
+        "attack_rise_time_norm": 0.68,
+        "pitch_confidence": 0.18,
+        "loop_percussive_event_ratio": 0.12,
+        "loop_sustained_tonal_frame_ratio": 0.22,
+    }
+    teachers = [
+        _named_fingerprint(
+            {
+                **common,
+                "stereo_width": 0.18,
+                "mid_side_ratio": 0.82,
+                "log_rolloff85_hz": 0.42,
+                "spectral_flux_variance": 0.26,
+            }
+        ),
+        _named_fingerprint(
+            {
+                **common,
+                "stereo_width": 0.46,
+                "mid_side_ratio": 0.54,
+                "log_rolloff85_hz": 0.64,
+                "spectral_flux_variance": 0.44,
+            }
+        ),
+        _named_fingerprint(
+            {
+                **common,
+                "stereo_width": 0.74,
+                "mid_side_ratio": 0.28,
+                "log_rolloff85_hz": 0.86,
+                "spectral_flux_variance": 0.62,
+            }
+        ),
+    ]
+    query = _named_fingerprint(
+        {
+            **common,
+            "stereo_width": 0.98,
+            "mid_side_ratio": 0.02,
+            "log_rolloff85_hz": 0.99,
+            "spectral_flux_variance": 0.90,
+        }
+    )
+    brain = _base_brain_with_real_feature_names([label, competitor])
+    brain["structure_by_label"][label] = "long_fx"
+    brain["structure_by_label"][competitor] = "loop"
+    brain["centroids"][label] = [teachers[0]]
+    brain["centroids"][competitor] = [query]
+    _install_gui_teacher_cloud(brain, label, teachers)
+
+    rows = BrainVoter().score_labels(
+        _audio_physics_for_vector(tmp_path, query),
+        _facts_for_vector(query),
+        brain,
+        [label, competitor],
+    )
+    ordered = sorted(rows, key=lambda row: float(row["score"]))
+
+    assert ordered[0]["label"] == label
+    assert ordered[0]["evidence"]["human_override_match_kind"] == "adaptive_teacher_cloud"
+
+
+def test_adaptive_teacher_cloud_rejects_stable_shape_contradiction(tmp_path: Path) -> None:
+    label = "Drums/Snares/Acoustic Snare/One Shots"
+    competitor = "Textures/Drones and Atmospheres/Atmosphere/Long FX"
+    teachers = [
+        _named_fingerprint(
+            {
+                "log_crest": 0.82,
+                "attack_rise_time_norm": 0.04,
+                "temporal_centroid_ratio": 0.13,
+                "attack_noise_ratio": 0.78,
+                "spectral_flux_mean": 0.70,
+                "log_decay_ratio": decay,
+                "spectral_flatness_mean": flatness,
+                "loop_percussive_event_ratio": 0.92,
+                "loop_drumlike_frame_ratio": 0.90,
+            }
+        )
+        for decay, flatness in ((0.24, 0.48), (0.42, 0.58), (0.62, 0.68))
+    ]
+    contradiction = _named_fingerprint(
+        {
+            "log_crest": 0.18,
+            "attack_rise_time_norm": 0.88,
+            "temporal_centroid_ratio": 0.78,
+            "attack_noise_ratio": 0.12,
+            "spectral_flux_mean": 0.10,
+            "log_decay_ratio": 0.90,
+            "spectral_flatness_mean": 0.30,
+            "loop_percussive_event_ratio": 0.05,
+            "loop_drumlike_frame_ratio": 0.04,
+            "loop_sustained_tonal_frame_ratio": 0.88,
+        }
+    )
+    brain = _base_brain_with_real_feature_names([label, competitor])
+    brain["centroids"][label] = [teachers[0]]
+    brain["centroids"][competitor] = [contradiction]
+    _install_gui_teacher_cloud(brain, label, teachers)
+
+    rows = BrainVoter().score_labels(
+        _audio_physics_for_vector(tmp_path, contradiction),
+        _facts_for_vector(contradiction),
+        brain,
+        [label, competitor],
+    )
+    label_row = next(row for row in rows if row["label"] == label)
+
+    assert label_row["evidence"]["human_override_matched"] is False
+    assert label_row["evidence"]["human_override_adaptive_stable_upper_rms"] > 1.85
+    competitor_row = next(row for row in rows if row["label"] == competitor)
+    assert float(label_row["score"]) >= float(competitor_row["score"]) - 1e-6
+
+
+def test_single_gui_teacher_allows_bounded_register_invariant_neighbor(tmp_path: Path) -> None:
+    label = "Instruments/Woodwinds/Saxophone/Loops"
+    competitor = "Instruments/Keys/Keys Loops/Loops"
+    stable_identity = {
+        "spectral_flux_mean": 0.34,
+        "spectral_flatness_mean": 0.16,
+        "spectral_entropy_mean": 0.42,
+        "attack_rise_time_norm": 0.22,
+        "tail_energy_ratio": 0.58,
+        "spectral_envelope_slope": -0.18,
+        "formant_like_peak_spacing": 0.46,
+        "pitch_confidence": 0.78,
+    }
+    teacher = _named_fingerprint(
+        {
+            **stable_identity,
+            "f0_median_hz": 0.10,
+            "low_peak_frequency_hz": 0.12,
+            "top1_peak_frequency_hz": 0.14,
+            "top2_peak_frequency_hz": 0.18,
+            "top3_peak_frequency_hz": 0.22,
+        }
+    )
+    different_register = _named_fingerprint(
+        {
+            **stable_identity,
+            "f0_median_hz": 0.88,
+            "low_peak_frequency_hz": 0.84,
+            "top1_peak_frequency_hz": 0.90,
+            "top2_peak_frequency_hz": 0.94,
+            "top3_peak_frequency_hz": 0.98,
+        }
+    )
+    brain = _base_brain_with_real_feature_names([label, competitor])
+    brain["centroids"][label] = [teacher]
+    brain["centroids"][competitor] = [different_register]
+    _install_gui_teacher_cloud(brain, label, [teacher], weight=240)
+
+    rows = BrainVoter().score_labels(
+        _audio_physics_for_vector(tmp_path, different_register),
+        _facts_for_vector(different_register),
+        brain,
+        [label, competitor],
+    )
+    ordered = sorted(rows, key=lambda row: float(row["score"]))
+    evidence = ordered[0]["evidence"]
+
+    assert ordered[0]["label"] == label
+    assert evidence["human_override_exact_audio_match"] is False
+    assert evidence["human_override_generalized_audio_match"] is True
+    assert evidence["human_override_match_kind"] == "adaptive_teacher_neighbor"
+    assert evidence["human_override_identity_neighbor_distance"] == 0.0

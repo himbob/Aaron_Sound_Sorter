@@ -9,6 +9,7 @@ from pathlib import Path
 from aaron_sound_sorter.domain.models import SortRequest
 
 DEFAULT_BRAIN = "stage4_folder_brain.json"
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 class CommandLineParser:
@@ -98,6 +99,24 @@ class CommandLineParser:
             default=0,
             help="Parallel per-file sort workers. Default: AARON_SORT_WORKERS or auto, capped at 6.",
         )
+        sort_parser.add_argument(
+            "--analysis-cache",
+            action="store_true",
+            help=(
+                "Reuse persistent measured audio analysis between runs. "
+                "Stores fingerprints/diagnostics only, never final folders."
+            ),
+        )
+        sort_parser.add_argument(
+            "--analysis-cache-dir",
+            default="",
+            help="Directory for --analysis-cache. Default: AARON_ANALYSIS_CACHE_DIR or _reports/analysis_cache/cli_v1.",
+        )
+        sort_parser.add_argument(
+            "--no-analysis-cache",
+            action="store_true",
+            help="Disable persistent measured-analysis cache even if the environment enables it.",
+        )
         sort_parser.add_argument("--no-zip", action="store_true", help="Do not create Aaron_Sorted_Sounds.zip.")
         sort_parser.set_defaults(command_kind="sort")
 
@@ -164,6 +183,32 @@ def _sort_workers_from_args(args: argparse.Namespace) -> int:
     return max(1, min(6, cpu_count - 1))
 
 
+def _analysis_cache_enabled_from_args(args: argparse.Namespace) -> bool:
+    """Return whether persistent measured-analysis cache is enabled."""
+    if bool(getattr(args, "no_analysis_cache", False)):
+        return False
+    if bool(getattr(args, "analysis_cache", False)):
+        return True
+    if str(getattr(args, "analysis_cache_dir", "") or "").strip():
+        return True
+    raw = str(os.environ.get("AARON_ANALYSIS_CACHE", "")).strip().lower()
+    if raw in {"1", "true", "yes", "on"}:
+        return True
+    if raw in {"0", "false", "no", "off"}:
+        return False
+    return bool(str(os.environ.get("AARON_ANALYSIS_CACHE_DIR", "")).strip())
+
+
+def _analysis_cache_dir_from_args(args: argparse.Namespace) -> Path:
+    """Return persistent measured-analysis cache directory for CLI runs."""
+    configured = str(getattr(args, "analysis_cache_dir", "") or "").strip()
+    if not configured:
+        configured = str(os.environ.get("AARON_ANALYSIS_CACHE_DIR", "")).strip()
+    if configured:
+        return Path(configured).expanduser()
+    return PROJECT_ROOT / "_reports" / "analysis_cache" / "cli_v1"
+
+
 def request_from_args(args: argparse.Namespace) -> SortRequest:
     """Build a SortRequest from parsed CLI args."""
     return SortRequest(
@@ -183,4 +228,6 @@ def request_from_args(args: argparse.Namespace) -> SortRequest:
         write_zip=not bool(args.no_zip),
         candidate_count=int(args.candidate_count),
         sort_workers=_sort_workers_from_args(args),
+        use_persistent_analysis_cache=_analysis_cache_enabled_from_args(args),
+        analysis_cache_dir=_analysis_cache_dir_from_args(args),
     )

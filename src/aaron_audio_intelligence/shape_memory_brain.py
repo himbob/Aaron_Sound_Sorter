@@ -15,7 +15,14 @@ from typing import Any
 
 import numpy as np
 
-from aaron_sound_sorter.core import FEATURE_WEIGHTS, FP_SIZE, FeatureRow
+from aaron_audio_intelligence.learned_memory_features import (
+    PITCH_REGISTER_SENSITIVE_MEMORY_FEATURES,
+    pad_vector,
+    scaled_vector_distance,
+    weighted_normalized_signature_vector,
+    weighted_normalized_vector,
+)
+from aaron_sound_sorter.core import FP_SIZE, FeatureRow
 from aaron_sound_sorter.training_labels import label_default_structure, public_label, top_for_public_label
 
 SHAPE_MEMORY_BRAIN_NAME = "stage4_shape_memory_brain.json"
@@ -30,16 +37,6 @@ _METADATA_KEYS = (
     "feature_weights",
     "scaler_mean",
     "scaler_std",
-)
-
-PITCH_REGISTER_SENSITIVE_MEMORY_FEATURES = frozenset(
-    {
-        "f0_median_hz",
-        "low_peak_frequency_hz",
-        "top1_peak_frequency_hz",
-        "top2_peak_frequency_hz",
-        "top3_peak_frequency_hz",
-    }
 )
 
 SHAPE_ROLE_MEMORY_FEATURES = frozenset(
@@ -691,128 +688,6 @@ def refresh_shape_memory_shape(payload: dict[str, Any], shape: str) -> None:
         centroids_by_shape[shape] = (np.sum(np.vstack(vectors), axis=0) / float(weight_total)).astype(float).tolist()
     else:
         centroids_by_shape[shape] = []
-
-
-def weighted_normalized_vector(
-    brain: dict[str, Any], values: tuple[float, ...] | list[float] | np.ndarray
-) -> np.ndarray:
-    """Return a finite normalized and feature-weighted vector.
-
-    Args:
-        brain: Brain dictionary containing scaler and feature-weight metadata.
-        values: Raw feature vector.
-
-    Returns:
-        ``FP_SIZE`` vector normalized with the brain scaler and feature weights.
-
-    Side Effects:
-        None.
-    """
-    vector = pad_vector(np.asarray(values, dtype=np.float32), 0.0)
-    mean = pad_vector(
-        np.asarray(brain.get("scaler_mean", np.zeros((FP_SIZE,), dtype=np.float32)), dtype=np.float32), 0.0
-    )
-    std = pad_vector(np.asarray(brain.get("scaler_std", np.ones((FP_SIZE,), dtype=np.float32)), dtype=np.float32), 1.0)
-    weights = pad_vector(np.asarray(brain.get("feature_weights", FEATURE_WEIGHTS), dtype=np.float32), 1.0)
-    safe_std = np.where(np.abs(std) < 1e-6, 1.0, std)
-    return ((vector - mean) / safe_std * weights).astype(np.float32)
-
-
-def weighted_normalized_signature_vector(
-    brain: dict[str, Any],
-    values: tuple[float, ...] | list[float] | np.ndarray,
-    *,
-    include_feature_names: frozenset[str] | set[str] | tuple[str, ...],
-    exclude_feature_names: frozenset[str] | set[str] | tuple[str, ...] = (),
-    include_feature_prefixes: tuple[str, ...] = (),
-    minimum_feature_count: int = 8,
-    fallback_width: int | None = None,
-) -> np.ndarray:
-    """Return a named, weighted feature signature for learned-memory matching.
-
-    Args:
-        brain: Brain metadata containing feature names, scaler, and weights.
-        values: Raw fingerprint values.
-        include_feature_names: Exact feature names to keep.
-        exclude_feature_names: Exact feature names to remove even if included.
-        include_feature_prefixes: Feature-name prefixes to keep, such as MFCC
-            families.
-        minimum_feature_count: Minimum named features required before using the
-            named signature.
-        fallback_width: Optional leading weighted-vector width for test brains
-            that lack real feature names. ``None`` returns the full vector.
-
-    Returns:
-        Weighted normalized signature vector.
-
-    Side Effects:
-        None.
-    """
-    weighted = weighted_normalized_vector(brain, values)
-    if weighted.size <= 0:
-        return np.asarray([], dtype=np.float32)
-    names = [str(name) for name in brain.get("feature_names", [])]
-    include_names = {str(name) for name in include_feature_names}
-    exclude_names = {str(name) for name in exclude_feature_names}
-    selected: list[int] = []
-    for index, feature_name in enumerate(names[: weighted.size]):
-        exact_match = feature_name in include_names
-        prefix_match = any(feature_name.startswith(prefix) for prefix in include_feature_prefixes)
-        if (exact_match or prefix_match) and feature_name not in exclude_names:
-            selected.append(index)
-    if len(selected) < max(1, int(minimum_feature_count)):
-        if fallback_width is None:
-            return weighted.astype(np.float32)
-        return weighted[: min(max(1, int(fallback_width)), weighted.size)].astype(np.float32)
-    return weighted[np.asarray(selected, dtype=np.int64)].astype(np.float32)
-
-
-def scaled_vector_distance(
-    query: np.ndarray,
-    example: np.ndarray,
-    *,
-    reference_size: int | None = None,
-) -> float:
-    """Return a finite Euclidean distance scaled to a comparable width.
-
-    Args:
-        query: Weighted query vector.
-        example: Weighted stored example vector.
-        reference_size: Optional vector width used to scale compact signatures
-            into the same rough distance range as full fingerprints.
-
-    Returns:
-        Finite distance, or infinity when either vector is empty.
-
-    Side Effects:
-        None.
-    """
-    usable = min(int(query.size), int(example.size))
-    if usable <= 0:
-        return float("inf")
-    distance = float(np.linalg.norm(query[:usable] - example[:usable]))
-    if reference_size is not None and reference_size > usable:
-        distance *= math.sqrt(float(reference_size) / float(usable))
-    return distance
-
-
-def pad_vector(values: np.ndarray, fill: float) -> np.ndarray:
-    """Return a finite ``FP_SIZE`` vector.
-
-    Args:
-        values: Input numeric vector.
-        fill: Replacement value for missing or invalid entries.
-
-    Returns:
-        Finite float32 vector padded or truncated to ``FP_SIZE``.
-
-    Side Effects:
-        None.
-    """
-    vector = np.asarray(values, dtype=np.float32).reshape(-1)
-    if vector.size < FP_SIZE:
-        vector = np.pad(vector, (0, FP_SIZE - vector.size), mode="constant", constant_values=fill)
-    return np.nan_to_num(vector[:FP_SIZE], nan=fill, posinf=fill, neginf=fill).astype(np.float32)
 
 
 def example_fingerprint(example: dict[str, Any]) -> np.ndarray:

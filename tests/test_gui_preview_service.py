@@ -3,12 +3,23 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import numpy as np
+
+from aaron_sound_sorter.domain.models import (
+    AudioPhysics,
+    CategoryGuess,
+    ConsensusDecision,
+    SharedAudioFacts,
+    SortFileResult,
+    VoterResult,
+)
 from aaron_sound_sorter.gui.models import PreviewRow, SortPreviewSession
 from aaron_sound_sorter.gui.preview_service import (
     SortPlanExporter,
     SortPreviewService,
     TrainingCorrectionImporter,
     correction_evidence,
+    detected_candidate_folders,
     gui_worker_count,
     load_available_labels,
     load_simple_yaml_mapping,
@@ -50,6 +61,101 @@ def _session(tmp_path: Path, rows: list[PreviewRow]) -> SortPreviewSession:
         available_labels=["Drums/Kicks/One Shots"],
         rows=rows,
     )
+
+
+def _guess(folder_path: str, rank: int) -> CategoryGuess:
+    return CategoryGuess(
+        label=folder_path,
+        folder_path=folder_path,
+        top_family=folder_path.split("/", 1)[0],
+        score=float(rank),
+        confidence=0.90,
+        rank=rank,
+        reason="unit test candidate",
+    )
+
+
+def _candidate_result(*, is_loop_like: bool) -> SortFileResult:
+    proposed = "Instruments/Bass/Bass Loops" if is_loop_like else "FX/Designed Noise FX/Alarm/One Shots"
+    facts = SharedAudioFacts(
+        is_broken_or_tiny=False,
+        is_loop_like=is_loop_like,
+        is_single_event_like=not is_loop_like,
+        is_short_hit_like=not is_loop_like,
+        is_long=True,
+        evidence={
+            "duration_sec": 8.0,
+            "structure_facts": {
+                "event_count_estimate": 9.0 if is_loop_like else 1.0,
+                "onset_span_ratio": 0.72 if is_loop_like else 0.10,
+            },
+            "shape_vote": {
+                "primary_shape": "solo_phrase" if is_loop_like else "hit_with_tail",
+                "confidence": 0.91,
+                "onset_count": 9.0 if is_loop_like else 1.0,
+                "onset_span_ratio": 0.72 if is_loop_like else 0.10,
+                "true_repetition_score": 0.64 if is_loop_like else 0.0,
+                "pitched_event_ratio": 1.0 if is_loop_like else 0.0,
+                "percussive_event_ratio": 0.0 if is_loop_like else 0.82,
+                "drumlike_frame_ratio": 0.0,
+            },
+            "measured_roles": {
+                "bass_loop": 1.0 if is_loop_like else 0.0,
+            },
+        },
+    )
+    brain_votes = VoterResult(
+        voter_name="brain",
+        guesses=[
+            _guess("Instruments/Bass/Electric Bass/One Shots", 1),
+            _guess("Instruments/Bass/Electric Bass/Loops", 2),
+        ],
+    )
+    physics_votes = VoterResult(
+        voter_name="physics",
+        guesses=[
+            _guess("FX/Designed Noise FX/Alarm/One Shots", 1),
+            _guess("Instruments/Bass/Generic Bass/Loops", 2),
+        ],
+    )
+    decision = ConsensusDecision(
+        final_label=proposed,
+        final_top=proposed.split("/", 1)[0],
+        folder_path=proposed,
+        consensus_status="unit_test",
+        reason="unit test decision",
+        shared_candidates=[
+            {"folder_path": "Drums/Kick Drums/Generic Kick/One Shots"},
+            {"folder_path": "Instruments/Bass/Synth Bass/Loops"},
+        ],
+    )
+    return SortFileResult(
+        source_path=Path("candidate.wav"),
+        placed_path=None,
+        physics=AudioPhysics(
+            source_path=Path("candidate.wav"),
+            fingerprint=np.zeros(1, dtype=np.float32),
+            duration_sec=8.0,
+            read_status="ok",
+        ),
+        facts=facts,
+        brain_votes=brain_votes,
+        physics_votes=physics_votes,
+        decision=decision,
+    )
+
+
+def test_possible_matches_hide_one_shots_for_decisive_loop_structure() -> None:
+    candidates = detected_candidate_folders(_candidate_result(is_loop_like=True))
+
+    assert "Instruments/Bass/Electric Bass/Loops" in candidates
+    assert all(not candidate.endswith("/One Shots") for candidate in candidates)
+
+
+def test_possible_matches_keep_long_one_shot_when_audio_is_not_a_loop() -> None:
+    candidates = detected_candidate_folders(_candidate_result(is_loop_like=False))
+
+    assert "FX/Designed Noise FX/Alarm/One Shots" in candidates
 
 
 def test_exporter_copies_approved_folder_tree(tmp_path: Path) -> None:
@@ -190,6 +296,38 @@ def test_training_correction_importer_skips_untrainable_review_folder(tmp_path: 
     assert "not a valid training label" in summary.errors[0] or "review folders are not trainable" in summary.errors[0]
 
 
+def test_training_correction_importer_archives_same_audio_from_wrong_slot(tmp_path: Path) -> None:
+    source = _audio_file(tmp_path, "corrected.wav")
+    wrong_slot = tmp_path / "training" / "locked_curated_v1" / "Instruments" / "Bass" / "Synth Bass" / "_LOOPS"
+    wrong_slot.mkdir(parents=True)
+    wrong_teacher = wrong_slot / "wrong_teacher.wav"
+    wrong_teacher.write_bytes(source.read_bytes())
+    row = _row(
+        source,
+        proposed="Instruments/Bass/Synth Bass/Loops",
+        approved="FX/Structural and Transitional FX/Risers and Builds/Generic Riser/Long FX",
+    )
+    session = _session(tmp_path, [row])
+
+    summary = TrainingCorrectionImporter(project_root=tmp_path).import_session(session)
+
+    correct_slot = (
+        tmp_path
+        / "training"
+        / "locked_curated_v1"
+        / "FX"
+        / "Structural and Transitional FX"
+        / "Risers and Builds"
+        / "Generic Riser"
+        / "_LONG_FX"
+    )
+    assert summary.staged_count == 1
+    assert not wrong_teacher.exists()
+    assert (correct_slot / "corrected.wav").exists()
+    archived = list((summary.report_dir / "superseded_training_conflicts").rglob("wrong_teacher.wav"))
+    assert len(archived) == 1
+
+
 def test_load_available_labels_adds_review_options_and_sorts_brain_labels(tmp_path: Path) -> None:
     brain = tmp_path / "brain.json"
     brain.write_text(
@@ -202,6 +340,28 @@ def test_load_available_labels_adds_review_options_and_sorts_brain_labels(tmp_pa
     assert labels[0] == "_TO_REVIEW/Needs Human Review"
     assert "Drums/Kick Drums/Generic Kick/One Shots" in labels
     assert "Instruments/Synths/Synth Loops" in labels
+
+
+def test_load_available_labels_canonicalizes_contradictory_structure_labels(tmp_path: Path) -> None:
+    brain = tmp_path / "brain.json"
+    brain.write_text(
+        json.dumps(
+            {
+                "labels": [
+                    "Instruments/Guitar/Guitar Loops/One Shots",
+                    "Instruments/Voice/Vocal One Shots/Loops",
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    labels = load_available_labels(brain)
+
+    assert "Instruments/Guitar/Guitar Loops/Loops" in labels
+    assert "Instruments/Guitar/Guitar Loops/One Shots" not in labels
+    assert "Instruments/Voice/Vocal One Shots/One Shots" in labels
+    assert "Instruments/Voice/Vocal One Shots/Loops" not in labels
 
 
 def test_load_available_labels_merges_future_catalog_and_training_slots(tmp_path: Path) -> None:

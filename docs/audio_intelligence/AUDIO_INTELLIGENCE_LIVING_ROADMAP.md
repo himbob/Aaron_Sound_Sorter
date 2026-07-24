@@ -170,9 +170,9 @@ Status: first product increment implemented.
 Goal:
 
 Make GUI corrections immediately useful without forcing a full retrain. When a
-user clicks "Train Brains From Corrections", the updater now keeps the existing
-full/core/spread/outlier incremental updates and also writes a dedicated
-`stage4_folder_brain_user_memory.json` brain lane.
+user clicks "Train Brains From Corrections", the updater now writes the
+correction into the active full/core/spread/outlier prototype lanes and the
+dedicated memory lanes in one audited run.
 
 Behavior:
 
@@ -186,10 +186,10 @@ Behavior:
 
 Why this matters:
 
-Human corrections now become an explicit trainable teacher brain instead of
-being diluted inside the large historical brain. This is the first step toward
-making more of the system trainable: owner brains, shape brains, role brains,
-and physics-like measured specialist brains.
+Human corrections now become explicit trainable teacher evidence in both the
+large prototype brains and the specialist memory brains. This is the first step
+toward making more of the system trainable: owner brains, shape brains, role
+brains, and physics-like measured specialist brains.
 
 ### Phase 1.6: Brain-First Owner Authority
 

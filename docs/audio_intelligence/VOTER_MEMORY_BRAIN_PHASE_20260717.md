@@ -7,11 +7,22 @@ Move the sorter one step away from static rescue code by adding a trainable low-
 ## What Changed
 
 - Added `stage4_voter_memory_brain.json` as a dedicated memory brain.
-- GUI incremental training now updates memory lanes by default:
+- GUI incremental training now updates the full active GUI brain family by
+  default. Human corrections train both direct memory lanes and the active
+  full/core/spread/outlier prototype lanes:
+  - `stage4_folder_brain.json`
+  - `stage4_folder_brain_baby.json`
+  - `stage4_folder_brain_core_baby.json`
+  - `stage4_folder_brain_spread_baby.json`
+  - `stage4_folder_brain_outlier_baby.json`
   - `stage4_folder_brain_user_memory.json`
   - `stage4_shape_memory_brain.json`
   - `stage4_voter_memory_brain.json`
-- Stable full/core/spread/outlier brains are no longer mutated by sparse GUI corrections by default.
+  - `stage4_physics_memory_brain.json`
+- Optional configured harmonic lanes are included when present on disk.
+- This is a deliberate policy change: human one-off overrides are treated as
+  high-trust supervised evidence. They still use measured fingerprints only and
+  are backed up before mutation.
 - Runtime sorting loads voter memory from `config/gui_brains.yaml` and merges it into the in-memory brain view.
 - ShapeVoter and PhysicsVoter read learned voter-memory evidence as calibration input.
 - Manifest reports now include `learned_voter_memory_*` columns and nested JSON diagnostics.
@@ -109,8 +120,12 @@ Final Phonk run family distribution:
 
 ## Important Architecture Notes
 
-- User corrections should keep teaching memory brains first.
-- Full/core/spread/outlier brains should be rebuilt from curated training data, not edited by sparse GUI corrections.
+- User corrections should teach memory brains and active prototype brains in
+  the same run. Memory lanes give fast ownership; full/core/spread/outlier lanes
+  make future ensemble votes less dependent on static guard code.
+- Full/core/spread/outlier brains should still be periodically rebuilt from
+  curated training data, but GUI corrections are allowed to incrementally
+  reinforce or supersede active prototypes between rebuilds.
 - Voter memory and physics memory are no longer decorative telemetry. They may
   produce owner evidence when paired with measured body compatibility.
 - Memory must not become a blind top-family override. It can own a deep label

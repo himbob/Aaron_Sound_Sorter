@@ -110,3 +110,86 @@ def test_memory_conflict_uses_top_family_but_not_exact_label() -> None:
 
     assert not memory_conflicts_with_candidate_top_family(facts, "Instruments/Voice/Vocal Loops/Loops")
     assert memory_conflicts_with_candidate_top_family(facts, "FX/Human and Voice FX/Spoken Voice/Long FX")
+
+
+def test_exact_human_teacher_consensus_requires_dual_near_identical_fingerprint_agreement() -> None:
+    from aaron_sound_sorter.engine.learned_memory_contracts import exact_human_teacher_consensus
+
+    label = "Instruments/Woodwinds/Saxophone/Loops"
+    facts = facts_with_memory(
+        (
+            "learned_voter_memory",
+            {
+                "matched": True,
+                "label": label,
+                "confidence": 0.94,
+                "effective_weight": 720,
+                "nearest_distance": 0.000002,
+                "match_kind": "fingerprint",
+            },
+        ),
+        (
+            "learned_physics_memory",
+            {
+                "matched": True,
+                "label": label,
+                "confidence": 0.96,
+                "effective_weight": 720,
+                "nearest_distance": 0.000002,
+                "match_kind": "fingerprint",
+            },
+        ),
+    )
+
+    consensus = exact_human_teacher_consensus(facts)
+
+    assert consensus is not None
+    assert consensus.label == label
+    assert consensus.confidence == 0.94
+    assert consensus.effective_weight == 720
+
+
+def test_exact_human_teacher_consensus_rejects_single_lane_or_cloud_match() -> None:
+    from aaron_sound_sorter.engine.learned_memory_contracts import exact_human_teacher_consensus
+
+    label = "Instruments/Woodwinds/Saxophone/Loops"
+    single_lane = facts_with_memory(
+        (
+            "learned_voter_memory",
+            {
+                "matched": True,
+                "label": label,
+                "confidence": 0.94,
+                "effective_weight": 1200,
+                "nearest_distance": 0.000002,
+                "match_kind": "fingerprint",
+            },
+        )
+    )
+    cloud_match = facts_with_memory(
+        (
+            "learned_voter_memory",
+            {
+                "matched": True,
+                "label": label,
+                "confidence": 0.94,
+                "effective_weight": 1200,
+                "nearest_distance": 0.02,
+                "match_kind": "fingerprint",
+            },
+        ),
+        (
+            "learned_physics_memory",
+            {
+                "matched": True,
+                "label": label,
+                "confidence": 0.96,
+                "effective_weight": 1200,
+                "nearest_distance": 0.02,
+                "match_kind": "teacher_physics_cloud",
+            },
+        ),
+    )
+
+    assert exact_human_teacher_consensus(single_lane) is None
+    assert exact_human_teacher_consensus(cloud_match) is None

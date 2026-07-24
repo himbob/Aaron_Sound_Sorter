@@ -17,5 +17,4 @@ echo "Running FX smoke no-review resolver regression tests..."
   tests/test_decision_core_v2.py \
   tests/test_decision_core_fx_smoke_no_review_guard.py \
   tests/test_decision_core_fx_smoke_no_review_v2.py \
-  tests/test_decision_core_ground_truth_samples_tdd.py \
   tests/test_decision_core_ground_truth_true_bucket_tdd.py

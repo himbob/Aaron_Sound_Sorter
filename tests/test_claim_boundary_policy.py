@@ -702,3 +702,31 @@ def test_profile_synth_one_shot_claim_deepens_to_loop_when_shape_is_loop() -> No
 
     assert winner.folder_path == "Instruments/Synths/Pads/Loops"
     assert winner.source == "profile_synth_loop_depth_contract"
+
+
+def test_exact_human_teacher_claim_is_typed_as_authoritative_boundary_evidence() -> None:
+    from aaron_sound_sorter.engine.learned_memory_contracts import (
+        EXACT_HUMAN_TEACHER_OWNER_CLAIM_SOURCE,
+    )
+
+    path = "Instruments/Woodwinds/Saxophone/Loops"
+    raw = _claim(path, source="strong_consensus")
+    claim = _claim(path, source=EXACT_HUMAN_TEACHER_OWNER_CLAIM_SOURCE, strength=0.99)
+    facts = _facts(
+        "pitched_repetition_phrase",
+        0.92,
+        {"pitched_event_ratio": 0.96, "sustained_tonal_frame_ratio": 0.90},
+        {
+            "woodwind_sax_score": 0.54,
+            "reed_wind_score": 0.52,
+            "reed_wind_authority_score": 0.42,
+            "synth_tonal_source_score": 0.82,
+            "synth_lead_score": 0.84,
+        },
+    )
+
+    decision = ClaimBoundaryPolicy().evaluate(raw_claim=raw, claim=claim, facts=facts)
+
+    assert decision.allowed
+    assert decision.authoritative
+    assert decision.reason == "dual_memory_exact_human_teacher_authority"

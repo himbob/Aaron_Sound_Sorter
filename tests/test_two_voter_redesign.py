@@ -404,6 +404,40 @@ def test_cli_uses_baby_brain_ensemble_by_default_with_disable_escape_hatch() -> 
     assert opt_in_request.use_harmonic_brains_in_sort is True
 
 
+def test_cli_exposes_persistent_measured_analysis_cache_flags(tmp_path: Path) -> None:
+    parser = CommandLineParser()
+    cache_dir = tmp_path / "analysis-cache"
+    enabled_args = parser.parse(
+        [
+            "sort",
+            "input.wav",
+            "out",
+            "--analysis-cache",
+            "--analysis-cache-dir",
+            str(cache_dir),
+        ]
+    )
+    enabled_request = request_from_args(enabled_args)
+
+    assert enabled_request.use_persistent_analysis_cache is True
+    assert enabled_request.analysis_cache_dir == cache_dir
+
+    disabled_args = parser.parse(
+        [
+            "sort",
+            "input.wav",
+            "out",
+            "--analysis-cache",
+            "--analysis-cache-dir",
+            str(cache_dir),
+            "--no-analysis-cache",
+        ]
+    )
+    disabled_request = request_from_args(disabled_args)
+
+    assert disabled_request.use_persistent_analysis_cache is False
+
+
 def test_cli_exposes_brain_lab_without_sorting_arguments() -> None:
     args = CommandLineParser().parse(["brain-lab", "sample.wav", "--top-n", "3"])
 

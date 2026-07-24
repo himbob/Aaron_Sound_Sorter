@@ -29,7 +29,9 @@ from aaron_sound_sorter.engine.decision_helpers import (
 )
 from aaron_sound_sorter.engine.family_claims import ConsensusClaim, claim_from_folder_path
 from aaron_sound_sorter.engine.learned_memory_contracts import (
+    EXACT_HUMAN_TEACHER_OWNER_CLAIM_SOURCE,
     LearnedMemoryMatch,
+    exact_human_teacher_consensus,
     has_non_voice_memory_match,
     is_voice_category_path,
     iter_learned_memory_matches,
@@ -38,7 +40,13 @@ from aaron_sound_sorter.engine.learned_memory_contracts import (
 
 LEARNED_OWNER_CLAIM_SOURCE = "learned_owner_body_claim"
 VOICE_OWNER_CLAIM_SOURCE = "learned_owner_voice_body_claim"
-LEARNED_OWNER_CLAIM_SOURCES = frozenset({LEARNED_OWNER_CLAIM_SOURCE, VOICE_OWNER_CLAIM_SOURCE})
+LEARNED_OWNER_CLAIM_SOURCES = frozenset(
+    {
+        LEARNED_OWNER_CLAIM_SOURCE,
+        VOICE_OWNER_CLAIM_SOURCE,
+        EXACT_HUMAN_TEACHER_OWNER_CLAIM_SOURCE,
+    }
+)
 
 VOICE_BODY_SHAPES = {
     "vocal_phrase",
@@ -66,6 +74,8 @@ class LearnedOwnerCandidate:
         support: Optional support score from the product brain ensemble.
         score: Optional distance/score from the learned lane.
         origin: Diagnostic origin of the learned claim.
+        exact_human_teacher: Whether both independent memory lanes recovered
+            the same near-identical GUI correction.
 
     Side Effects:
         None.
@@ -84,6 +94,7 @@ class LearnedOwnerCandidate:
     support: float
     score: float
     origin: str
+    exact_human_teacher: bool = False
 
 
 class LearnedOwnerAuthorityClaimProducer:
@@ -120,10 +131,15 @@ class LearnedOwnerAuthorityClaimProducer:
                 folder_path=owner_candidate.target_path,
                 source=claim_source,
                 reason=(
-                    "learned owner claim: matched trainable memory evidence "
-                    "was validated by measured body facts before broad static "
-                    f"fallback; origin={owner_candidate.origin}; "
-                    f"evidence={owner_candidate.evidence_path}"
+                    (
+                        "exact human teacher owner claim: both independent memory lanes "
+                        "recovered the same near-identical GUI correction and measured "
+                        "body facts rejected catastrophic family contradiction"
+                        if owner_candidate.exact_human_teacher
+                        else "learned owner claim: matched trainable memory evidence was "
+                        "validated by measured body facts before broad static fallback"
+                    )
+                    + f"; origin={owner_candidate.origin}; evidence={owner_candidate.evidence_path}"
                 ),
                 shared=context.raw.shared_candidates,
                 raw_candidate_score=self._claim_score(context.raw, owner_candidate),
@@ -194,6 +210,19 @@ class LearnedOwnerAuthorityClaimProducer:
         candidates = self._candidates_from_memory_facts(context)
         if not candidates:
             return None
+        exact_teacher = exact_human_teacher_consensus(context.facts)
+        if exact_teacher is not None:
+            exact_target = self._target_path_for_exact_teacher(context.facts, exact_teacher.label)
+            if exact_target is not None:
+                return LearnedOwnerCandidate(
+                    target_path=exact_target,
+                    evidence_path=exact_teacher.label,
+                    confidence=exact_teacher.confidence,
+                    support=float(exact_teacher.effective_weight),
+                    score=exact_teacher.nearest_distance,
+                    origin="dual_memory_exact_human_teacher",
+                    exact_human_teacher=True,
+                )
         candidates.sort(key=lambda candidate: (-candidate.confidence, -candidate.support, candidate.score))
         return candidates[0]
 
@@ -576,36 +605,37 @@ class LearnedOwnerAuthorityClaimProducer:
             self._score(facts, "formant_fx_score"),
         )
 
-    def _voice_target_path(self, facts: SharedAudioFacts | None, evidence_path: str) -> str:
-        normalized = str(evidence_path or "").replace("\\", "/").strip("/").lower()
-        if normalized.startswith("instruments/voice"):
-            return str(evidence_path).strip("/")
-        duration = _feature_number_from_facts(facts, "duration_sec")
-        onset_count = _shape_metric_from_facts(facts, "onset_count")
-        shape = _shape_vote_from_facts(facts)
-        loopish = bool(
-            getattr(facts, "is_loop_like", False)
-            or duration >= 1.35
-            or onset_count >= 4.0
-            or shape in {"pitched_repetition_phrase", "repeated_phrase_loop", "bass_phrase"}
-        )
-        if loopish:
-            return "Instruments/Voice/Vocal Loops/Loops"
-        return "Instruments/Voice/Phrase/One Shots"
+    def _target_path_for_exact_teacher(
+        self,
+        facts: SharedAudioFacts | None,
+        label: str,
+    ) -> str | None:
+        """Return the exact supervised folder for dual-lane memory.
+
+        ``facts`` remains part of the private method contract because callers
+        supply it alongside every learned-memory lookup. It is deliberately
+        not used to rewrite a human-approved label into another family.
+        """
+        del facts
+        normalized_label = str(label or "").strip("/")
+        if not normalized_label or normalized_label.lower().startswith("_to_review"):
+            return None
+        if normalized_label.split("/", 1)[0] not in {"Drums", "Instruments", "FX"}:
+            return None
+        return normalized_label
 
     def _target_path_for_memory(
         self,
         facts: SharedAudioFacts | None,
         memory: LearnedMemoryMatch,
     ) -> str | None:
-        """Return the product folder owned by a memory row."""
+        """Return the exact supervised folder owned by a memory row."""
+        del facts
         if memory.confidence < 0.72:
             return None
         normalized_label = str(memory.label or "").strip("/")
         if not normalized_label or normalized_label.lower().startswith("_to_review"):
             return None
-        if memory.is_voice_source:
-            return self._voice_target_path(facts, normalized_label)
         target_top = normalized_label.split("/", 1)[0]
         if target_top not in {"Drums", "Instruments", "FX"}:
             return None
@@ -614,6 +644,8 @@ class LearnedOwnerAuthorityClaimProducer:
     @staticmethod
     def _claim_source(candidate: LearnedOwnerCandidate) -> str:
         """Return the stable source id for a learned owner claim."""
+        if candidate.exact_human_teacher:
+            return EXACT_HUMAN_TEACHER_OWNER_CLAIM_SOURCE
         if candidate.target_path.startswith("Instruments/Voice"):
             return VOICE_OWNER_CLAIM_SOURCE
         return LEARNED_OWNER_CLAIM_SOURCE

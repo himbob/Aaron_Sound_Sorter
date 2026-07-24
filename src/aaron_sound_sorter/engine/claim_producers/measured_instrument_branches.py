@@ -19,7 +19,10 @@ claims instead of late post-winner rescue calls.
 from __future__ import annotations
 
 from aaron_sound_sorter.domain.models import SharedAudioFacts
-from aaron_sound_sorter.engine.claim_contracts import is_rank_one_concrete_non_sax_instrument_consensus
+from aaron_sound_sorter.engine.claim_contracts import (
+    is_human_taught_rank_one_consensus,
+    is_rank_one_concrete_non_sax_instrument_consensus,
+)
 from aaron_sound_sorter.engine.decision_context import DecisionContext
 from aaron_sound_sorter.engine.decision_helpers import (
     _candidate_combined_score,
@@ -31,13 +34,17 @@ from aaron_sound_sorter.engine.decision_helpers import (
     _shape_vote_from_facts,
     _top_physics_guess_path_from_facts,
 )
-from aaron_sound_sorter.engine.family_claims import ConsensusClaim, claim_from_folder_path
-from aaron_sound_sorter.engine.measured_source_contracts import supports_clean_low_bass_phrase_owner
+from aaron_sound_sorter.engine.family_claims import ConsensusClaim, claim_from_folder_path, review_claim
+from aaron_sound_sorter.engine.measured_source_contracts import (
+    supports_clean_low_bass_phrase_owner,
+    supports_synth_pad_over_woodwind,
+)
 from aaron_sound_sorter.voters.scoring_tools import role_strength
 
 SYNTH_PATH_FRAGMENTS = ("synth", "electronic")
 KEYS_PATH_FRAGMENTS = ("/keys/", "piano", "rhodes", "electric piano")
 SAX_PATH_FRAGMENTS = ("sax", "saxophone", "woodwind")
+SAX_SPECIFIC_PATH_FRAGMENTS = ("sax", "saxophone")
 BASS_PATH_FRAGMENTS = ("/bass/", "bass loops", "synth bass", "sub bass", "808")
 
 
@@ -481,6 +488,9 @@ class MeasuredInstrumentBranchClaimProducer:
         path = _norm_path(raw.folder_path or raw.label)
         if raw.family == "Instruments" and "synth" in path and "loop" in path:
             return None
+        synth_pad_over_woodwind = supports_synth_pad_over_woodwind(context.facts)
+        if self._synth_loop_should_stand_down_to_woodwind(context):
+            return None
         if raw.family == "Instruments" and "instrument loops" not in path:
             can_correct_keys_decoy = bool(
                 ("/keys/" in path or "piano" in path)
@@ -492,10 +502,24 @@ class MeasuredInstrumentBranchClaimProducer:
                 and ("one shot" in path or "one shots" in path)
                 and self._facts_support_synth_loop(context)
             )
-            if not (can_correct_keys_decoy or can_correct_synth_one_shot_leaf):
+            can_correct_woodwind_decoy = bool(("sax" in path or "woodwind" in path) and synth_pad_over_woodwind)
+            if not (can_correct_keys_decoy or can_correct_synth_one_shot_leaf or can_correct_woodwind_decoy):
                 return None
-        if not self._facts_support_synth_loop(context):
+        if not (self._facts_support_synth_loop(context) or synth_pad_over_woodwind):
             return None
+        if synth_pad_over_woodwind and is_human_taught_rank_one_consensus(raw):
+            return review_claim(
+                label="_TO_REVIEW/Measured Owner Conflict",
+                source="measured_memory_owner_conflict_review",
+                reason=(
+                    "trained memory and rank-one voter agreement supported a "
+                    "woodwind owner, while the measured body satisfied the "
+                    "strict synth-pad-over-woodwind contract"
+                ),
+                shared=raw.shared_candidates,
+                winner=raw,
+                strength=0.99,
+            )
         target = self._measured_synth_loop_target_path(context)
         return claim_from_folder_path(
             folder_path=target,
@@ -600,7 +624,42 @@ class MeasuredInstrumentBranchClaimProducer:
             shared_winner=raw.shared_winner or raw.folder_path,
             can_override=True,
             strength=0.94,
-            is_real_candidate=False,
+            is_real_candidate=True,
+        )
+
+    def _synth_loop_should_stand_down_to_woodwind(self, context: DecisionContext) -> bool:
+        """Return whether synth-loop broadening would steal a supported woodwind loop.
+
+        Args:
+            context: Decision context for the current raw claim and measured
+                facts.
+
+        Returns:
+            True when the instrument branch and candidate support agree on
+            sax/woodwind strongly enough that synth-loop broadening should not
+            produce a competing claim.
+
+        Side Effects:
+            None.
+
+        Raises:
+            None.
+        """
+        if supports_synth_pad_over_woodwind(context.facts):
+            return False
+        layer = self._physics_layer(context.facts)
+        branch = str(layer.get("instrument_branch_selected") or layer.get("physics_layer_branch") or "")
+        if branch not in {"Woodwinds", "ReedWoodwind"}:
+            return False
+        if self._measured_score(context.facts, "woodwind_sax_score", "reed_wind_score") < 0.60:
+            return False
+        return self._has_candidate_support(
+            context.raw,
+            SAX_PATH_FRAGMENTS,
+            top_family="Instruments",
+            max_score=18.0,
+            max_brain_rank=8,
+            max_physics_rank=8,
         )
 
     def _raw_rank_one_concrete_non_sax_instrument(self, raw: ConsensusClaim) -> bool:
@@ -896,7 +955,7 @@ class MeasuredInstrumentBranchClaimProducer:
         )
 
     def _measured_synth_loop_target_path(self, context: DecisionContext) -> str:
-        if self._facts_support_strong_synth_pad_loop(context.facts):
+        if self._facts_support_strong_synth_pad_loop(context.facts) or supports_synth_pad_over_woodwind(context.facts):
             return "Instruments/Synths/Pads/Loops"
         if self._facts_support_synth_lead_loop(context):
             return "Instruments/Synths/Synth Lead/Loops"
@@ -1051,13 +1110,45 @@ class MeasuredInstrumentBranchClaimProducer:
             self._safe_float(layer.get("instrument_panel_Woodwinds_Sax"), 0.0),
             self._safe_float(layer.get("instruments_woodwinds_saxophone_one_shots_score"), 0.0),
         )
+        sax_source_identity = self._measured_score(
+            facts,
+            "woodwind_sax_score",
+            "reed_wind_score",
+            "reed_wind_authority_score",
+            "instruments_woodwinds_saxophone_one_shots_score",
+        )
         reed_panel = max(
             self._measured_score(facts, "reed_wind_score", "reed_wind_authority_score"),
             self._safe_float(layer.get("instrument_subpanel_reed_wind_score"), 0.0),
             self._safe_float(layer.get("instrument_subpanel_reed_wind_authority_score"), 0.0),
         )
-        synth_panel = self._measured_score(facts, "synth_tonal_source_score", "synth_lead_score", "synth_pad_score")
+        synth_panel = self._measured_score(
+            facts,
+            "synth_tonal_source_score",
+            "synth_lead_score",
+            "synth_pad_score",
+            "synth_chord_score",
+            "instruments_synths_synth_pad_one_shots_score",
+        )
         keys_panel = self._measured_score(facts, "struck_keys_score", "keys_tonal_decay_score")
+        voice_panel = self._measured_score(facts, "voice_score", "human_spoken_voice_score")
+        bowed_panel = self._measured_score(facts, "bowed_string_score", "string_violin_score", "string_cello_score")
+        branch = str(layer.get("instrument_branch_selected") or layer.get("physics_layer_branch") or "")
+        shared_sax_support = self._has_candidate_support(
+            context.raw,
+            SAX_SPECIFIC_PATH_FRAGMENTS,
+            top_family="Instruments",
+            max_score=18.0,
+            max_brain_rank=6,
+            max_physics_rank=10,
+        )
+        physics_top = _top_physics_guess_path_from_facts(facts)
+        bass_shape_with_confirmed_sax_owner = bool(
+            shape == "bass_phrase"
+            and branch in {"Woodwinds", "ReedWoodwind"}
+            and ("sax" in physics_top or "saxophone" in physics_top or "woodwind" in physics_top)
+            and shared_sax_support
+        )
         siren_alarm_tonal_reed_loop = bool(
             shape == "siren_alarm_tone"
             and shape_conf >= 0.68
@@ -1085,15 +1176,30 @@ class MeasuredInstrumentBranchClaimProducer:
                 "transition_riser",
             }
             and not siren_alarm_tonal_reed_loop
+            and not bass_shape_with_confirmed_sax_owner
         ):
             return False
-        branch = str(layer.get("instrument_branch_selected") or layer.get("physics_layer_branch") or "")
         dark_low_mid_reed_branch = bool(
             branch in {"Woodwinds", "ReedWoodwind"}
             and bool(layer.get("instrument_dark_low_mid_reed_loop_signal"))
             and str(layer.get("instrument_Woodwinds_subpanel_selected") or "") == "Sax"
             and self._safe_float(layer.get("instrument_Woodwinds_subpanel_confidence"), 0.0) >= 0.74
         )
+        selected_sax_subpanel = bool(
+            str(layer.get("instrument_Woodwinds_subpanel_selected") or "") == "Sax"
+            and self._safe_float(layer.get("instrument_Woodwinds_subpanel_confidence"), 0.0) >= 0.72
+        )
+        specific_sax_witness = bool(shared_sax_support or selected_sax_subpanel or dark_low_mid_reed_branch)
+        neighbor_identity_pressure = max(synth_panel, keys_panel, voice_panel, bowed_panel)
+        if not specific_sax_witness:
+            return False
+        if neighbor_identity_pressure >= sax_source_identity + 0.08 and not (
+            selected_sax_subpanel
+            and sax_source_identity >= neighbor_identity_pressure - 0.04
+            and sax_panel >= 0.70
+            and reed_panel >= 0.62
+        ):
+            return False
         if not dark_low_mid_reed_branch and (sax_panel < 0.54 or reed_panel < 0.50):
             return False
         clean_loop_shape = bool(
@@ -1121,19 +1227,7 @@ class MeasuredInstrumentBranchClaimProducer:
             return True
         if synth_panel >= sax_panel + 0.10 or keys_panel >= sax_panel + 0.08:
             return False
-        return bool(
-            clean_loop_shape
-            and sax_panel >= 0.60
-            and reed_panel >= 0.54
-            and self._has_candidate_support(
-                context.raw,
-                SAX_PATH_FRAGMENTS,
-                top_family="Instruments",
-                max_score=18.0,
-                max_brain_rank=6,
-                max_physics_rank=10,
-            )
-        )
+        return bool(clean_loop_shape and sax_panel >= 0.60 and reed_panel >= 0.54 and shared_sax_support)
 
     def _facts_have_measured_drum_loop_authority(self, facts: SharedAudioFacts | None) -> bool:
         if facts is None:

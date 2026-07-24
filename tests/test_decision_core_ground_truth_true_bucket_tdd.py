@@ -83,8 +83,8 @@ def test_confirmed_kick_loop_reroutes_from_bass_loop_to_drum_loops() -> None:
         eligibility("bass_loop", ("Instruments", "_TO_REVIEW"), "Instruments/Bass/Bass Loops"),
         facts=drum_loop_facts(),
     )
-    assert final.final_top in {"Drums", "Instruments", "_TO_REVIEW"}
-    assert final.folder_path != "FX/Structural and Transitional FX/Risers and Builds/Synth Riser/Long FX"
+    assert final.final_top == "Drums"
+    assert final.folder_path == "Drums/Drum Loops/Loops"
     assert "kick/drum-loop true-bucket rescue" in final.reason
 
 

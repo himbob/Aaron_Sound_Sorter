@@ -6,6 +6,8 @@ __pycache__/
 .ruff_cache/
 .venv/
 .venv_phase4/
+.venv_neural/
+*.egg-info/
 
 # macOS
 .DS_Store
@@ -15,11 +17,17 @@ __pycache__/
 outputs/
 reports/
 _reports/
+_models/
+_neural_cache/
+_neural_runs/
+neural_artifacts/
 _real_sort_tests/
 _pytest_outputs/
 _pytest_regression_outputs/
 dist/
 build/
+!commands/build/
+!commands/build/*.command
 
 # Large generated brain files
 stage4_folder_brain*.json
