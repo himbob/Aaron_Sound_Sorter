@@ -6,6 +6,11 @@ Give it a ZIP, folder, or audio file. It builds a producer-friendly library,
 keeps uncertain sounds in `_TO_REVIEW`, and records why each decision happened.
 `definitely_a_kick_FINAL_9.wav` gets no special treatment.
 
+This started as Aaron's attempt to make DSP do the tedious work of sorting
+music-production samples. It turned out to be useful for almost any sound
+collection, so the project grew—but the producer-friendly workflow is still
+the heart of it.
+
 ## What it does
 
 - Sorts Drums, Instruments, Voice, Textures, and FX.
