@@ -12,5 +12,7 @@ def test_current_architecture_boundary_is_packaged_for_future_ai() -> None:
 
     assert must_read_doc.exists()
     text = must_read_doc.read_text(encoding="utf-8")
-    assert "`src/aaron_sound_sorter/neural_audio/` is shadow-only" in text
-    assert "not a place to add new category rules" in text
+    normalized_text = " ".join(text.split())
+    assert "limited GUI proposal authority" in normalized_text
+    assert "Unknown cross-family conflicts go to Review" in normalized_text
+    assert "not a place to add new category rules" in normalized_text

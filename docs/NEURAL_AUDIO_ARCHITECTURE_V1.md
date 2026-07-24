@@ -208,8 +208,11 @@ The first implementation lives in:
 src/aaron_sound_sorter/neural_audio/
 ```
 
-It is shadow-only. It may build indexes, run held-out evaluation, audit trainers, log
-feedback, and compare with legacy manifests. It does not own production placement yet.
+It builds indexes, runs held-out evaluation, audits trainers, logs feedback, and
+compares with legacy manifests. In the GUI, a known learned CLAP neighborhood
+may own the proposal when measured structure is compatible. Unknown
+cross-family conflicts go to Review. This is limited ownership, not general
+neural authority.
 
 The command-line entry point is `tools/neural_audio_lab.py`. Mac helper commands live
 under `commands/neural/`. Model download is disabled by default inside providers; a
@@ -237,4 +240,5 @@ improved held-out recall over the legacy `Instruments/Voice` family
 (30/39 versus 21/39). Two of 28 protected negatives had a raw musical-vocal
 top-1, but both were outside the prototype neighborhood. In addition, 38/39
 vocal predictions were OOD. The architecture therefore behaves as designed:
-neural evidence is reported, but production ownership remains disabled.
+the original evidence did not justify broad ownership. Limited GUI ownership
+now applies only to source-blind, human-approved learned neighborhoods.

@@ -16,7 +16,6 @@ from aaron_sound_sorter.gui.web_app import (
     audio_content_type,
     backup_active_brain_family,
     browser_preview_audio_path,
-    build_brain_family_training_command,
     cancel_preview_job,
     chooser_default_location,
     create_export_job,
@@ -24,6 +23,7 @@ from aaron_sound_sorter.gui.web_app import (
     parse_range_header,
     preview_job_to_payload,
     render_index_html,
+    run_brain_training_job,
     session_to_payload,
     training_job_to_payload,
     update_preview_job_progress,
@@ -206,18 +206,6 @@ def test_apply_overrides_updates_approved_folder_only() -> None:
     assert row.proposed_folder == "Drums/Kick Drums/Generic Kick/One Shots"
     assert row.approved_folder == "Drums/Kick Drums/808 Kick/One Shots"
     assert row.is_corrected
-
-
-def test_brain_family_training_command_rebuilds_all_gui_brains(tmp_path: Path) -> None:
-    command = build_brain_family_training_command(tmp_path, tmp_path / "training" / "locked_curated_v1")
-
-    assert command[1] == str(tmp_path / "Aaron_Sound_Sorter.py")
-    assert "train-brain-family" in command
-    assert str(tmp_path / "training" / "locked_curated_v1") in command
-    assert str(tmp_path / "stage4_folder_brain.json") in command
-    assert str(tmp_path / "stage4_folder_brain_core_baby.json") in command
-    assert str(tmp_path / "stage4_folder_brain_spread_baby.json") in command
-    assert str(tmp_path / "stage4_folder_brain_outlier_baby.json") in command
 
 
 def test_backup_active_brain_family_copies_existing_gui_brains(tmp_path: Path) -> None:
@@ -428,3 +416,65 @@ def test_training_job_payload_reports_reused_existing_corrections() -> None:
     assert payload["reused_existing_count"] == 6
     assert payload["trainable_count"] == 12
     assert payload["skipped_count"] == 0
+    assert payload["neural_status"] == "queued"
+    assert payload["neural_training_example_count"] == 0
+    assert payload["neural_label_count"] == 0
+
+
+def test_gui_training_builds_clap_before_best_effort_legacy_refresh(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    events: list[str] = []
+    report_dir = tmp_path / "_reports" / "training"
+    job = BrainTrainingJob(
+        job_id="train-clap-first",
+        status="running",
+        report_dir=str(report_dir),
+        manifest_path=str(report_dir / "import.csv"),
+        backup_dir=str(report_dir / "backups"),
+        log_path=str(report_dir / "training.log"),
+    )
+
+    monkeypatch.setattr(
+        "aaron_sound_sorter.gui.web_app.corrections_from_import_manifest",
+        lambda _path: [object()],
+    )
+
+    def fake_neural_rebuild(_project_root: Path, _report_dir: Path) -> dict[str, object]:
+        events.append("clap")
+        return {
+            "status": "built",
+            "index_path": "neural/index",
+            "report_path": "neural/report.json",
+            "training_example_count": 9,
+            "label_count": 4,
+            "correction_predictions": [],
+        }
+
+    class FailingLegacyUpdater:
+        def __init__(self, _project_root: Path) -> None:
+            pass
+
+        def apply(self, *_args, **_kwargs):
+            events.append("legacy")
+            raise RuntimeError("obsolete lane failed")
+
+    monkeypatch.setattr(
+        "aaron_sound_sorter.gui.web_app.run_configured_neural_rebuild",
+        fake_neural_rebuild,
+    )
+    monkeypatch.setattr(
+        "aaron_sound_sorter.gui.web_app.IncrementalBrainUpdater",
+        FailingLegacyUpdater,
+    )
+
+    run_brain_training_job(job, tmp_path)
+
+    assert events == ["clap", "legacy"]
+    assert job.status == "done"
+    assert job.neural_status == "built"
+    assert job.neural_training_example_count == 9
+    assert "CLAP ready" in job.message
+    assert "Transitional memories were not refreshed" in job.message
+    assert any("obsolete lane failed" in error for error in job.errors)

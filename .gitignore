@@ -21,6 +21,7 @@ _models/
 _neural_cache/
 _neural_runs/
 neural_artifacts/
+config/runtime/neural_clap_index_path.txt
 _real_sort_tests/
 _pytest_outputs/
 _pytest_regression_outputs/

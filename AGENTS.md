@@ -7,7 +7,7 @@ Rules for every AI or human coding agent working in this repository.
 1. `CURRENT_STATUS.md`
 2. `docs/README.md`
 3. `docs/NEURAL_AUDIO_ARCHITECTURE_V1.md`
-4. `docs/NEURAL_TRAINING_CURATION_HANDOFF_20260724.md`
+4. `docs/TESTING_POLICY.md`
 5. `docs/NO_SOURCE_NAME_SORTING_POLICY_20260515.md`
 
 Archived documents are history, not current authority.
@@ -38,8 +38,8 @@ Archived documents are history, not current authority.
 - Full/core/spread/outlier brains are rebuilt from reviewed training data.
 - Training, validation, calibration, and final held-out sets must not share
   audio or derived duplicates.
-- Frozen neural encoders remain shadow-only until readiness, OOD, calibration,
-  negative, and rollback gates pass.
+- CLAP may own a GUI proposal only inside a learned neighborhood with compatible
+  measured structure; unknown cross-family conflicts go to Review.
 - Never delete old brains or trainers without a reversible migration report.
 
 ## Public repository safety

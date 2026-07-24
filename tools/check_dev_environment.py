@@ -38,6 +38,9 @@ class RequiredTool:
 
 
 REQUIRED_TOOLS: tuple[RequiredTool, ...] = (
+    RequiredTool("numpy", "NumPy runtime", ("-c", "import numpy; print(numpy.__version__)")),
+    RequiredTool("soundfile", "SoundFile runtime", ("-c", "import soundfile; print(soundfile.__version__)")),
+    RequiredTool("librosa", "librosa runtime", ("-c", "import librosa; print(librosa.__version__)")),
     RequiredTool("pytest", "pytest", ("-m", "pytest", "--version")),
     RequiredTool("pytest_cov", "pytest-cov", ("-m", "pytest", "--version")),
     RequiredTool("coverage", "coverage", ("-m", "coverage", "--version")),

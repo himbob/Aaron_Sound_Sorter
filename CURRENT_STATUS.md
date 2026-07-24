@@ -6,16 +6,21 @@ Updated: 2026-07-24
 
 - CLI sorting with local trained brains.
 - Local GUI review and supervised corrections.
+- Durable, source-blind GUI corrections feeding versioned CLAP prototypes.
+- Limited CLAP ownership across all categories inside known neighborhoods.
+- Cross-family neural/legacy conflicts routed to Review.
 - Exact human-approved memory ownership across Drums, Instruments, and FX.
 - Source-name blindness audit.
-- CLAP and MERT embedding, cache, prototype, evaluation, and shadow tooling.
+- CLAP and MERT embedding, cache, prototype, and evaluation tooling.
 - Provenance, contamination, readiness, active-learning, and ablation reports.
 
 ## Production authority
 
 - Measured evidence and trained memory: active.
-- Frozen neural category ownership: disabled.
-- Legacy arbiter: still active as compatibility and safety infrastructure.
+- CLAP ownership: active only for known learned neighborhoods with compatible
+  measured structure.
+- Unknown or conflicting neural evidence: Review or legacy fallback.
+- Legacy arbiter: temporary compatibility and safety infrastructure.
 
 ## Neural evidence
 
@@ -47,4 +52,4 @@ requires a compatible local brain.
 - Validate one small category group for neural ownership.
 - Retire legacy lanes only after independent ablation and rollback testing.
 
-See `docs/NEURAL_TRAINING_CURATION_HANDOFF_20260724.md`.
+See `docs/NEURAL_AUDIO_ARCHITECTURE_V1.md`.

@@ -199,7 +199,15 @@ class PrototypeIndex:
         if record.dimension != self.metadata.dimension:
             raise ValueError("embedding dimension does not match prototype index")
 
-        similarities = self._matrix @ record.vector
+        # NumPy's accelerated matmul can emit spurious floating-point warnings
+        # for finite, normalized CLAP vectors on some macOS Accelerate builds.
+        # Element-wise reduction is equally exact for this small index and
+        # avoids that unstable BLAS path.
+        similarities = np.sum(
+            self._matrix.astype(np.float64) * record.vector.astype(np.float64)[None, :],
+            axis=1,
+            dtype=np.float64,
+        )
         best_per_label: dict[str, tuple[float, int]] = {}
         for idx, proto in enumerate(self.prototypes):
             score = float(similarities[idx])

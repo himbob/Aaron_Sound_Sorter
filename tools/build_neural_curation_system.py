@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import shutil
 import sys
@@ -280,23 +281,30 @@ def load_gui_candidates(
     manifest_path: Path,
     embeddings_by_hash: dict[str, tuple[str, ...]],
     samples_root: Path,
+    project_root: Path = PROJECT_ROOT,
 ) -> list[ProvenanceCandidate]:
     """Load explicit recent GUI corrections as training-only supervision."""
     candidates: list[ProvenanceCandidate] = []
     for position, row in enumerate(read_csv(manifest_path), start=1):
-        path = Path(str(row.get("source_path", "")))
+        raw_path = str(row.get("source_path", ""))
+        path = (
+            project_root / raw_path.removeprefix("project://") if raw_path.startswith("project://") else Path(raw_path)
+        )
         label = str(row.get("approved_folder", "")).strip()
         if not path.is_file() or not is_trainable_taxonomy_label(label):
             continue
         byte_digest, decoded_digest, normalized_digest = audio_hashes(path)
+        occurrence_digest = hashlib.sha256(
+            f"{manifest_path.resolve()}\0{position}\0{byte_digest}\0{label}".encode()
+        ).hexdigest()[:12]
         candidates.append(
             ProvenanceCandidate(
-                candidate_id=f"gui_{position:04d}_{byte_digest[:12]}",
+                candidate_id=f"gui_{occurrence_digest}",
                 audio_path=str(path.resolve()),
                 intended_label=label,
                 label_source=f"explicit approved_folder in {manifest_path.parent.name}",
                 source_kind="recent_gui_correction",
-                source_group=source_group_for_path(path, samples_root),
+                source_group=str(row.get("source_group", "")).strip() or source_group_for_path(path, samples_root),
                 human_approved=True,
                 file_sha256=byte_digest,
                 decoded_audio_sha256=decoded_digest,
@@ -889,6 +897,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=Path("tests/acceptance/locked_smoke_v1/trusted_training_seed_v1.json"),
     )
     parser.add_argument("--gui-manifest", type=Path, action="append", default=[])
+    parser.add_argument(
+        "--gui-inbox",
+        type=Path,
+        default=Path("neural_artifacts/gui_training_inbox/current.csv"),
+        help="Durable current GUI neural-training inbox.",
+    )
     parser.add_argument("--trainer-audit", type=Path, required=True)
     parser.add_argument("--brain-audit", type=Path, required=True)
     parser.add_argument("--embedding-cache", type=Path, required=True)
@@ -933,7 +947,24 @@ def main(argv: list[str] | None = None) -> int:
     candidates.extend(load_seed_candidates(seed_manifest, embeddings_by_hash))
     samples_root = args.samples_root.expanduser().resolve()
     for gui_manifest in args.gui_manifest:
-        candidates.extend(load_gui_candidates(resolve(root, gui_manifest), embeddings_by_hash, samples_root))
+        candidates.extend(
+            load_gui_candidates(
+                resolve(root, gui_manifest),
+                embeddings_by_hash,
+                samples_root,
+                project_root=root,
+            )
+        )
+    gui_inbox = resolve(root, args.gui_inbox)
+    if gui_inbox.is_file():
+        candidates.extend(
+            load_gui_candidates(
+                gui_inbox,
+                embeddings_by_hash,
+                samples_root,
+                project_root=root,
+            )
+        )
     assigned = list(assign_leakage_safe_uses(candidates))
 
     all_rows = candidate_csv_rows(assigned)

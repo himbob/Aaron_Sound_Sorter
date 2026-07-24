@@ -6,7 +6,7 @@
 - [AI rules](../AGENTS.md)
 - [Architecture](NEURAL_AUDIO_ARCHITECTURE_V1.md)
 - [Migration phases](NEURAL_AUDIO_MIGRATION_PHASES.md)
-- [Current neural handoff](NEURAL_TRAINING_CURATION_HANDOFF_20260724.md)
+- [Audio sorting guide](AUDIO_SORTING_GUIDE.md)
 
 ## Policies
 
@@ -18,7 +18,6 @@
 
 ## Development
 
-- [Implementation status](NEURAL_AUDIO_IMPLEMENTATION_STATUS_20260724.md)
 - [Research basis](RESEARCH_BASIS.md)
 - [Brain-lane reduction](BRAIN_LANE_REDUCTION_PLAN.md)
 - [GUI](GUI.md)

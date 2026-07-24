@@ -102,6 +102,12 @@ Exit gate:
 - protected real-audio smoke cases pass;
 - neural-owned categories show sustained superiority.
 
+Status: started on 2026-07-24. Approved GUI corrections now enter a durable
+source-blind inbox and rebuild versioned CLAP prototypes. Known neighborhoods
+may own GUI proposals when measured structure agrees. Unknown cross-family
+conflicts go to Review. Broader category ownership still requires held-out
+coverage and calibration.
+
 ## Phase 5 — Arbiter retirement and brain reduction
 
 1. Measure unique wins, unique vetoes, duplication, runtime, and review impact for every

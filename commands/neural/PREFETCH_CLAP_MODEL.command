@@ -2,10 +2,10 @@
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-VENV_DIR="${AARON_NEURAL_VENV:-$PROJECT_ROOT/_reports/neural_audio/runtime/.venv}"
+VENV_DIR="${AARON_NEURAL_VENV:-$PROJECT_ROOT/.venv_neural}"
 MODEL_ID="${AARON_CLAP_MODEL_ID:-laion/larger_clap_music_and_speech}"
 MODEL_REVISION="${AARON_CLAP_MODEL_REVISION:-195c3a3e68faebb3e2088b9a79e79b43ddbda76b}"
-MODEL_DIR="${AARON_CLAP_MODEL_DIR:-$PROJECT_ROOT/_reports/neural_audio/models/laion_larger_clap_music_and_speech}"
+MODEL_DIR="${AARON_CLAP_MODEL_DIR:-$PROJECT_ROOT/_models/laion_larger_clap_music_and_speech}"
 
 if [ ! -x "$VENV_DIR/bin/python" ]; then
   echo "Neural environment is missing. Run commands/neural/INSTALL_NEURAL_LAB.command first." >&2

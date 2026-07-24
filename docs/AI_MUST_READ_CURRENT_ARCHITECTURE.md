@@ -15,8 +15,6 @@ The authoritative target is:
 
 Read first:
 
-- `NEURAL_TRAINING_CURATION_HANDOFF_20260724.md`
-- `NEURAL_AUDIO_IMPLEMENTATION_STATUS_20260724.md`
 - `NEURAL_AUDIO_ARCHITECTURE_V1.md`
 - `NEURAL_AUDIO_MIGRATION_PHASES.md`
 - `NO_SOURCE_NAME_SORTING_POLICY_20260515.md`
@@ -24,9 +22,11 @@ Read first:
 
 ## Current implementation boundary
 
-`src/aaron_sound_sorter/neural_audio/` is shadow-only. It must not silently control
-production routing. The legacy `FamilyClaimArbiter` is a compatibility component slated
-for measured retirement, not a place to add new category rules.
+`src/aaron_sound_sorter/neural_audio/` now has limited GUI proposal authority.
+CLAP may own known learned neighborhoods when measured structure is compatible.
+Unknown cross-family conflicts go to Review. The legacy `FamilyClaimArbiter` is
+a compatibility component slated for measured retirement, not a place to add
+new category rules.
 
 ## Non-negotiable rules
 
@@ -35,5 +35,5 @@ for measured retirement, not a place to add new category rules.
 - Do not evaluate on examples used to build prototypes.
 - Do not average weak and strong encoders without per-label held-out proof.
 - Do not delete old brains until lane-reduction replay proves redundancy.
-- Do not turn the measured CLAP recall improvement into production authority
-  while 38/39 held-out vocals are OOD.
+- Do not expand CLAP ownership beyond learned neighborhoods without held-out
+  evidence.

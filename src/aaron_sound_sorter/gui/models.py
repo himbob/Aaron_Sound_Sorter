@@ -38,6 +38,12 @@ class PreviewRow:
         diagnostic_summary: Compact human-readable voter/shape summary.
         candidate_folders: Diagnostic candidate folders proposed by voters and
             final arbitration. These are displayed only as human override hints.
+        neural_folder: Source-name-blind neural prototype prediction.
+        neural_known_distribution: Whether the prediction falls inside a
+            learned neighborhood. ``None`` means neural inference was absent.
+        neural_similarity: Cosine similarity to the winning prototype.
+        neural_margin: Similarity lead over the second label.
+        neural_radius_ratio: Distance relative to the learned label radius.
         result: Full in-memory sort result used for correction evidence. Tests
             may provide ``None`` when only export behavior is under test.
 
@@ -62,6 +68,11 @@ class PreviewRow:
     decision_reason: str
     diagnostic_summary: str
     candidate_folders: list[str] = field(default_factory=list)
+    neural_folder: str = ""
+    neural_known_distribution: bool | None = None
+    neural_similarity: float = 0.0
+    neural_margin: float = 0.0
+    neural_radius_ratio: float = 0.0
     result: SortFileResult | None = field(default=None, repr=False)
 
     @property
@@ -139,6 +150,11 @@ class TrainingImportSummary:
             present in the approved training slot. These rows are trainable.
         skipped_count: Number of corrected rows skipped with a reason.
         staged_paths: Training-file paths created by the import.
+        neural_intake_path: Durable current neural-training inbox.
+        neural_event_log_path: Append-only neural approval ledger.
+        neural_queued_count: New or relabeled neural examples.
+        neural_reaffirmed_count: Existing content/label approvals repeated.
+        neural_superseded_count: Older labels replaced by newer approvals.
         errors: Non-fatal per-row import errors.
 
     Side Effects:
@@ -153,6 +169,11 @@ class TrainingImportSummary:
     reused_existing_count: int
     skipped_count: int
     staged_paths: list[Path]
+    neural_intake_path: Path
+    neural_event_log_path: Path
+    neural_queued_count: int
+    neural_reaffirmed_count: int
+    neural_superseded_count: int
     errors: list[str]
 
 

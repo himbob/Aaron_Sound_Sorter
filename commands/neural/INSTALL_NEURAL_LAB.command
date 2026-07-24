@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-VENV_DIR="${AARON_NEURAL_VENV:-$PROJECT_ROOT/_reports/neural_audio/runtime/.venv}"
+VENV_DIR="${AARON_NEURAL_VENV:-$PROJECT_ROOT/.venv_neural}"
 PYTHON_BIN="${PYTHON_BIN:-$(command -v python3)}"
 
 cd "$PROJECT_ROOT"

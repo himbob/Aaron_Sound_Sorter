@@ -39,6 +39,12 @@ from aaron_sound_sorter.infrastructure.report_writer import (
     safe_folder_path,
     unique_path,
 )
+from aaron_sound_sorter.neural_audio.gui_training import NeuralTrainingInbox
+from aaron_sound_sorter.neural_audio.runtime import (
+    NeuralRuntimeBatch,
+    NeuralRuntimePrediction,
+    run_configured_neural_predictions,
+)
 from aaron_sound_sorter.taxonomy_contracts import (
     STRUCTURE_TERMINALS,
     TOP_LEVEL_TAXONOMY_FAMILIES,
@@ -282,6 +288,15 @@ class SortPreviewService:
             _raise_if_preview_cancelled(cancel_requested)
             labels = load_available_labels(brain_config.full_brain_path, project_root=self.project_root)
             rows = [preview_row_from_result(index, result) for index, result in enumerate(results, start=1)]
+            neural_batch = run_configured_neural_predictions(
+                self.project_root,
+                [(row.row_id, row.source_path) for row in rows],
+                run_dir,
+            )
+            apply_neural_runtime_authority(rows, neural_batch)
+            if row_callback is not None and neural_batch.predictions:
+                for row in rows:
+                    row_callback(row)
             session = SortPreviewSession(
                 run_dir=run_dir,
                 input_path=Path(input_path).expanduser(),
@@ -691,6 +706,8 @@ class TrainingCorrectionImporter:
             errors.append(f"{row.row_id}: {row.display_name}: {row_record['message']}")
         manifest_path = report_dir / "Aaron_GUI_Training_Import.csv"
         write_training_import_manifest(manifest_path, manifest_rows)
+        neural_intake = NeuralTrainingInbox(self.project_root).queue_import_manifest(manifest_path)
+        errors.extend(neural_intake.errors)
         return TrainingImportSummary(
             training_root=self.training_root,
             report_dir=report_dir,
@@ -700,6 +717,11 @@ class TrainingCorrectionImporter:
             reused_existing_count=len(reused_existing_paths),
             skipped_count=skipped_count,
             staged_paths=staged_paths,
+            neural_intake_path=neural_intake.current_manifest_path,
+            neural_event_log_path=neural_intake.event_log_path,
+            neural_queued_count=neural_intake.queued_count,
+            neural_reaffirmed_count=neural_intake.reaffirmed_count,
+            neural_superseded_count=neural_intake.superseded_count,
             errors=errors,
         )
 
@@ -1092,6 +1114,114 @@ def preview_row_from_result(index: int, result: SortFileResult) -> PreviewRow:
         candidate_folders=detected_candidate_folders(result),
         result=result,
     )
+
+
+def apply_neural_runtime_authority(
+    rows: list[PreviewRow],
+    batch: NeuralRuntimeBatch,
+) -> None:
+    """Apply conservative category-wide neural ownership to GUI proposals.
+
+    A prediction inside a learned prototype neighborhood owns the proposal
+    unless measured structure contradicts it. Outside learned neighborhoods,
+    disagreement between broad source families becomes Review. This policy is
+    identical for voice, instruments, drums, and FX.
+    """
+    predictions = {prediction.row_id: prediction for prediction in batch.predictions}
+    for row in rows:
+        prediction = predictions.get(row.row_id)
+        if prediction is None:
+            if batch.status in {"error", "unavailable"}:
+                row.diagnostic_summary = f"{row.diagnostic_summary}; neural={batch.status} ({batch.message})"
+            continue
+        _apply_neural_prediction(row, prediction)
+
+
+def _apply_neural_prediction(row: PreviewRow, prediction: NeuralRuntimePrediction) -> None:
+    """Apply one neural result without consulting source-name text."""
+    neural_label = normalize_taxonomy_label(prediction.predicted_label)
+    row.neural_folder = neural_label
+    row.neural_known_distribution = prediction.known_distribution
+    row.neural_similarity = prediction.top_similarity
+    row.neural_margin = prediction.margin
+    row.neural_radius_ratio = prediction.radius_ratio
+    if neural_label and neural_label not in row.candidate_folders:
+        row.candidate_folders.insert(0, neural_label)
+
+    neural_summary = (
+        f"neural={neural_label or 'none'} "
+        f"(known={prediction.known_distribution}, "
+        f"similarity={prediction.top_similarity:.3f}, "
+        f"margin={prediction.margin:.3f}, "
+        f"radius_ratio={prediction.radius_ratio:.3f})"
+    )
+    row.diagnostic_summary = f"{row.diagnostic_summary}; {neural_summary}"
+    if not is_valid_taxonomy_label(neural_label):
+        return
+
+    legacy_label = row.proposed_folder
+    if prediction.known_distribution:
+        if _neural_structure_conflicts(row, neural_label):
+            row.proposed_folder = "_TO_REVIEW/Measured Role Conflict"
+            row.approved_folder = row.proposed_folder
+            row.final_top = "_TO_REVIEW"
+            row.consensus_status = "neural_measured_structure_conflict_review"
+            row.decision_reason = (
+                "Neural identity was inside a learned neighborhood, but its structure "
+                "contradicted measured audio structure."
+            )
+            return
+        row.proposed_folder = neural_label
+        row.approved_folder = neural_label
+        row.final_top = neural_label.split("/", 1)[0]
+        row.consensus_status = "neural_known_distribution_owner"
+        row.confidence = max(0.0, min(1.0, prediction.top_similarity))
+        row.decision_reason = (
+            "Source-name-blind neural audio matched a learned prototype neighborhood "
+            f"and took ownership from the legacy proposal ({legacy_label})."
+        )
+        return
+
+    legacy_owner = _neural_owner_family(legacy_label)
+    neural_owner = _neural_owner_family(neural_label)
+    if legacy_owner and neural_owner and legacy_owner != neural_owner:
+        row.proposed_folder = "_TO_REVIEW/Measured Role Conflict"
+        row.approved_folder = row.proposed_folder
+        row.final_top = "_TO_REVIEW"
+        row.consensus_status = "neural_legacy_owner_conflict_review"
+        row.decision_reason = (
+            "Neural audio was outside its learned radius and disagreed with the "
+            f"legacy source family ({neural_owner} vs {legacy_owner}); forcing human review."
+        )
+
+
+def _neural_owner_family(label: str) -> str:
+    """Return a broad source-family contract for conflict-only review."""
+    normalized = normalize_taxonomy_label(label)
+    lowered = normalized.lower()
+    if normalized.startswith("_TO_REVIEW/"):
+        return "review"
+    if normalized.startswith("Instruments/Voice/") or normalized.startswith("FX/Human and Voice FX/"):
+        return "voice"
+    if normalized.startswith("Drums/"):
+        return "drums"
+    if normalized.startswith("FX/"):
+        return "fx"
+    if normalized.startswith("Instruments/"):
+        return "instruments_nonvoice"
+    if "voice" in lowered or "vocal" in lowered:
+        return "voice"
+    return ""
+
+
+def _neural_structure_conflicts(row: PreviewRow, neural_label: str) -> bool:
+    """Return whether strong measured structure rejects a neural terminal."""
+    if row.result is None:
+        return False
+    terminal = taxonomy_label_contract(neural_label).structure_terminal
+    if has_decisive_loop_structure(row.result) and terminal == "One Shots":
+        return True
+    return bool(row.result.facts.is_single_event_like and terminal == "Loops")
 
 
 def decision_confidence(result: SortFileResult) -> float:
@@ -1579,6 +1709,11 @@ def preview_manifest_fields() -> list[str]:
         "decision_reason",
         "diagnostic_summary",
         "candidate_folders_json",
+        "neural_folder",
+        "neural_known_distribution",
+        "neural_similarity",
+        "neural_margin",
+        "neural_radius_ratio",
     ]
 
 
@@ -1599,6 +1734,13 @@ def preview_row_to_csv(row: PreviewRow) -> dict[str, str]:
         "decision_reason": row.decision_reason,
         "diagnostic_summary": row.diagnostic_summary,
         "candidate_folders_json": json.dumps(row.candidate_folders, sort_keys=True),
+        "neural_folder": row.neural_folder,
+        "neural_known_distribution": (
+            "" if row.neural_known_distribution is None else ("1" if row.neural_known_distribution else "0")
+        ),
+        "neural_similarity": f"{row.neural_similarity:.8f}",
+        "neural_margin": f"{row.neural_margin:.8f}",
+        "neural_radius_ratio": f"{row.neural_radius_ratio:.8f}",
     }
 
 

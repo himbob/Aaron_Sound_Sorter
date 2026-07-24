@@ -50,6 +50,21 @@ def test_index_round_trip_without_pickle(tmp_path) -> None:
     assert loaded.metadata.training_hashes == index.metadata.training_hashes
 
 
+def test_prediction_uses_finite_reduction_without_matmul_warnings() -> None:
+    index = PrototypeIndexBuilder().build(
+        {
+            "A": [rec("p", "m", 1, [1.0, 0.0])],
+            "B": [rec("p", "m", 2, [0.0, 1.0])],
+        }
+    )
+
+    with np.errstate(all="raise"):
+        prediction = index.predict(rec("p", "m", 3, [0.8, 0.2]))
+
+    assert prediction.predicted_label == "A"
+    assert np.isfinite(prediction.top_similarity)
+
+
 def test_failed_index_replacement_restores_previous_index(tmp_path, monkeypatch) -> None:
     original = PrototypeIndexBuilder().build(
         {

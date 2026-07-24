@@ -22,17 +22,19 @@ def test_standard_cleanup_preserves_critical_training_neural_and_brain_assets(tm
         tmp_path / "_models" / "pinned_encoder" / "weights.bin",
         tmp_path / "neural_artifacts" / "run" / "neural_model_registry.json",
         tmp_path / "stage4_folder_brain.json",
+        tmp_path / "_reports" / "gui_training_imports" / "run" / "brain_backups" / "brain.json",
     ]
     for path in critical_paths:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(b"critical")
-    generated_report = tmp_path / "_reports" / "temporary" / "report.csv"
+    generated_report = tmp_path / "_reports" / "quality" / "report.csv"
     generated_report.parent.mkdir(parents=True)
     generated_report.write_text("generated\n", encoding="utf-8")
 
     candidates = {candidate.path for candidate in collect_candidates(tmp_path, "standard")}
 
-    assert tmp_path / "_reports" in candidates
+    assert generated_report.parent in candidates
+    assert tmp_path / "_reports" not in candidates
     assert all(path not in candidates for path in critical_paths)
     assert not any(
         critical_path == candidate or candidate in critical_path.parents

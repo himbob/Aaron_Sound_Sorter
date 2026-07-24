@@ -8,7 +8,6 @@ import mimetypes
 import os
 import shutil
 import subprocess
-import sys
 import threading
 import time
 import uuid
@@ -34,6 +33,7 @@ from aaron_sound_sorter.gui.preview_service import (
     gui_worker_count,
     load_available_labels,
 )
+from aaron_sound_sorter.neural_audio.runtime import run_configured_neural_rebuild
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
@@ -95,6 +95,12 @@ class BrainTrainingJob:
     backup_dir: str = ""
     log_path: str = ""
     update_manifest_path: str = ""
+    neural_status: str = "queued"
+    neural_intake_path: str = ""
+    neural_index_path: str = ""
+    neural_report_path: str = ""
+    neural_training_example_count: int = 0
+    neural_label_count: int = 0
     errors: list[str] = field(default_factory=list)
     started_at: float = field(default_factory=time.time)
     updated_at: float = field(default_factory=time.time)
@@ -653,12 +659,13 @@ def create_brain_training_job(import_summary: TrainingImportSummary) -> BrainTra
         evidence_path=str(import_summary.correction_evidence_path),
         backup_dir=str(import_summary.report_dir / "brain_backups_before_training"),
         log_path=str(import_summary.report_dir / "Aaron_GUI_Brain_Training.log"),
+        neural_intake_path=str(import_summary.neural_intake_path),
         errors=list(import_summary.errors),
     )
 
 
 def run_brain_training_job(job: BrainTrainingJob, project_root: Path) -> None:
-    """Run an incremental brain update for a correction-driven GUI job."""
+    """Train neural prototypes first, then refresh transitional memories."""
     log_path = Path(job.log_path)
     log_path.parent.mkdir(parents=True, exist_ok=True)
     try:
@@ -677,91 +684,92 @@ def run_brain_training_job(job: BrainTrainingJob, project_root: Path) -> None:
                 job.updated_at = time.time()
                 log_handle.write(job.message + "\n")
                 return
-            backup_dir = backup_active_brain_family(project_root, Path(job.backup_dir))
-            log_handle.write(f"Backed up active brain files to: {backup_dir}\n\n")
+            log_handle.write("Rebuilding versioned CLAP prototypes from neural training intake...\n")
             log_handle.flush()
-            summary = IncrementalBrainUpdater(project_root).apply(
-                corrections,
-                report_dir=Path(job.report_dir),
-                backup_dir=Path(job.backup_dir),
-            )
-            job.update_manifest_path = str(summary.manifest_path)
-            job.errors.extend(summary.errors)
-            for result in summary.updated_brains:
+            try:
+                neural_summary = run_configured_neural_rebuild(project_root, Path(job.report_dir))
+                job.neural_status = str(neural_summary.get("status", "error"))
+                job.neural_index_path = str(neural_summary.get("index_path", ""))
+                job.neural_report_path = str(neural_summary.get("report_path", ""))
+                job.neural_training_example_count = int(neural_summary.get("training_example_count", 0))
+                job.neural_label_count = int(neural_summary.get("label_count", 0))
                 log_handle.write(
-                    f"Updated {result.brain_path.name}: "
-                    f"labels {result.label_count_before}->{result.label_count_after}; "
-                    f"corrections={result.corrections_applied}; "
-                    f"touched={', '.join(result.labels_touched)}\n"
+                    f"Neural status: {job.neural_status}; "
+                    f"examples={job.neural_training_example_count}; "
+                    f"labels={job.neural_label_count}\n"
                 )
-                for warning in result.warnings:
-                    log_handle.write(f"WARNING {result.brain_path.name}: {warning}\n")
-            if summary.errors:
-                log_handle.write("\nErrors/warnings:\n")
-                for error in summary.errors:
-                    log_handle.write(f"- {error}\n")
+                log_handle.write(f"Neural index: {job.neural_index_path or '-'}\n")
+                log_handle.write(f"Neural report: {job.neural_report_path or '-'}\n")
+                for prediction in neural_summary.get("correction_predictions", []):
+                    log_handle.write(
+                        "Neural correction verification: "
+                        f"approved={prediction.get('approved_label', '')}; "
+                        f"before={prediction.get('predicted_before', '') or '-'}; "
+                        f"after={prediction.get('predicted_after', '')}; "
+                        f"known_distribution={prediction.get('known_distribution_after', False)}\n"
+                    )
+            except Exception as exc:
+                job.neural_status = "queued_only"
+                warning = f"Neural intake was saved, but automatic CLAP prototype rebuilding failed: {exc}"
+                job.errors.append(warning)
+                log_handle.write(f"WARNING: {warning}\n")
+            log_handle.write("\nRefreshing transitional legacy memories...\n")
+            log_handle.flush()
+            legacy_summary = None
+            try:
+                backup_dir = backup_active_brain_family(project_root, Path(job.backup_dir))
+                log_handle.write(f"Backed up active brain files to: {backup_dir}\n\n")
+                legacy_summary = IncrementalBrainUpdater(project_root).apply(
+                    corrections,
+                    report_dir=Path(job.report_dir),
+                    backup_dir=Path(job.backup_dir),
+                )
+                job.update_manifest_path = str(legacy_summary.manifest_path)
+                job.errors.extend(legacy_summary.errors)
+                for result in legacy_summary.updated_brains:
+                    log_handle.write(
+                        f"Updated {result.brain_path.name}: "
+                        f"labels {result.label_count_before}->{result.label_count_after}; "
+                        f"corrections={result.corrections_applied}; "
+                        f"touched={', '.join(result.labels_touched)}\n"
+                    )
+                    for warning in result.warnings:
+                        log_handle.write(f"WARNING {result.brain_path.name}: {warning}\n")
+                if legacy_summary.errors:
+                    log_handle.write("\nLegacy memory warnings:\n")
+                    for error in legacy_summary.errors:
+                        log_handle.write(f"- {error}\n")
+            except Exception as exc:
+                warning = f"CLAP training was independent, but transitional legacy memory refreshing failed: {exc}"
+                job.errors.append(warning)
+                log_handle.write(f"WARNING: {warning}\n")
+        neural_built = job.neural_status in {"built", "unchanged"}
+        legacy_built = legacy_summary is not None
+        if not neural_built and not legacy_built:
+            job.returncode = 1
+            job.status = "error"
+            job.message = "Both CLAP rebuilding and transitional memory refreshing failed."
+            job.updated_at = time.time()
+            return
         job.returncode = 0
         job.status = "done"
-        job.message = (
-            f"Incrementally updated {len(summary.updated_brains)} active brain file(s) "
-            f"from {summary.applied_correction_count} correction(s)."
+        neural_message = (
+            f"CLAP ready with {job.neural_training_example_count} example(s)."
+            if neural_built
+            else "CLAP evidence was queued for a later rebuild."
         )
+        legacy_message = (
+            f" Transitional memories refreshed from {legacy_summary.applied_correction_count} correction(s)."
+            if legacy_summary is not None
+            else " Transitional memories were not refreshed."
+        )
+        job.message = f"{neural_message}{legacy_message}"
         job.updated_at = time.time()
     except Exception as exc:
         job.status = "error"
         job.returncode = 1
         job.message = f"Incremental brain update failed before completion: {exc}"
         job.updated_at = time.time()
-
-
-def build_brain_family_training_command(project_root: Path, training_root: Path) -> list[str]:
-    """Build the command that rebuilds the full/core/spread/outlier brains.
-
-    Args:
-        project_root: Project root containing ``Aaron_Sound_Sorter.py``.
-        training_root: Trusted curated training tree.
-
-    Returns:
-        Command argument list suitable for ``subprocess.run``.
-
-    Side Effects:
-        None.
-    """
-    root = Path(project_root).expanduser().resolve()
-    return [
-        str(Path(sys.executable).expanduser()),
-        str(root / "Aaron_Sound_Sorter.py"),
-        "train-brain-family",
-        str(Path(training_root).expanduser().resolve()),
-        "--project-dir",
-        str(root),
-        "--save-full",
-        str(root / "stage4_folder_brain.json"),
-        "--save-core-baby",
-        str(root / "stage4_folder_brain_core_baby.json"),
-        "--save-spread-baby",
-        str(root / "stage4_folder_brain_spread_baby.json"),
-        "--save-outlier-baby",
-        str(root / "stage4_folder_brain_outlier_baby.json"),
-        "--core-anchors",
-        "3",
-        "--spread-anchors",
-        "3",
-        "--outlier-anchors",
-        "3",
-        "--full-max-centroids",
-        "6",
-        "--baby-max-centroids",
-        "3",
-        "--max-files-per-label-to-scan",
-        "0",
-        "--fingerprint-timeout-sec",
-        "45",
-        "--training-preview-per-label",
-        "3",
-        "--min-active-train-per-label",
-        "1",
-    ]
 
 
 def training_job_to_payload(job: BrainTrainingJob) -> dict[str, Any]:
@@ -783,6 +791,12 @@ def training_job_to_payload(job: BrainTrainingJob) -> dict[str, Any]:
         "backup_dir": job.backup_dir,
         "log_path": job.log_path,
         "update_manifest_path": job.update_manifest_path,
+        "neural_status": job.neural_status,
+        "neural_intake_path": job.neural_intake_path,
+        "neural_index_path": job.neural_index_path,
+        "neural_report_path": job.neural_report_path,
+        "neural_training_example_count": job.neural_training_example_count,
+        "neural_label_count": job.neural_label_count,
         "errors": job.errors,
         "started_at": job.started_at,
         "updated_at": job.updated_at,
@@ -916,6 +930,11 @@ def row_to_payload(index: int, row: PreviewRow) -> dict[str, Any]:
         "decision_reason": row.decision_reason,
         "diagnostic_summary": row.diagnostic_summary,
         "candidate_folders": row.candidate_folders,
+        "neural_folder": row.neural_folder,
+        "neural_known_distribution": row.neural_known_distribution,
+        "neural_similarity": row.neural_similarity,
+        "neural_margin": row.neural_margin,
+        "neural_radius_ratio": row.neural_radius_ratio,
         "is_corrected": row.is_corrected,
     }
 

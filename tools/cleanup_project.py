@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Clean generated Aaron Sound Sorter project junk.
+"""Clean disposable Aaron Sound Sorter project junk.
 
-This tool is intentionally boring and conservative. It removes generated reports,
-old run outputs, cache files, and root clutter. It does not touch classifier code,
-active brain JSONs, source files, tests, docs, or training/ by default.
+This tool is intentionally boring and conservative. It removes caches, test
+outputs, preview runs, and root clutter. It preserves GUI training evidence,
+rollback backups, classifier code, active brains, source, tests, docs, training
+audio, models, and neural artifacts by default.
 """
 
 from __future__ import annotations
@@ -59,7 +60,6 @@ STANDARD_DIRS = [
     ".mypy_cache",
     ".ruff_cache",
     "htmlcov",
-    "_reports",
     "reports",
     "_real_sort_tests",
     "outputs",
@@ -74,6 +74,20 @@ STANDARD_DIRS = [
     "_qa_parent_eligibility_v2",
     "_backups",
     "_patch_backups",
+]
+
+STANDARD_REPORT_DIRS = [
+    "quality",
+    "python_pycache",
+    "pytest_outputs",
+    "pytest_regression_outputs",
+    "gui_preview",
+    "generated_private_regression_audio",
+]
+
+STANDARD_REPORT_DIR_GLOBS = [
+    "pytest_*",
+    "generated_*",
 ]
 
 STANDARD_DIR_GLOBS = [
@@ -162,6 +176,12 @@ def collect_root_dir_candidates(project_root: Path, mode: str) -> list[RemovalCa
     for pattern in STANDARD_DIR_GLOBS:
         for path in project_root.glob(pattern):
             add_if_exists(candidates, path, f"generated directory pattern {pattern}")
+    reports_root = project_root / "_reports"
+    for name in STANDARD_REPORT_DIRS:
+        add_if_exists(candidates, reports_root / name, "disposable generated report directory")
+    for pattern in STANDARD_REPORT_DIR_GLOBS:
+        for path in reports_root.glob(pattern):
+            add_if_exists(candidates, path, f"disposable report directory pattern {pattern}")
     if mode == "heavy-local":
         for name in HEAVY_LOCAL_DIRS:
             add_if_exists(candidates, project_root / name, "heavy local generated training selection folder")

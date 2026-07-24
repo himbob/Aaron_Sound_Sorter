@@ -18,6 +18,7 @@ from aaron_sound_sorter.gui.preview_service import (
     SortPlanExporter,
     SortPreviewService,
     TrainingCorrectionImporter,
+    apply_neural_runtime_authority,
     correction_evidence,
     detected_candidate_folders,
     gui_worker_count,
@@ -25,6 +26,10 @@ from aaron_sound_sorter.gui.preview_service import (
     load_simple_yaml_mapping,
     training_slot_path,
     write_corrections_csv,
+)
+from aaron_sound_sorter.neural_audio.runtime import (
+    NeuralRuntimeBatch,
+    NeuralRuntimePrediction,
 )
 
 
@@ -60,6 +65,33 @@ def _session(tmp_path: Path, rows: list[PreviewRow]) -> SortPreviewSession:
         brain_path=brain,
         available_labels=["Drums/Kicks/One Shots"],
         rows=rows,
+    )
+
+
+def _neural_prediction(
+    label: str,
+    *,
+    known: bool,
+    row_id: str = "00001",
+) -> NeuralRuntimePrediction:
+    return NeuralRuntimePrediction(
+        row_id=row_id,
+        file_sha256="a" * 64,
+        predicted_label=label,
+        second_label="Instruments/Mixed Musical Loops/Multi Instrument/Loops",
+        top_similarity=0.81,
+        second_similarity=0.55,
+        margin=0.26,
+        radius_ratio=0.72 if known else 2.4,
+        known_distribution=known,
+    )
+
+
+def _neural_batch(prediction: NeuralRuntimePrediction) -> NeuralRuntimeBatch:
+    return NeuralRuntimeBatch(
+        status="predicted",
+        message="Predicted one audio waveform.",
+        predictions=(prediction,),
     )
 
 
@@ -156,6 +188,85 @@ def test_possible_matches_keep_long_one_shot_when_audio_is_not_a_loop() -> None:
     candidates = detected_candidate_folders(_candidate_result(is_loop_like=False))
 
     assert "FX/Designed Noise FX/Alarm/One Shots" in candidates
+
+
+def test_known_neural_neighborhood_takes_gui_ownership_for_any_category(tmp_path: Path) -> None:
+    row = _row(
+        _audio_file(tmp_path, "words_that_must_not_matter.wav"),
+        proposed="FX/Hybrid Designed FX",
+    )
+
+    apply_neural_runtime_authority(
+        [row],
+        _neural_batch(_neural_prediction("Drums/Drum Loops/Loops", known=True)),
+    )
+
+    assert row.proposed_folder == "Drums/Drum Loops/Loops"
+    assert row.approved_folder == "Drums/Drum Loops/Loops"
+    assert row.consensus_status == "neural_known_distribution_owner"
+    assert row.neural_known_distribution is True
+    assert row.neural_folder == "Drums/Drum Loops/Loops"
+
+
+def test_unknown_neural_nonvoice_vs_legacy_voice_forces_review(tmp_path: Path) -> None:
+    row = _row(
+        _audio_file(tmp_path, "also_not_evidence.wav"),
+        proposed="Instruments/Voice/Vocal Loops/Loops",
+    )
+
+    apply_neural_runtime_authority(
+        [row],
+        _neural_batch(
+            _neural_prediction(
+                "Instruments/Synths/Synth Lead/Loops",
+                known=False,
+            )
+        ),
+    )
+
+    assert row.proposed_folder == "_TO_REVIEW/Measured Role Conflict"
+    assert row.approved_folder == "_TO_REVIEW/Measured Role Conflict"
+    assert row.consensus_status == "neural_legacy_owner_conflict_review"
+    assert "instruments_nonvoice vs voice" in row.decision_reason
+
+
+def test_unknown_neural_cross_owner_review_is_not_voice_specific(tmp_path: Path) -> None:
+    row = _row(
+        _audio_file(tmp_path),
+        proposed="Drums/Snares/Acoustic Snare/One Shots",
+    )
+
+    apply_neural_runtime_authority(
+        [row],
+        _neural_batch(
+            _neural_prediction(
+                "FX/Impacts and Hits/Generic Impact/One Shots",
+                known=False,
+            )
+        ),
+    )
+
+    assert row.proposed_folder == "_TO_REVIEW/Measured Role Conflict"
+    assert row.consensus_status == "neural_legacy_owner_conflict_review"
+
+
+def test_unknown_neural_same_owner_keeps_legacy_proposal(tmp_path: Path) -> None:
+    legacy = "Instruments/Synths/Synth Pad/Loops"
+    row = _row(_audio_file(tmp_path), proposed=legacy)
+
+    apply_neural_runtime_authority(
+        [row],
+        _neural_batch(
+            _neural_prediction(
+                "Instruments/Synths/Synth Lead/Loops",
+                known=False,
+            )
+        ),
+    )
+
+    assert row.proposed_folder == legacy
+    assert row.approved_folder == legacy
+    assert row.neural_folder == "Instruments/Synths/Synth Lead/Loops"
 
 
 def test_exporter_copies_approved_folder_tree(tmp_path: Path) -> None:
@@ -264,6 +375,9 @@ def test_training_correction_importer_copies_corrected_audio_to_training_slot(tm
     assert staged.read_bytes() == source.read_bytes()
     assert summary.manifest_path.exists()
     assert summary.correction_evidence_path.exists()
+    assert summary.neural_queued_count == 1
+    assert summary.neural_intake_path.exists()
+    assert summary.neural_event_log_path.exists()
 
 
 def test_training_correction_importer_reuses_duplicate_audio_in_same_slot(tmp_path: Path) -> None:
