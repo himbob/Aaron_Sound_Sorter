@@ -12811,6 +12811,8 @@ class FamilyClaimArbiter:
             )
         ):
             return None
+        if raw_claim.family == "Instruments" and self._facts_support_clean_tonal_chord_stab(facts):
+            return None
 
         blocked = [
             claim
