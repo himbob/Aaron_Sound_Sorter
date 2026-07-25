@@ -37,7 +37,7 @@ AI_BASE ?= HEAD
         lint format format-check type-check docstyle quality qa ci quality-report quality-report-full \
         quality-report-coverage quality-gate-report quality-baseline quality-strict \
         ai-preflight ai-changed-files ai-fix ai-check ai-test ai-bundle-check \
-        bundle bundle-dry-run clean-generated clean clean-dry-run clean-for-bundle clean-heavy-local \
+        bundle bundle-dry-run patch-bundle patch-bundle-dry-run clean-generated clean clean-dry-run clean-for-bundle clean-heavy-local \
         clean-heavy-local-dry-run organize-root-commands show-junk
 
 help:
@@ -61,8 +61,10 @@ help:
 	@echo "  make ai-check                  Strict gate for changed Python files plus source-name audit."
 	@echo "  make ai-test TEST=path::node   Run one focused pytest target through the venv."
 	@echo "  make ai-bundle-check BUNDLE_DIR=/path  Fail if bundle contains caches, pyc files, reports, or macOS junk."
-	@echo "  make bundle BUNDLE_NAME=name         Full clean, AI check, then build a clean patch bundle under _reports/bundles."
-	@echo "  make bundle-dry-run BUNDLE_NAME=name Preview bundle file selection after cleaning."
+	@echo "  make bundle                    Build code ZIP + balanced upload-safe end-user pack parts with commands/bundle/bundle.sh."
+	@echo "  make bundle-dry-run            Preview code/runtime selections and multipart upload settings without writing ZIPs."
+	@echo "  make patch-bundle BUNDLE_NAME=name   Build the legacy changed-files AI patch bundle."
+	@echo "  make patch-bundle-dry-run             Preview the legacy changed-files patch bundle."
 	@echo ""
 	@echo "Whole-repo tests and quality:"
 	@echo "  make audit-source-names        Run the source-name evidence audit."
@@ -212,7 +214,20 @@ ai-bundle-check:
 	"$(VENV_PYTHON)" tools/ai_quality_gate.py --project-root "$(PROJECT_ROOT)" bundle-check --bundle-dir "$(BUNDLE_DIR)"
 
 
-bundle: clean-for-bundle ai-check
+bundle:
+	PROJECT_ROOT="$(PROJECT_ROOT)" \
+	PYTHON_BIN="$(PYTHON)" \
+	BUNDLE_OUTPUT_DIR="$(BUNDLE_OUTPUT_DIR)" \
+	./commands/bundle/bundle.sh
+
+bundle-dry-run:
+	PROJECT_ROOT="$(PROJECT_ROOT)" \
+	PYTHON_BIN="$(PYTHON)" \
+	BUNDLE_OUTPUT_DIR="$(BUNDLE_OUTPUT_DIR)" \
+	DRY_RUN=1 \
+	./commands/bundle/bundle.sh
+
+patch-bundle: clean-for-bundle ai-check
 	PROJECT_ROOT="$(PROJECT_ROOT)" \
 	PYTHON_BIN="$(VENV_PYTHON)" \
 	AI_BASE="$(AI_BASE)" \
@@ -220,7 +235,7 @@ bundle: clean-for-bundle ai-check
 	BUNDLE_OUTPUT_DIR="$(BUNDLE_OUTPUT_DIR)" \
 	./commands/build/BUILD_CLEAN_PATCH_BUNDLE.command
 
-bundle-dry-run: clean-for-bundle
+patch-bundle-dry-run: clean-for-bundle
 	PROJECT_ROOT="$(PROJECT_ROOT)" \
 	PYTHON_BIN="$(VENV_PYTHON)" \
 	AI_BASE="$(AI_BASE)" \

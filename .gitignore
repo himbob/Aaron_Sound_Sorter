@@ -1,54 +1,105 @@
-# Python
+# Python generated files
 __pycache__/
 *.py[cod]
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-.venv/
-.venv_phase4/
-.venv_neural/
 *.egg-info/
+.coverage
+htmlcov/
+build/
+dist/
 
-# macOS
+# Local Python environments
+.venv/
+.venv_*/
+venv/
+env/
+
+# macOS and editor metadata
 .DS_Store
 ._*
+.vscode/
 
-# Project generated output
+# Generated project output
 outputs/
+output/
 reports/
 _reports/
-_models/
-_neural_cache/
-_neural_runs/
-neural_artifacts/
-config/runtime/neural_clap_index_path.txt
-config/runtime/sample_library_root.txt
 _real_sort_tests/
 _pytest_outputs/
 _pytest_regression_outputs/
-dist/
-build/
-!commands/build/
-!commands/build/*.command
+Aaron_Sorted_Sounds/
+Aaron_Test_Cases/
+test_output/
+sorted_output/
+source_cache/
+**/source_cache/
 
-# Large generated brain files
-stage4_folder_brain*.json
-stage4_physics_memory_brain*.json
-stage4_voter_memory_brain*.json
-stage4_shape_memory_brain*.json
-stage4_shape_memory_starter_brain*.json
-
-# Local training/audio data
+# Local training data and generated training runs
 training/
-!commands/training/
-!commands/training/*.command
+_training_data/
+_balanced_baby_training/
+stage4_brain_family_training/run_*/
+stage4_folder_brain_training/
+
+# Keep only the two pinned runtime neural model snapshots.
+# Their large files are tracked through Git LFS in .gitattributes.
+_models/*
+!_models/laion_larger_clap_music_and_speech/
+!_models/laion_larger_clap_music_and_speech/**
+!_models/mert_v1_95m_7d1bb4c/
+!_models/mert_v1_95m_7d1bb4c/**
+_models/**/.cache/
+_models/**/cache/
+_models/**/logs/
+_models/**/*backup*
+_models/**/*archive*
+
+# Keep only compact runtime neural prototype indexes.
+# Embedding caches, curation runs, GUI imports/inboxes, and reports stay local.
+neural_artifacts/*
+!neural_artifacts/prototype_indexes/
+!neural_artifacts/prototype_indexes/**
+neural_artifacts/prototype_indexes/**/.cache/
+neural_artifacts/prototype_indexes/**/*backup*
+neural_artifacts/prototype_indexes/**/*archive*
+_neural_cache/
+_neural_runs/
+
+# Active root brain JSON files are intentionally tracked.
+# Ignore only clear backup/archive copies of those brains.
+stage4_*brain*.bak
+stage4_*brain*.bak.*
+stage4_*brain*_backup*.json
+stage4_*brain*-backup*.json
+stage4_*brain*_old*.json
+stage4_*brain*-old*.json
+stage4_*brain*_archiv*.json
+stage4_*brain*-archiv*.json
+
+# Local sample audio and package archives are not repository assets.
 *.wav
 *.aif
 *.aiff
+*.au
 *.flac
+*.ogg
 *.mp3
 *.m4a
+*.aac
 *.zip
+*.tar
+*.tar.gz
+*.tgz
+*.7z
+*.rar
 
-# Generated brain training runs
-stage4_brain_family_training/run_*/
+# Preserve executable command sources beneath otherwise generated names.
+!commands/build/
+!commands/build/*.command
+!commands/training/
+!commands/training/*.command
+_models/**/.git/
+_models/**/.github/
+_models/**/__pycache__/

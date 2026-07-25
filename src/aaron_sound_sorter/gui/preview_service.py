@@ -89,6 +89,7 @@ TRAINING_STRUCTURE_FOLDER_NAMES = {
     "_ONE_SHOTS": "One Shots",
     "_LOOPS": "Loops",
     "_LONG_FX": "Long FX",
+    "_LONG_RUNNING": "Long Running",
 }
 AUDIO_LABEL_SUFFIXES = {".wav", ".wave", ".aif", ".aiff", ".flac", ".mp3", ".m4a", ".ogg"}
 
@@ -1353,7 +1354,7 @@ def diagnostic_vote_digest_keys() -> tuple[str, ...]:
 
 
 def load_available_labels(
-    brain_path: Path,
+    brain_path: Path | BrainFamilyConfig,
     *,
     project_root: Path | None = None,
     taxonomy_catalog_path: Path | None = None,
@@ -1361,8 +1362,8 @@ def load_available_labels(
     """Load chooser taxonomy labels for GUI correction workflows.
 
     Args:
-        brain_path: Active trained brain JSON. Its labels represent folders the
-            sorter can currently recognize.
+        brain_path: Active trained brain JSON or GUI brain-family config.
+            Its labels represent folders the sorter can currently recognize.
         project_root: Optional project root used to merge training-folder slots,
             the master taxonomy ledger, and GUI-only future taxonomy labels.
         taxonomy_catalog_path: Optional catalog path. Relative paths resolve
@@ -1379,7 +1380,11 @@ def load_available_labels(
         These labels are used only by the GUI chooser and correction-evidence
         writer. They are not sorting evidence and must not influence voters.
     """
-    label_set = set(load_brain_taxonomy_labels(Path(brain_path)))
+    label_set = set()
+    if isinstance(brain_path, BrainFamilyConfig):
+        label_set.update(load_brain_family_taxonomy_labels(brain_path))
+    else:
+        label_set.update(load_brain_taxonomy_labels(Path(brain_path)))
     if project_root is not None:
         root = Path(project_root).expanduser().resolve()
         label_set.update(load_training_taxonomy_labels(root / DEFAULT_TRAINING_TAXONOMY_ROOT))
@@ -1418,14 +1423,60 @@ def load_brain_taxonomy_labels(brain_path: Path) -> list[str]:
         Normalized trained labels from the brain's ``labels`` list.
 
     Side Effects:
-        Reads ``brain_path``.
+        Reads ``brain_path`` when it exists.
     """
-    with Path(brain_path).expanduser().open("r", encoding="utf-8") as handle:
-        brain = json.load(handle)
+    resolved = Path(brain_path).expanduser()
+    if not resolved.exists() or not resolved.is_file():
+        return []
+    try:
+        with resolved.open("r", encoding="utf-8") as handle:
+            brain = json.load(handle)
+    except (OSError, json.JSONDecodeError):
+        return []
     labels = brain.get("labels", [])
     if not isinstance(labels, list):
         return []
     return [normalize_taxonomy_label(label) for label in labels]
+
+
+def load_brain_family_taxonomy_labels(brain_family: BrainFamilyConfig) -> list[str]:
+    """Load trained taxonomy labels from every configured GUI brain file.
+
+    Args:
+        brain_family: GUI brain-family configuration.
+
+    Returns:
+        Normalized labels from every configured brain file.
+
+    Side Effects:
+        Reads the configured brain JSON files.
+    """
+    paths: list[Path] = [brain_family.full_brain_path]
+    paths.extend(
+        path
+        for path in [
+            brain_family.baby_brain_path,
+            brain_family.core_baby_brain_path,
+            brain_family.spread_baby_brain_path,
+            brain_family.outlier_baby_brain_path,
+            brain_family.user_memory_brain_path,
+            brain_family.physics_memory_brain_path,
+            brain_family.voter_memory_brain_path,
+            brain_family.shape_starter_memory_brain_path,
+            brain_family.shape_memory_brain_path,
+            brain_family.harmonic_core_baby_brain_path,
+            brain_family.harmonic_spread_baby_brain_path,
+            brain_family.harmonic_outlier_baby_brain_path,
+        ]
+        if path is not None
+    )
+    labels: list[str] = []
+    for path in paths:
+        try:
+            labels.extend(load_brain_taxonomy_labels(path))
+        except (OSError, json.JSONDecodeError):
+            continue
+    return labels
 
 
 def load_json_taxonomy_labels(path: Path) -> list[str]:

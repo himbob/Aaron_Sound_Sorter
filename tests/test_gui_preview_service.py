@@ -24,6 +24,7 @@ from aaron_sound_sorter.gui.preview_service import (
     gui_worker_count,
     load_available_labels,
     load_simple_yaml_mapping,
+    load_training_taxonomy_labels,
     training_slot_path,
     write_corrections_csv,
 )
@@ -630,6 +631,90 @@ def test_load_available_labels_merges_future_catalog_and_training_slots(tmp_path
     assert "Instruments/Synths/Synth Loops" in labels
     assert "Instruments/Plucked Strings/Koto/One Shots" in labels
     assert "Instruments/Plucked Strings/Koto/Loops" in labels
+
+def test_load_available_labels_merges_all_configured_gui_brains(tmp_path: Path) -> None:
+    config_path = tmp_path / "gui_brains.yaml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "brains:",
+                "  full: brains/full.json",
+                "  user_memory: brains/user_memory.json",
+                "  physics_memory: brains/physics_memory.json",
+                "  voter_memory: brains/voter_memory.json",
+                "  baby:",
+                "    legacy: brains/legacy.json",
+                "    core: brains/core.json",
+                "    spread: brains/spread.json",
+                "    outlier: brains/outlier.json",
+                "  harmonic_baby:",
+                "    core: brains/harmonic_core.json",
+                "    spread: brains/harmonic_spread.json",
+                "    outlier: brains/harmonic_outlier.json",
+                "options:",
+                "  use_baby_brains_in_sort: true",
+                "  use_harmonic_brains_in_sort: false",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    data_paths = [
+        "brains/full.json",
+        "brains/user_memory.json",
+        "brains/physics_memory.json",
+        "brains/voter_memory.json",
+        "brains/legacy.json",
+        "brains/core.json",
+        "brains/spread.json",
+        "brains/outlier.json",
+        "brains/harmonic_core.json",
+        "brains/harmonic_spread.json",
+        "brains/harmonic_outlier.json",
+    ]
+    for index, rel_path in enumerate(data_paths, start=1):
+        path = tmp_path / rel_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"labels": [f"Instruments/Example/{index}/One Shots"]}), encoding="utf-8")
+
+    service = SortPreviewService(project_root=tmp_path, brain_config_path=config_path)
+    brain_config = service.load_brain_family_config()
+    labels = load_available_labels(brain_config, project_root=tmp_path)
+
+    assert "Instruments/Example/1/One Shots" in labels
+    assert "Instruments/Example/11/One Shots" in labels
+    assert len([label for label in labels if label.startswith("Instruments/Example/")]) == len(data_paths)
+
+
+def test_load_available_labels_includes_saxophone_subtypes(tmp_path: Path) -> None:
+    catalog = tmp_path / "config" / "gui_taxonomy_catalog.json"
+    catalog.parent.mkdir(parents=True)
+    catalog.write_text(
+        json.dumps({
+            "labels": [
+                "Instruments/Woodwinds/Saxophone/Alto/Loops",
+                "Instruments/Woodwinds/Saxophone/Tenor/One Shots",
+                "Instruments/Woodwinds/Saxophone/Bass/Loops",
+            ]
+        }),
+        encoding="utf-8",
+    )
+    labels = load_available_labels(
+        tmp_path / "missing_brain.json",
+        project_root=tmp_path,
+        taxonomy_catalog_path=Path("config/gui_taxonomy_catalog.json"),
+    )
+
+    assert "Instruments/Woodwinds/Saxophone/Alto/Loops" in labels
+    assert "Instruments/Woodwinds/Saxophone/Tenor/One Shots" in labels
+    assert "Instruments/Woodwinds/Saxophone/Bass/Loops" in labels
+
+def test_load_training_taxonomy_labels_supports_long_running(tmp_path: Path) -> None:
+    training_slot = tmp_path / "training" / "locked_curated_v1" / "Instruments" / "Woodwinds" / "Saxophone" / "_LONG_RUNNING"
+    training_slot.mkdir(parents=True)
+
+    labels = load_training_taxonomy_labels(tmp_path / "training" / "locked_curated_v1")
+
+    assert "Instruments/Woodwinds/Saxophone/Long Running" in labels
 
 
 def test_preview_empty_audio_folder_writes_clear_error_report(tmp_path: Path) -> None:

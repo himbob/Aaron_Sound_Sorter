@@ -1,0 +1,421 @@
+{
+  "metadata": {
+    "build_settings": {
+      "keep_fraction": 0.95,
+      "max_prototypes_per_label": 6
+    },
+    "created_utc": "2026-07-24T18:20:52.803720+00:00",
+    "dimension": 512,
+    "label_example_counts": {
+      "Drums/Claps Snaps Slaps/Generic Clap/One Shots": 2,
+      "Drums/Drum Loops/Loops": 1,
+      "Drums/Kick Drums/Generic Kick/One Shots": 1,
+      "Drums/Snares/Acoustic Snare/One Shots": 1,
+      "FX/Designed Noise FX/Siren/Long FX": 1,
+      "FX/Human and Voice FX/Altered Voice/Long FX": 4,
+      "FX/Human and Voice FX/Spoken Voice/Long FX": 1,
+      "FX/Human and Voice FX/Spoken Voice/One Shots": 1,
+      "FX/Structural and Transitional FX/Reverses and Tails/Generic Reverse/One Shots": 1,
+      "FX/Structural and Transitional FX/Risers and Builds/Generic Riser/Long FX": 1,
+      "Instruments/Bass/Electric Bass/Loops": 1,
+      "Instruments/Bass/Generic Bass/Loops": 3,
+      "Instruments/Guitar/Acoustic Guitar/Loops": 1,
+      "Instruments/Guitar/Guitar Chords/One Shots": 1,
+      "Instruments/Keys/Electric Piano/Loops": 1,
+      "Instruments/Keys/Keys Loops/Loops": 1,
+      "Instruments/Keys/Piano/Loops": 2,
+      "Instruments/Mallets and Bells/Bells and Mallets/Loops": 1,
+      "Instruments/Mixed Musical Loops/Multi Instrument/Loops": 1,
+      "Instruments/Plucked Strings/Koto/Loops": 1,
+      "Instruments/Strings/String Loops/Loops": 1,
+      "Instruments/Synths/Synth Arp/Loops": 1,
+      "Instruments/Synths/Synth Lead/Loops": 1,
+      "Instruments/Synths/Synth Loops/Loops": 1,
+      "Instruments/Synths/Synth Pad/Loops": 2,
+      "Instruments/Voice/Phrase/One Shots": 2,
+      "Instruments/Voice/Vocal Loops/Loops": 3,
+      "Instruments/Woodwinds/Saxophone/Loops": 3
+    },
+    "label_prototype_counts": {
+      "Drums/Claps Snaps Slaps/Generic Clap/One Shots": 1,
+      "Drums/Drum Loops/Loops": 1,
+      "Drums/Kick Drums/Generic Kick/One Shots": 1,
+      "Drums/Snares/Acoustic Snare/One Shots": 1,
+      "FX/Designed Noise FX/Siren/Long FX": 1,
+      "FX/Human and Voice FX/Altered Voice/Long FX": 2,
+      "FX/Human and Voice FX/Spoken Voice/Long FX": 1,
+      "FX/Human and Voice FX/Spoken Voice/One Shots": 1,
+      "FX/Structural and Transitional FX/Reverses and Tails/Generic Reverse/One Shots": 1,
+      "FX/Structural and Transitional FX/Risers and Builds/Generic Riser/Long FX": 1,
+      "Instruments/Bass/Electric Bass/Loops": 1,
+      "Instruments/Bass/Generic Bass/Loops": 1,
+      "Instruments/Guitar/Acoustic Guitar/Loops": 1,
+      "Instruments/Guitar/Guitar Chords/One Shots": 1,
+      "Instruments/Keys/Electric Piano/Loops": 1,
+      "Instruments/Keys/Keys Loops/Loops": 1,
+      "Instruments/Keys/Piano/Loops": 1,
+      "Instruments/Mallets and Bells/Bells and Mallets/Loops": 1,
+      "Instruments/Mixed Musical Loops/Multi Instrument/Loops": 1,
+      "Instruments/Plucked Strings/Koto/Loops": 1,
+      "Instruments/Strings/String Loops/Loops": 1,
+      "Instruments/Synths/Synth Arp/Loops": 1,
+      "Instruments/Synths/Synth Lead/Loops": 1,
+      "Instruments/Synths/Synth Loops/Loops": 1,
+      "Instruments/Synths/Synth Pad/Loops": 1,
+      "Instruments/Voice/Phrase/One Shots": 1,
+      "Instruments/Voice/Vocal Loops/Loops": 1,
+      "Instruments/Woodwinds/Saxophone/Loops": 1
+    },
+    "label_spread_p95": {
+      "Drums/Claps Snaps Slaps/Generic Clap/One Shots": 0.11313438415527344,
+      "Drums/Drum Loops/Loops": 0.0,
+      "Drums/Kick Drums/Generic Kick/One Shots": 0.0,
+      "Drums/Snares/Acoustic Snare/One Shots": 0.0,
+      "FX/Designed Noise FX/Siren/Long FX": 0.0,
+      "FX/Human and Voice FX/Altered Voice/Long FX": 0.19954037964344024,
+      "FX/Human and Voice FX/Spoken Voice/Long FX": 0.0,
+      "FX/Human and Voice FX/Spoken Voice/One Shots": 0.0,
+      "FX/Structural and Transitional FX/Reverses and Tails/Generic Reverse/One Shots": 0.0,
+      "FX/Structural and Transitional FX/Risers and Builds/Generic Riser/Long FX": 0.0,
+      "Instruments/Bass/Electric Bass/Loops": 0.0,
+      "Instruments/Bass/Generic Bass/Loops": 0.18215194940567017,
+      "Instruments/Guitar/Acoustic Guitar/Loops": 0.0,
+      "Instruments/Guitar/Guitar Chords/One Shots": 0.0,
+      "Instruments/Keys/Electric Piano/Loops": 0.0,
+      "Instruments/Keys/Keys Loops/Loops": 0.0,
+      "Instruments/Keys/Piano/Loops": 0.13727021217346191,
+      "Instruments/Mallets and Bells/Bells and Mallets/Loops": 0.0,
+      "Instruments/Mixed Musical Loops/Multi Instrument/Loops": 0.0,
+      "Instruments/Plucked Strings/Koto/Loops": 0.0,
+      "Instruments/Strings/String Loops/Loops": 0.0,
+      "Instruments/Synths/Synth Arp/Loops": 0.0,
+      "Instruments/Synths/Synth Lead/Loops": 0.0,
+      "Instruments/Synths/Synth Loops/Loops": 0.0,
+      "Instruments/Synths/Synth Pad/Loops": 0.1046245664358139,
+      "Instruments/Voice/Phrase/One Shots": 0.10027175843715667,
+      "Instruments/Voice/Vocal Loops/Loops": 0.20978089570999145,
+      "Instruments/Woodwinds/Saxophone/Loops": 0.13389047980308533
+    },
+    "model_id": "laion/larger_clap_music_and_speech@195c3a3e68faebb3e2088b9a79e79b43ddbda76b#snapshot=b3cc57c40aa913ea508cde7dffcccbfbfa88fe36e359577c40e9c272f989bb93#preprocess=clap-mono-processor-rate-three-position-segments-v2:max_seconds=10:max_segments=3#embedding_schema=1",
+    "provider_id": "hf_clap",
+    "schema_version": 1,
+    "training_hashes": [
+      "033c45b87b5936ce9bfff301a5a4f59f4b65e80569b024c4f1ec9b035d8f1c21",
+      "0e7ead99e27fa6fc94943d68a99682398303640c486eb5ce9334ffa0997ac4f3",
+      "2193e0ad0149b6c818e196019396294cbf35305238eead20b7635d3c31943a12",
+      "251968018ff9f5bffc856ac8d2669a297c8a427eb8b8c1c3bfe79fffd9d2b2ec",
+      "290aa9755ae624169a7dfa6e65cbb9f791d89a29cce5b681f405a4d35a92c154",
+      "2c981159be114c4b025a7cfb2d5060158acd045487077c9cbc02c2026659af09",
+      "371e36a5bab37bcf44273f1a533175a7336068e3f473b25076a28b1e01a264c9",
+      "376e68c70723f184db9ce0521c9471ef89905a0b3518ce409d8a2a0f8f884b83",
+      "3ccb8223d1942e4be2869a9ffbcbc2ab23c344564f90842183f615ac32866387",
+      "42ca658ef215bf822d2153a02827ee317c5ceeb1563c40a3482dfc0dd57e534e",
+      "4b8830e5c88d7d252dade91a04dafa2181948183f7c6e36fa475564609098826",
+      "4c8053b25b6112ec24fc7ab91e495e19a68eef8f71dd74caea614ef2796d2209",
+      "4f0d2cb66245ac5b1d7f290cac35a534e27ce27fd0a50dbb250ff26abfa29b3a",
+      "58bf7528f584f55835ea20e070f688708adae3c8c4e1c3539a853a37c2359949",
+      "5e7fee00434434828580814de34904213b845a2f06413a2fb4f196c5616f1aa5",
+      "66a50b99a5000ed629de2e70e86fd422fb1d72e5e36bbda06f299b221a9572ac",
+      "6c27a9138b4138235c2380493782ec7962a08aadc962c6e561c2475e430214f6",
+      "6e3b080d416f6ba01978ea55656f075b42a1675fc96b38d4924df008189d7326",
+      "7b543840ace33d297fb40c5e57b0ae4c54e44f7cb64f48b6378d7562184ab66d",
+      "8a0d8bf193002c78e0bc0c9f6eae38e61eca9ca26f4244548ecf2b6efd1405ba",
+      "8cd3190dbe732d44a9a5827a6a88ce4719eda7ae10182e1e0dc1753f48784d33",
+      "9389924c296c07fcee41ef5eeee6a2f09f27d48217d763e8b3e8f551c3d1d10d",
+      "9ae4008e608833443cc85c5462fba0d622fb688e0bbbcff556ec061bef87d5e6",
+      "9c6d0ee918bf92a13f2c97baba4d350dab7d20d480010d9d3378f7ee6d319c10",
+      "9ec761f4cec161691364c07e923117a36418752f0d0e65e7c1596ebc0857d5eb",
+      "a48020c92adb0e4eacbc0aca391543ce9da88407f34fad7aa84e99a8029325de",
+      "b0c04f2574fdb6063d1574b8960f062bebfbbeb5944bb24e0a916d6873e5d924",
+      "b8e822e1111430f0b29e6563beda148d530b7e26d3f429ea1f831f260bdb1846",
+      "b97b70e06f1150e7015bb794d86a90767e135d586ce575568d74a9e62af749d8",
+      "bb1d9aed4a223aa7ec3ed7cf00039405289082740b83b6d50668d16948a18d62",
+      "bc30aa657d35212d2fddad9a8fe9833246222db7c46d2cef27b8bb1963e53b7c",
+      "bff584ce1f71784b5eea5e10a6140dcd0a432c8209afe1f93839b096b1a04ddb",
+      "c84daa17b6fdac4d3686755ef2d7072960d521e23f068f963f953b3937d92772",
+      "cac63f41e1c430eb282d8abce593daf10e249f6ee3ec06f6440365989f6e4052",
+      "e7ed00a835f6816b83e56a1ae44e6a9416f631f195568f22945661ee66af8232",
+      "ea111aa9a812e481c56cf883bd52b7afea68061ea7b3265633d71f848d8c5ec2",
+      "f1206f9cb54b169805e43c3be160293bd1e70814922efe8c5ea58867742a8a9a",
+      "f2988ee5af50955b6731a7f0401384ac83d93225fe377bfe5dab30c4a7285802",
+      "f2e3c4d4f02cc52c950750a4510535c38f82a076354b6775a21fe4b4994d0812",
+      "fbcc321df7910a67549a054f5366c5bf15fdb150e72fc841b3bf4a163512c61c",
+      "fbe07e118e2426217a661dadf3e599a9e1809be41d3175c00b311d6d42ff04f5"
+    ]
+  },
+  "prototypes": [
+    {
+      "label": "Drums/Claps Snaps Slaps/Generic Clap/One Shots",
+      "mean_distance": 0.11313441395759583,
+      "member_hashes": [
+        "5e7fee00434434828580814de34904213b845a2f06413a2fb4f196c5616f1aa5",
+        "b97b70e06f1150e7015bb794d86a90767e135d586ce575568d74a9e62af749d8"
+      ],
+      "prototype_id": "Drums/Claps Snaps Slaps/Generic Clap/One Shots::p1",
+      "radius_p95": 0.11313444375991821
+    },
+    {
+      "label": "Drums/Drum Loops/Loops",
+      "mean_distance": 0.0,
+      "member_hashes": [
+        "251968018ff9f5bffc856ac8d2669a297c8a427eb8b8c1c3bfe79fffd9d2b2ec"
+      ],
+      "prototype_id": "Drums/Drum Loops/Loops::p1",
+      "radius_p95": 0.0
+    },
+    {
+      "label": "Drums/Kick Drums/Generic Kick/One Shots",
+      "mean_distance": 0.0,
+      "member_hashes": [
+        "8a0d8bf193002c78e0bc0c9f6eae38e61eca9ca26f4244548ecf2b6efd1405ba"
+      ],
+      "prototype_id": "Drums/Kick Drums/Generic Kick/One Shots::p1",
+      "radius_p95": 0.0
+    },
+    {
+      "label": "Drums/Snares/Acoustic Snare/One Shots",
+      "mean_distance": 0.0,
+      "member_hashes": [
+        "4f0d2cb66245ac5b1d7f290cac35a534e27ce27fd0a50dbb250ff26abfa29b3a"
+      ],
+      "prototype_id": "Drums/Snares/Acoustic Snare/One Shots::p1",
+      "radius_p95": 0.0
+    },
+    {
+      "label": "FX/Designed Noise FX/Siren/Long FX",
+      "mean_distance": 0.0,
+      "member_hashes": [
+        "2193e0ad0149b6c818e196019396294cbf35305238eead20b7635d3c31943a12"
+      ],
+      "prototype_id": "FX/Designed Noise FX/Siren/Long FX::p1",
+      "radius_p95": 0.0
+    },
+    {
+      "label": "FX/Human and Voice FX/Altered Voice/Long FX",
+      "mean_distance": 0.0,
+      "member_hashes": [
+        "f1206f9cb54b169805e43c3be160293bd1e70814922efe8c5ea58867742a8a9a"
+      ],
+      "prototype_id": "FX/Human and Voice FX/Altered Voice/Long FX::p1",
+      "radius_p95": 0.0
+    },
+    {
+      "label": "FX/Human and Voice FX/Altered Voice/Long FX",
+      "mean_distance": 0.1696230173110962,
+      "member_hashes": [
+        "290aa9755ae624169a7dfa6e65cbb9f791d89a29cce5b681f405a4d35a92c154",
+        "376e68c70723f184db9ce0521c9471ef89905a0b3518ce409d8a2a0f8f884b83",
+        "9389924c296c07fcee41ef5eeee6a2f09f27d48217d763e8b3e8f551c3d1d10d"
+      ],
+      "prototype_id": "FX/Human and Voice FX/Altered Voice/Long FX::p2",
+      "radius_p95": 0.20090894401073456
+    },
+    {
+      "label": "FX/Human and Voice FX/Spoken Voice/Long FX",
+      "mean_distance": 0.0,
+      "member_hashes": [
+        "b0c04f2574fdb6063d1574b8960f062bebfbbeb5944bb24e0a916d6873e5d924"
+      ],
+      "prototype_id": "FX/Human and Voice FX/Spoken Voice/Long FX::p1",
+      "radius_p95": 0.0
+    },
+    {
+      "label": "FX/Human and Voice FX/Spoken Voice/One Shots",
+      "mean_distance": 0.0,
+      "member_hashes": [
+        "bff584ce1f71784b5eea5e10a6140dcd0a432c8209afe1f93839b096b1a04ddb"
+      ],
+      "prototype_id": "FX/Human and Voice FX/Spoken Voice/One Shots::p1",
+      "radius_p95": 0.0
+    },
+    {
+      "label": "FX/Structural and Transitional FX/Reverses and Tails/Generic Reverse/One Shots",
+      "mean_distance": 0.0,
+      "member_hashes": [
+        "a48020c92adb0e4eacbc0aca391543ce9da88407f34fad7aa84e99a8029325de"
+      ],
+      "prototype_id": "FX/Structural and Transitional FX/Reverses and Tails/Generic Reverse/One Shots::p1",
+      "radius_p95": 0.0
+    },
+    {
+      "label": "FX/Structural and Transitional FX/Risers and Builds/Generic Riser/Long FX",
+      "mean_distance": 0.0,
+      "member_hashes": [
+        "bb1d9aed4a223aa7ec3ed7cf00039405289082740b83b6d50668d16948a18d62"
+      ],
+      "prototype_id": "FX/Structural and Transitional FX/Risers and Builds/Generic Riser/Long FX::p1",
+      "radius_p95": 0.0
+    },
+    {
+      "label": "Instruments/Bass/Electric Bass/Loops",
+      "mean_distance": 0.0,
+      "member_hashes": [
+        "b8e822e1111430f0b29e6563beda148d530b7e26d3f429ea1f831f260bdb1846"
+      ],
+      "prototype_id": "Instruments/Bass/Electric Bass/Loops::p1",
+      "radius_p95": 0.0
+    },
+    {
+      "label": "Instruments/Bass/Generic Bass/Loops",
+      "mean_distance": 0.14600986242294312,
+      "member_hashes": [
+        "4b8830e5c88d7d252dade91a04dafa2181948183f7c6e36fa475564609098826",
+        "9ae4008e608833443cc85c5462fba0d622fb688e0bbbcff556ec061bef87d5e6",
+        "e7ed00a835f6816b83e56a1ae44e6a9416f631f195568f22945661ee66af8232"
+      ],
+      "prototype_id": "Instruments/Bass/Generic Bass/Loops::p1",
+      "radius_p95": 0.1821519136428833
+    },
+    {
+      "label": "Instruments/Guitar/Acoustic Guitar/Loops",
+      "mean_distance": 0.0,
+      "member_hashes": [
+        "bc30aa657d35212d2fddad9a8fe9833246222db7c46d2cef27b8bb1963e53b7c"
+      ],
+      "prototype_id": "Instruments/Guitar/Acoustic Guitar/Loops::p1",
+      "radius_p95": 0.0
+    },
+    {
+      "label": "Instruments/Guitar/Guitar Chords/One Shots",
+      "mean_distance": 0.0,
+      "member_hashes": [
+        "3ccb8223d1942e4be2869a9ffbcbc2ab23c344564f90842183f615ac32866387"
+      ],
+      "prototype_id": "Instruments/Guitar/Guitar Chords/One Shots::p1",
+      "radius_p95": 0.0
+    },
+    {
+      "label": "Instruments/Keys/Electric Piano/Loops",
+      "mean_distance": 0.0,
+      "member_hashes": [
+        "f2e3c4d4f02cc52c950750a4510535c38f82a076354b6775a21fe4b4994d0812"
+      ],
+      "prototype_id": "Instruments/Keys/Electric Piano/Loops::p1",
+      "radius_p95": 0.0
+    },
+    {
+      "label": "Instruments/Keys/Keys Loops/Loops",
+      "mean_distance": 0.0,
+      "member_hashes": [
+        "8cd3190dbe732d44a9a5827a6a88ce4719eda7ae10182e1e0dc1753f48784d33"
+      ],
+      "prototype_id": "Instruments/Keys/Keys Loops/Loops::p1",
+      "radius_p95": 0.0
+    },
+    {
+      "label": "Instruments/Keys/Piano/Loops",
+      "mean_distance": 0.1372702419757843,
+      "member_hashes": [
+        "033c45b87b5936ce9bfff301a5a4f59f4b65e80569b024c4f1ec9b035d8f1c21",
+        "9ec761f4cec161691364c07e923117a36418752f0d0e65e7c1596ebc0857d5eb"
+      ],
+      "prototype_id": "Instruments/Keys/Piano/Loops::p1",
+      "radius_p95": 0.1372702717781067
+    },
+    {
+      "label": "Instruments/Mallets and Bells/Bells and Mallets/Loops",
+      "mean_distance": 0.0,
+      "member_hashes": [
+        "6c27a9138b4138235c2380493782ec7962a08aadc962c6e561c2475e430214f6"
+      ],
+      "prototype_id": "Instruments/Mallets and Bells/Bells and Mallets/Loops::p1",
+      "radius_p95": 0.0
+    },
+    {
+      "label": "Instruments/Mixed Musical Loops/Multi Instrument/Loops",
+      "mean_distance": 0.0,
+      "member_hashes": [
+        "4c8053b25b6112ec24fc7ab91e495e19a68eef8f71dd74caea614ef2796d2209"
+      ],
+      "prototype_id": "Instruments/Mixed Musical Loops/Multi Instrument/Loops::p1",
+      "radius_p95": 0.0
+    },
+    {
+      "label": "Instruments/Plucked Strings/Koto/Loops",
+      "mean_distance": 0.0,
+      "member_hashes": [
+        "cac63f41e1c430eb282d8abce593daf10e249f6ee3ec06f6440365989f6e4052"
+      ],
+      "prototype_id": "Instruments/Plucked Strings/Koto/Loops::p1",
+      "radius_p95": 0.0
+    },
+    {
+      "label": "Instruments/Strings/String Loops/Loops",
+      "mean_distance": 0.0,
+      "member_hashes": [
+        "0e7ead99e27fa6fc94943d68a99682398303640c486eb5ce9334ffa0997ac4f3"
+      ],
+      "prototype_id": "Instruments/Strings/String Loops/Loops::p1",
+      "radius_p95": 0.0
+    },
+    {
+      "label": "Instruments/Synths/Synth Arp/Loops",
+      "mean_distance": 0.0,
+      "member_hashes": [
+        "f2988ee5af50955b6731a7f0401384ac83d93225fe377bfe5dab30c4a7285802"
+      ],
+      "prototype_id": "Instruments/Synths/Synth Arp/Loops::p1",
+      "radius_p95": 0.0
+    },
+    {
+      "label": "Instruments/Synths/Synth Lead/Loops",
+      "mean_distance": 0.0,
+      "member_hashes": [
+        "ea111aa9a812e481c56cf883bd52b7afea68061ea7b3265633d71f848d8c5ec2"
+      ],
+      "prototype_id": "Instruments/Synths/Synth Lead/Loops::p1",
+      "radius_p95": 0.0
+    },
+    {
+      "label": "Instruments/Synths/Synth Loops/Loops",
+      "mean_distance": 0.0,
+      "member_hashes": [
+        "fbe07e118e2426217a661dadf3e599a9e1809be41d3175c00b311d6d42ff04f5"
+      ],
+      "prototype_id": "Instruments/Synths/Synth Loops/Loops::p1",
+      "radius_p95": 0.0
+    },
+    {
+      "label": "Instruments/Synths/Synth Pad/Loops",
+      "mean_distance": 0.10462456941604614,
+      "member_hashes": [
+        "66a50b99a5000ed629de2e70e86fd422fb1d72e5e36bbda06f299b221a9572ac",
+        "fbcc321df7910a67549a054f5366c5bf15fdb150e72fc841b3bf4a163512c61c"
+      ],
+      "prototype_id": "Instruments/Synths/Synth Pad/Loops::p1",
+      "radius_p95": 0.10462462157011032
+    },
+    {
+      "label": "Instruments/Voice/Phrase/One Shots",
+      "mean_distance": 0.10027176141738892,
+      "member_hashes": [
+        "42ca658ef215bf822d2153a02827ee317c5ceeb1563c40a3482dfc0dd57e534e",
+        "58bf7528f584f55835ea20e070f688708adae3c8c4e1c3539a853a37c2359949"
+      ],
+      "prototype_id": "Instruments/Voice/Phrase/One Shots::p1",
+      "radius_p95": 0.1002718135714531
+    },
+    {
+      "label": "Instruments/Voice/Vocal Loops/Loops",
+      "mean_distance": 0.17653392255306244,
+      "member_hashes": [
+        "2c981159be114c4b025a7cfb2d5060158acd045487077c9cbc02c2026659af09",
+        "7b543840ace33d297fb40c5e57b0ae4c54e44f7cb64f48b6378d7562184ab66d",
+        "9c6d0ee918bf92a13f2c97baba4d350dab7d20d480010d9d3378f7ee6d319c10"
+      ],
+      "prototype_id": "Instruments/Voice/Vocal Loops/Loops::p1",
+      "radius_p95": 0.20978088676929474
+    },
+    {
+      "label": "Instruments/Woodwinds/Saxophone/Loops",
+      "mean_distance": 0.1004871129989624,
+      "member_hashes": [
+        "371e36a5bab37bcf44273f1a533175a7336068e3f473b25076a28b1e01a264c9",
+        "6e3b080d416f6ba01978ea55656f075b42a1675fc96b38d4924df008189d7326",
+        "c84daa17b6fdac4d3686755ef2d7072960d521e23f068f963f953b3937d92772"
+      ],
+      "prototype_id": "Instruments/Woodwinds/Saxophone/Loops::p1",
+      "radius_p95": 0.13389059901237488
+    }
+  ]
+}

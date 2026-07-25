@@ -1,0 +1,96 @@
+{
+  "correction_predictions": [
+    {
+      "approved_label": "Instruments/Synths/Synth Pad/Loops",
+      "file_sha256": "66a50b99a5000ed629de2e70e86fd422fb1d72e5e36bbda06f299b221a9572ac",
+      "known_distribution_after": true,
+      "margin_after": 0.24596683013526155,
+      "predicted_after": "Instruments/Synths/Synth Pad/Loops",
+      "predicted_before": "Instruments/Synths/Synth Pad/Loops",
+      "second_after": "FX/Structural and Transitional FX/Risers and Builds/Long Riser/Long FX",
+      "top_similarity_after": 0.8953754171162442
+    },
+    {
+      "approved_label": "FX/Human and Voice FX/Altered Voice/Long FX",
+      "file_sha256": "c1fc387a1a18af327ce5a2ababd3161997ae907a9d0786faaffd78625ba18ba7",
+      "known_distribution_after": true,
+      "margin_after": 0.13633059428174055,
+      "predicted_after": "FX/Human and Voice FX/Altered Voice/Long FX",
+      "predicted_before": "FX/Human and Voice FX/Altered Voice/Long FX",
+      "second_after": "Instruments/Synths/Synth Loops/Loops",
+      "top_similarity_after": 0.8149209258923387
+    },
+    {
+      "approved_label": "FX/Human and Voice FX/Altered Voice/Long FX",
+      "file_sha256": "0422da63d1a60dbb18e78ade13d4cb39f344fb2d67922d2a2d4abab69a08c846",
+      "known_distribution_after": true,
+      "margin_after": 0.12767400314600685,
+      "predicted_after": "FX/Human and Voice FX/Altered Voice/Long FX",
+      "predicted_before": "FX/Human and Voice FX/Spoken Voice/One Shots",
+      "second_after": "FX/Structural and Transitional FX/Risers and Builds/Long Riser/Long FX",
+      "top_similarity_after": 0.7964906063274992
+    },
+    {
+      "approved_label": "FX/Human and Voice FX/Altered Voice/Long FX",
+      "file_sha256": "9b5b2525e67d88c55184f478c67398aa112ea621ea755a2d5817ba700878d87e",
+      "known_distribution_after": true,
+      "margin_after": 0.20421506829149794,
+      "predicted_after": "FX/Human and Voice FX/Altered Voice/Long FX",
+      "predicted_before": "FX/Human and Voice FX/Spoken Voice/One Shots",
+      "second_after": "FX/Structural and Transitional FX/Risers and Builds/Long Riser/Long FX",
+      "top_similarity_after": 0.6927459170841732
+    },
+    {
+      "approved_label": "FX/Human and Voice FX/Altered Voice/Long FX",
+      "file_sha256": "71b7ea4ea096ccf9cb00316c49e1a9639a1b0f671663e1fcc381f1e111a1f79f",
+      "known_distribution_after": true,
+      "margin_after": 0.18388566762419245,
+      "predicted_after": "FX/Human and Voice FX/Altered Voice/Long FX",
+      "predicted_before": "FX/Human and Voice FX/Altered Voice/Long FX",
+      "second_after": "FX/Human and Voice FX/Spoken Voice/Long FX",
+      "top_similarity_after": 0.7643613915416352
+    },
+    {
+      "approved_label": "FX/Structural and Transitional FX/Risers and Builds/Long Riser/Long FX",
+      "file_sha256": "9b0b8b945e6857935534916a6c514bac12bfe111553cdef36e1ebdc04186fcf6",
+      "known_distribution_after": true,
+      "margin_after": 0.34216386266421717,
+      "predicted_after": "FX/Structural and Transitional FX/Risers and Builds/Long Riser/Long FX",
+      "predicted_before": "FX/Human and Voice FX/Altered Voice/Long FX",
+      "second_after": "FX/Human and Voice FX/Altered Voice/Long FX",
+      "top_similarity_after": 1.0000000551350379
+    },
+    {
+      "approved_label": "FX/Human and Voice FX/Altered Voice/Long FX",
+      "file_sha256": "feda5fbc24c7df2eb1d58de302a65d7fda0c36d80d700fff55b730f888bf985b",
+      "known_distribution_after": true,
+      "margin_after": 0.16883244198591918,
+      "predicted_after": "FX/Human and Voice FX/Altered Voice/Long FX",
+      "predicted_before": "FX/Human and Voice FX/Altered Voice/Long FX",
+      "second_after": "Instruments/Synths/Synth Pad/Loops",
+      "top_similarity_after": 0.7929095057708041
+    }
+  ],
+  "index_path": "neural_artifacts/prototype_indexes/hf_clap/run_20260724_183345_313583/index",
+  "invalidated_evaluation_hashes": [],
+  "label_count": 29,
+  "missing_audio_hashes": [
+    "21518d3c83e6cbab2efe418878e91cb9cf2bea0aad77311b752a5822f6496ba7",
+    "65d26baeb0304f261657f546e5bfc74a056d63778562ca87de82afa3681a56a2",
+    "6de6344fcf2fa9edee7b6fc91b463c22a21cdc42f8e5ada9cbe5e2ae5dfd790d",
+    "75a33e7baa374f0ab55b7575cad2ccb5716a735b45ef72e4d26d06016fe949bf",
+    "8b4275655997ee120ac08e7aae8f704d2b19babfabf4f1945b3fded65b7c8874",
+    "e4bebc3753ef1904e383fe5290ed6ff566a7a3c09c51d493b84e45f207927884",
+    "f20a4a0bdaa3a6c89b7e2addc18489a73e976afc38084c929027c6f31762a83a",
+    "f687dd0abf65e1a4f2a990f408db591fe38e125957e5057d552b5f4ac6e84ab0"
+  ],
+  "model_id": "laion/larger_clap_music_and_speech@195c3a3e68faebb3e2088b9a79e79b43ddbda76b#snapshot=b3cc57c40aa913ea508cde7dffcccbfbfa88fe36e359577c40e9c272f989bb93#preprocess=clap-mono-processor-rate-three-position-segments-v2:max_seconds=10:max_segments=3#embedding_schema=1",
+  "previous_index_path": "neural_artifacts/prototype_indexes/hf_clap/run_20260724_183301_395117/index",
+  "production_ownership_enabled": true,
+  "provider_id": "hf_clap",
+  "schema_version": 1,
+  "source_name_policy": "audio bytes and explicit human labels only",
+  "status": "built",
+  "training_example_count": 47,
+  "training_signature": "9b3b77987196f95df0ab4ec2d76457d36734d32b1ce54724a7687f3a0c095804"
+}

@@ -1,0 +1,747 @@
+{
+  "correction_predictions": [
+    {
+      "approved_label": "Instruments/Synths/Synth Pad/Loops",
+      "file_sha256": "407ee62ca72ddf8d0855acfa90f26712e03d74e014e6a11c6a29d67d76401ff7",
+      "known_distribution_after": true,
+      "margin_after": 0.3630858307028112,
+      "predicted_after": "Instruments/Synths/Synth Pad/Loops",
+      "predicted_before": "Instruments/Keys/Electric Piano/Loops",
+      "second_after": "Instruments/Synths/Synth Lead/Loops",
+      "top_similarity_after": 0.9999999851421227
+    },
+    {
+      "approved_label": "Instruments/Synths/Synth Pluck/Loops",
+      "file_sha256": "dbebeb90d5b12fc80163078a2e85d879263f67564a9c9da5b133eea734e4ef2a",
+      "known_distribution_after": true,
+      "margin_after": 0.2576616827600656,
+      "predicted_after": "Instruments/Synths/Synth Pluck/Loops",
+      "predicted_before": "Instruments/Synths/Synth Loops/Loops",
+      "second_after": "FX/Everyday Foley/Water Foley/Splash/Long FX",
+      "top_similarity_after": 0.8581081630663102
+    },
+    {
+      "approved_label": "Instruments/Bass/Synth Bass/Loops",
+      "file_sha256": "51fcff699b44ad0e1eccd583b31eb9dff07b71140bfb91a117e07c06afa469f8",
+      "known_distribution_after": true,
+      "margin_after": 0.457814263856957,
+      "predicted_after": "Instruments/Bass/Synth Bass/Loops",
+      "predicted_before": "Instruments/Synths/Synth Arp/Loops",
+      "second_after": "Instruments/Synths/Synth Pluck/Loops",
+      "top_similarity_after": 0.9999999957644091
+    },
+    {
+      "approved_label": "Instruments/Voice/Vocal Loops/Loops",
+      "file_sha256": "0e446b7279c53ccf85c5cbf613241bd5c6f25a6009b0ddc82039187c5c8bc8ad",
+      "known_distribution_after": true,
+      "margin_after": 0.15632836889956658,
+      "predicted_after": "Instruments/Voice/Vocal Loops/Loops",
+      "predicted_before": "FX/Human and Voice FX/Spoken Voice/One Shots",
+      "second_after": "FX/Human and Voice FX/Spoken Voice/One Shots",
+      "top_similarity_after": 0.919710927690916
+    },
+    {
+      "approved_label": "Instruments/Strings/String Loops/Loops",
+      "file_sha256": "afdceafb647752338685e2abc81e19728349af72d53a10d297b20c9b177fbb65",
+      "known_distribution_after": true,
+      "margin_after": 0.11661445923943692,
+      "predicted_after": "Instruments/Strings/String Loops/Loops",
+      "predicted_before": "Instruments/Strings/String Loops/Loops",
+      "second_after": "Instruments/Synths/Synth Loops/Loops",
+      "top_similarity_after": 0.8698196770959501
+    },
+    {
+      "approved_label": "Instruments/Synths/Synth Pad/Loops",
+      "file_sha256": "66a50b99a5000ed629de2e70e86fd422fb1d72e5e36bbda06f299b221a9572ac",
+      "known_distribution_after": true,
+      "margin_after": 0.14850538754321663,
+      "predicted_after": "Instruments/Synths/Synth Pad/Loops",
+      "predicted_before": "Instruments/Synths/Synth Pad/Loops",
+      "second_after": "Instruments/Keys/Rhodes/One Shots",
+      "top_similarity_after": 0.8195458951253066
+    },
+    {
+      "approved_label": "Instruments/Keys/Wurlitzer/Loops",
+      "file_sha256": "63bbe04ddca0833670843e1d92c048ff1e4575cf2ac5874de0ee4cafa6f5d597",
+      "known_distribution_after": true,
+      "margin_after": 0.16337107399645845,
+      "predicted_after": "Instruments/Keys/Wurlitzer/Loops",
+      "predicted_before": "Instruments/Keys/Electric Piano/Loops",
+      "second_after": "Instruments/Keys/Rhodes/Loops",
+      "top_similarity_after": 0.999999970049928
+    },
+    {
+      "approved_label": "FX/Designed Noise FX/Siren/Long FX",
+      "file_sha256": "429bfe56bfd5934012f22d4bade9314a1925974a629bcd0aeb8a1392d85d3c88",
+      "known_distribution_after": true,
+      "margin_after": 0.3042893937514405,
+      "predicted_after": "FX/Designed Noise FX/Siren/Long FX",
+      "predicted_before": "FX/Designed Noise FX/Siren/Long FX",
+      "second_after": "FX/Human and Voice FX/Scream/Long FX",
+      "top_similarity_after": 0.8873933497986509
+    },
+    {
+      "approved_label": "FX/Human and Voice FX/Altered Voice/Long FX",
+      "file_sha256": "c1fc387a1a18af327ce5a2ababd3161997ae907a9d0786faaffd78625ba18ba7",
+      "known_distribution_after": true,
+      "margin_after": 0.13605032857510357,
+      "predicted_after": "FX/Human and Voice FX/Altered Voice/Long FX",
+      "predicted_before": "FX/Human and Voice FX/Altered Voice/Long FX",
+      "second_after": "Instruments/Synths/Synth Loops/Loops",
+      "top_similarity_after": 0.8146406601857017
+    },
+    {
+      "approved_label": "Instruments/Synths/Synth Pluck/Loops",
+      "file_sha256": "bb123ae81a51b619c812ff34b9f5de53b49339cb94ddc1a2dbf659b08cdb9d32",
+      "known_distribution_after": true,
+      "margin_after": 0.1187901682597794,
+      "predicted_after": "Instruments/Synths/Synth Pluck/Loops",
+      "predicted_before": "Instruments/Mallets and Bells/Bells and Mallets/Loops",
+      "second_after": "Instruments/Synths/Synth Lead/Loops",
+      "top_similarity_after": 0.8581081874482719
+    },
+    {
+      "approved_label": "Instruments/Mixed Musical Loops/Multi Instrument/Loops",
+      "file_sha256": "23febbdcd375fdca3c7f49fa5e88c5f5dca6450c5126c1bebbe0e1a6e5518d5a",
+      "known_distribution_after": true,
+      "margin_after": 0.2588609396575816,
+      "predicted_after": "Instruments/Mixed Musical Loops/Multi Instrument/Loops",
+      "predicted_before": "Instruments/Mallets and Bells/Bells and Mallets/Loops",
+      "second_after": "Instruments/Mallets and Bells/Bells and Mallets/Loops",
+      "top_similarity_after": 0.8298616921826755
+    },
+    {
+      "approved_label": "Instruments/Woodwinds/Saxophone/Loops",
+      "file_sha256": "aa3548da62aa147c691dbfd16cce4d55439f72af6de4b6f69da1539260fd6b3f",
+      "known_distribution_after": true,
+      "margin_after": 0.2665811290423127,
+      "predicted_after": "Instruments/Woodwinds/Saxophone/Loops",
+      "predicted_before": "Instruments/Plucked Strings/Koto/Loops",
+      "second_after": "Instruments/Mallets and Bells/Bells and Mallets/Loops",
+      "top_similarity_after": 0.8870367846036744
+    },
+    {
+      "approved_label": "FX/Structural and Transitional FX/Risers and Builds/Generic Build/Long FX",
+      "file_sha256": "b9332f4afe90211221334db8a2efb98896719de251754515f0e9e6754a30eb97",
+      "known_distribution_after": true,
+      "margin_after": 0.30482457995215584,
+      "predicted_after": "FX/Structural and Transitional FX/Risers and Builds/Generic Build/Long FX",
+      "predicted_before": "FX/Structural and Transitional FX/Risers and Builds/Generic Riser/Long FX",
+      "second_after": "FX/Impacts and Hits/Boom/One Shots",
+      "top_similarity_after": 0.8066975078264002
+    },
+    {
+      "approved_label": "FX/Human and Voice FX/Altered Voice/Long FX",
+      "file_sha256": "0422da63d1a60dbb18e78ade13d4cb39f344fb2d67922d2a2d4abab69a08c846",
+      "known_distribution_after": true,
+      "margin_after": 0.1880391099416402,
+      "predicted_after": "FX/Human and Voice FX/Altered Voice/Long FX",
+      "predicted_before": "FX/Human and Voice FX/Spoken Voice/One Shots",
+      "second_after": "FX/Structural and Transitional FX/Risers and Builds/Long Riser/Long FX",
+      "top_similarity_after": 0.8568557131231326
+    },
+    {
+      "approved_label": "Instruments/Guitar/Acoustic Guitar/Loops",
+      "file_sha256": "68b061e287bf13caeaaf8600b65809c003918ee19896c740ffb2b43ac34fdd15",
+      "known_distribution_after": true,
+      "margin_after": 0.10433178167894319,
+      "predicted_after": "Instruments/Guitar/Acoustic Guitar/Loops",
+      "predicted_before": "Instruments/Guitar/Acoustic Guitar/Loops",
+      "second_after": "Instruments/Guitar/Nylon Guitar/Loops",
+      "top_similarity_after": 0.9147007094462004
+    },
+    {
+      "approved_label": "FX/Human and Voice FX/Altered Voice/One Shots",
+      "file_sha256": "bcdbc13e5b227a18cf074f6b9d4ecdf8e4e10a8f32c655d6e357cfafe52f82f0",
+      "known_distribution_after": true,
+      "margin_after": 0.23542316826679677,
+      "predicted_after": "FX/Human and Voice FX/Altered Voice/One Shots",
+      "predicted_before": "FX/Human and Voice FX/Altered Voice/Long FX",
+      "second_after": "FX/Human and Voice FX/Altered Voice/Long FX",
+      "top_similarity_after": 0.7540741949112026
+    },
+    {
+      "approved_label": "Instruments/Bass/Electric Bass/Loops",
+      "file_sha256": "6be28a5ad92d981590bf1a3b69213edc11135f0e29a199a91f4520398f529c66",
+      "known_distribution_after": true,
+      "margin_after": 0.21834114661579507,
+      "predicted_after": "Instruments/Bass/Electric Bass/Loops",
+      "predicted_before": "Instruments/Bass/Electric Bass/Loops",
+      "second_after": "Instruments/Bass/Generic Bass/Loops",
+      "top_similarity_after": 0.9590068828920263
+    },
+    {
+      "approved_label": "Instruments/Strings/String Loops/Loops",
+      "file_sha256": "cc0a64e0b96403888a228d77e1e8b31a91cc2787ef89b42b289de8e208c4d7e1",
+      "known_distribution_after": true,
+      "margin_after": 0.11317255893450073,
+      "predicted_after": "FX/Designed Noise FX/Siren/Long FX",
+      "predicted_before": "FX/Designed Noise FX/Siren/Long FX",
+      "second_after": "FX/Human and Voice FX/Scream/Long FX",
+      "top_similarity_after": 0.8683278572997952
+    },
+    {
+      "approved_label": "Instruments/Guitar/Acoustic Guitar/Loops",
+      "file_sha256": "8fff53538e9ac9fd21b04ab3be3c709785b8c6535ca495ca185193b9b1ad038c",
+      "known_distribution_after": true,
+      "margin_after": 0.3703096477319774,
+      "predicted_after": "Instruments/Guitar/Acoustic Guitar/Loops",
+      "predicted_before": "Instruments/Guitar/Acoustic Guitar/Loops",
+      "second_after": "Instruments/Guitar/Nylon Guitar/Loops",
+      "top_similarity_after": 0.9404634148725459
+    },
+    {
+      "approved_label": "Instruments/Woodwinds/Saxophone/Loops",
+      "file_sha256": "f5af650b8e2fb091ba70e4b77e30da6937dbe0359f786ce7863e157b1451179a",
+      "known_distribution_after": true,
+      "margin_after": 0.391251416505483,
+      "predicted_after": "Instruments/Woodwinds/Saxophone/Loops",
+      "predicted_before": "Instruments/Guitar/Guitar Chords/One Shots",
+      "second_after": "FX/Human and Voice FX/Altered Voice/Long FX",
+      "top_similarity_after": 0.8870367486513417
+    },
+    {
+      "approved_label": "Drums/Rims and Sticks/Rimshot/Loops",
+      "file_sha256": "4eced252ff3c39cacea77f30e6fe8438b06b1eda30641815dd1787ec52f662ef",
+      "known_distribution_after": true,
+      "margin_after": 0.31994043898385305,
+      "predicted_after": "Drums/Rims and Sticks/Rimshot/Loops",
+      "predicted_before": "Drums/Rims and Sticks/Sidestick/One Shots",
+      "second_after": "Drums/Rims and Sticks/Drum Sticks/One Shots",
+      "top_similarity_after": 1.0000000939486071
+    },
+    {
+      "approved_label": "Drums/Drum Loops/Full Drum Loops/Loops",
+      "file_sha256": "fc3ea8b09cb2913bd11d1ffa2b104979758fc3cbbf4260da53980031f7f8233e",
+      "known_distribution_after": true,
+      "margin_after": 0.22060117991759742,
+      "predicted_after": "Drums/Drum Loops/Full Drum Loops/Loops",
+      "predicted_before": "Drums/Drum Loops/Loops",
+      "second_after": "Drums/Drum Loops/Loops",
+      "top_similarity_after": 0.8791470347127847
+    },
+    {
+      "approved_label": "FX/Structural and Transitional FX/Drops and Downlifters/Generic Downlifter/Long FX",
+      "file_sha256": "9c2ad0eef00e2c902c95795e145b4c167ca5016c63a1c88b74c03e2fba73495a",
+      "known_distribution_after": true,
+      "margin_after": 0.1717387247689509,
+      "predicted_after": "FX/Structural and Transitional FX/Drops and Downlifters/Generic Downlifter/Long FX",
+      "predicted_before": "Drums/Snares/Acoustic Snare/One Shots",
+      "second_after": "FX/Structural and Transitional FX/Risers and Builds/Generic Build/Long FX",
+      "top_similarity_after": 0.8091162044556063
+    },
+    {
+      "approved_label": "Instruments/Keys/Rhodes/Loops",
+      "file_sha256": "d8fa388234106ad60a09ac4a6f5cc95fb24985dca459594e0763819a911248f3",
+      "known_distribution_after": true,
+      "margin_after": 0.0974467797161831,
+      "predicted_after": "Instruments/Keys/Rhodes/Loops",
+      "predicted_before": "Instruments/Keys/Electric Piano/Loops",
+      "second_after": "Instruments/Keys/Wurlitzer/Loops",
+      "top_similarity_after": 0.9288603563562094
+    },
+    {
+      "approved_label": "Instruments/Mallets and Bells/Bells and Mallets/Loops",
+      "file_sha256": "5ff140d20e152b9a6fa02a226b159f13b40fd251f464f403d2d3f811f3d3011c",
+      "known_distribution_after": true,
+      "margin_after": 0.24063451402433422,
+      "predicted_after": "Instruments/Mallets and Bells/Bells and Mallets/Loops",
+      "predicted_before": "Instruments/Mallets and Bells/Bells and Mallets/Loops",
+      "second_after": "Instruments/Mallets and Bells/Marimba/Loops",
+      "top_similarity_after": 0.8201885436983614
+    },
+    {
+      "approved_label": "Instruments/Guitar/Electric Guitar/Loops",
+      "file_sha256": "bce6412f84b29ec672c0c91ec7f802ae84cccae8b93939b71419a3a5db62ad11",
+      "known_distribution_after": true,
+      "margin_after": 0.34163440687238533,
+      "predicted_after": "Instruments/Guitar/Electric Guitar/Loops",
+      "predicted_before": "Instruments/Guitar/Guitar Chords/One Shots",
+      "second_after": "Instruments/Keys/Electric Piano/One Shots",
+      "top_similarity_after": 0.9577679571813102
+    },
+    {
+      "approved_label": "Instruments/Bass/808 Bass/Loops",
+      "file_sha256": "278409137ef71543d3e8a09bcb7eed5f84ecd5f877d65c54e4f3508bd1444ebf",
+      "known_distribution_after": true,
+      "margin_after": 0.19618660959020562,
+      "predicted_after": "Instruments/Bass/808 Bass/Loops",
+      "predicted_before": "Instruments/Bass/Generic Bass/Loops",
+      "second_after": "Drums/Kick Drums/Sub Kick/Loops",
+      "top_similarity_after": 1.0000000425437077
+    },
+    {
+      "approved_label": "FX/Human and Voice FX/Altered Voice/Long FX",
+      "file_sha256": "9a407491de40eba66005d63c9dea16f02a6c22f7b33d6d49bf9f850b6fd27a15",
+      "known_distribution_after": true,
+      "margin_after": 0.1446001856241934,
+      "predicted_after": "FX/Human and Voice FX/Altered Voice/Long FX",
+      "predicted_before": "FX/Human and Voice FX/Spoken Voice/One Shots",
+      "second_after": "FX/Structural and Transitional FX/Risers and Builds/Long Riser/Long FX",
+      "top_similarity_after": 0.759968479860466
+    },
+    {
+      "approved_label": "Instruments/Mixed Musical Loops/Multi Instrument/Loops",
+      "file_sha256": "d65e68bbaaa7824ba2b5d3f6d4d42080a0c385d94adc1fb2bcd4409b500acc05",
+      "known_distribution_after": true,
+      "margin_after": 0.272257994203041,
+      "predicted_after": "Instruments/Mixed Musical Loops/Multi Instrument/Loops",
+      "predicted_before": "Instruments/Keys/Electric Piano/Loops",
+      "second_after": "Instruments/Keys/Electric Piano/Loops",
+      "top_similarity_after": 0.9041532268409457
+    },
+    {
+      "approved_label": "Drums/Kick Drums/Sub Kick/Loops",
+      "file_sha256": "14195063568daaebab10e29639630793d41ecf487ee6d3d222d407aa20bbdb33",
+      "known_distribution_after": true,
+      "margin_after": 0.19618654771313992,
+      "predicted_after": "Drums/Kick Drums/Sub Kick/Loops",
+      "predicted_before": "Instruments/Bass/Generic Bass/Loops",
+      "second_after": "Instruments/Bass/808 Bass/Loops",
+      "top_similarity_after": 0.999999980666642
+    },
+    {
+      "approved_label": "FX/Human and Voice FX/Spoken Voice/Long FX",
+      "file_sha256": "6010d2b54c5dfb5e1d091990326db2ff81c798ffd94ea8cf88fe75566a616d80",
+      "known_distribution_after": true,
+      "margin_after": 0.4023969322804781,
+      "predicted_after": "FX/Human and Voice FX/Spoken Voice/Long FX",
+      "predicted_before": "FX/Human and Voice FX/Spoken Voice/Long FX",
+      "second_after": "FX/Human and Voice FX/Spoken Voice/One Shots",
+      "top_similarity_after": 0.8839554670842439
+    },
+    {
+      "approved_label": "Instruments/Guitar/Acoustic Guitar/Loops",
+      "file_sha256": "61306e53c3cd8138f03d8606d3c9c170fb492d4430892b5d1dfc7a336759cebe",
+      "known_distribution_after": true,
+      "margin_after": 0.47399963197472483,
+      "predicted_after": "Instruments/Guitar/Acoustic Guitar/Loops",
+      "predicted_before": "Instruments/Guitar/Acoustic Guitar/Loops",
+      "second_after": "Instruments/Guitar/Nylon Guitar/Loops",
+      "top_similarity_after": 0.9999999771488478
+    },
+    {
+      "approved_label": "Drums/Drum Loops/Full Drum Loops/Loops",
+      "file_sha256": "532c4d16eb5a886049d4fd220eac89f9b25572d32d18d87a37bc18ae55d13a04",
+      "known_distribution_after": true,
+      "margin_after": 0.21342886925594085,
+      "predicted_after": "Drums/Drum Loops/Full Drum Loops/Loops",
+      "predicted_before": "Drums/Drum Loops/Loops",
+      "second_after": "Drums/Drum Loops/Loops",
+      "top_similarity_after": 0.8972971705568745
+    },
+    {
+      "approved_label": "Drums/Drum Loops/Full Drum Loops/Loops",
+      "file_sha256": "76ae8c3484677cbb65cd21a7ee0fe1530e86fb99e297a6369ae424fbf08494d2",
+      "known_distribution_after": true,
+      "margin_after": 0.23240189932871136,
+      "predicted_after": "Drums/Drum Loops/Full Drum Loops/Loops",
+      "predicted_before": "Instruments/Voice/Vocal Loops/Loops",
+      "second_after": "Instruments/Voice/Vocal Loops/Loops",
+      "top_similarity_after": 0.8202412401801584
+    },
+    {
+      "approved_label": "Instruments/Guitar/Nylon Guitar/Loops",
+      "file_sha256": "47a0e976994559196e7c6f9ec4d310a3bbac712472393f671418b1c612c70661",
+      "known_distribution_after": true,
+      "margin_after": 0.3013274377857105,
+      "predicted_after": "Instruments/Guitar/Nylon Guitar/Loops",
+      "predicted_before": "Instruments/Plucked Strings/Koto/Loops",
+      "second_after": "Instruments/Guitar/Acoustic Guitar/Loops",
+      "top_similarity_after": 1.0000000160544122
+    },
+    {
+      "approved_label": "Instruments/Bass/Sub Bass/Loops",
+      "file_sha256": "f3f4b4af5efc2eb406cb0be8fca5ac7a6365975e449cf2a218b0862884741a7e",
+      "known_distribution_after": true,
+      "margin_after": 0.37891946502516327,
+      "predicted_after": "Instruments/Bass/Sub Bass/Loops",
+      "predicted_before": "Instruments/Bass/Generic Bass/Loops",
+      "second_after": "Instruments/Bass/Synth Bass/Loops",
+      "top_similarity_after": 0.8713976207955161
+    },
+    {
+      "approved_label": "FX/Human and Voice FX/Altered Voice/Long FX",
+      "file_sha256": "9b5b2525e67d88c55184f478c67398aa112ea621ea755a2d5817ba700878d87e",
+      "known_distribution_after": true,
+      "margin_after": 0.1672048038248889,
+      "predicted_after": "FX/Human and Voice FX/Altered Voice/Long FX",
+      "predicted_before": "FX/Structural and Transitional FX/Drops and Downlifters/Generic Downlifter/Long FX",
+      "second_after": "FX/Structural and Transitional FX/Risers and Builds/Granular Riser/Long FX",
+      "top_similarity_after": 0.7072230041747141
+    },
+    {
+      "approved_label": "Drums/Claps Snaps Slaps/Generic Clap/One Shots",
+      "file_sha256": "427770200f835054454bd928c913d043e83d35fdb126ffba584018901e548fc1",
+      "known_distribution_after": true,
+      "margin_after": 0.2733829518537375,
+      "predicted_after": "Drums/Claps Snaps Slaps/Generic Clap/One Shots",
+      "predicted_before": "Drums/Claps Snaps Slaps/Generic Clap/One Shots",
+      "second_after": "Drums/Rims and Sticks/Drum Sticks/One Shots",
+      "top_similarity_after": 0.9307998759338876
+    },
+    {
+      "approved_label": "Instruments/Keys/Rhodes/Loops",
+      "file_sha256": "41c71779a718aaa8d40f50b6f6ec2afe3ce2411bd102e473a76c4a6555add906",
+      "known_distribution_after": true,
+      "margin_after": 0.20605114996136686,
+      "predicted_after": "Instruments/Keys/Rhodes/Loops",
+      "predicted_before": "Instruments/Keys/Electric Piano/Loops",
+      "second_after": "Instruments/Keys/Wurlitzer/Loops",
+      "top_similarity_after": 0.9288603173940824
+    },
+    {
+      "approved_label": "Instruments/Synths/Synth Pad/Loops",
+      "file_sha256": "c875eff57d576d6d99b88bfb2e489d1b78af7be091dab67269d600dd64758f83",
+      "known_distribution_after": true,
+      "margin_after": 0.15600620857533887,
+      "predicted_after": "Instruments/Synths/Synth Pad/Loops",
+      "predicted_before": "Instruments/Synths/Synth Pad/Loops",
+      "second_after": "Instruments/Keys/Rhodes/Loops",
+      "top_similarity_after": 0.8764094580755012
+    },
+    {
+      "approved_label": "Instruments/Mallets and Bells/Marimba/Loops",
+      "file_sha256": "c6ccab8bbefec5c2d57be698f73abaa43e6a9ad56f40b5201f2558aaac6d0142",
+      "known_distribution_after": true,
+      "margin_after": 0.2764188767876741,
+      "predicted_after": "Instruments/Mallets and Bells/Marimba/Loops",
+      "predicted_before": "Instruments/Plucked Strings/Koto/Loops",
+      "second_after": "Instruments/Plucked Strings/Koto/Loops",
+      "top_similarity_after": 0.9999999823940068
+    },
+    {
+      "approved_label": "FX/Everyday Foley/Water Foley/Splash/Long FX",
+      "file_sha256": "e2936b2f643d493e8be43b5c7e4e1a54cfa3995a42d6fb3140e704cf36917ed4",
+      "known_distribution_after": true,
+      "margin_after": 0.4085835998347238,
+      "predicted_after": "FX/Everyday Foley/Water Foley/Splash/Long FX",
+      "predicted_before": "Instruments/Synths/Synth Pad/Loops",
+      "second_after": "Instruments/Synths/Synth Pluck/Loops",
+      "top_similarity_after": 1.000000059917058
+    },
+    {
+      "approved_label": "Instruments/Keys/Rhodes/One Shots",
+      "file_sha256": "dce83dfb36e1565aad5ecfb8b41854f4579bffc43f5079519e4715eade7562bf",
+      "known_distribution_after": true,
+      "margin_after": 0.32367882696677497,
+      "predicted_after": "Instruments/Keys/Rhodes/One Shots",
+      "predicted_before": "Instruments/Synths/Synth Pad/Loops",
+      "second_after": "Instruments/Synths/Synth Pad/Loops",
+      "top_similarity_after": 0.999999968667266
+    },
+    {
+      "approved_label": "FX/Human and Voice FX/Altered Voice/One Shots",
+      "file_sha256": "35945d2df1ff278708d19994a4b450ac6d9624f41041b5e140deff5f7a67d76e",
+      "known_distribution_after": true,
+      "margin_after": 0.18975296079141513,
+      "predicted_after": "FX/Human and Voice FX/Altered Voice/One Shots",
+      "predicted_before": "FX/Human and Voice FX/Altered Voice/Long FX",
+      "second_after": "Instruments/Voice/Vocal Loops/Loops",
+      "top_similarity_after": 0.754074110411032
+    },
+    {
+      "approved_label": "Instruments/Keys/Piano/Loops",
+      "file_sha256": "76316963e09588389872b127917b3bb86814a7eced98be3071e2a7e934497725",
+      "known_distribution_after": true,
+      "margin_after": 0.18984413560257685,
+      "predicted_after": "Instruments/Keys/Piano/Loops",
+      "predicted_before": "Instruments/Keys/Piano/Loops",
+      "second_after": "Instruments/Mallets and Bells/Bells and Mallets/Loops",
+      "top_similarity_after": 0.9035392890935532
+    },
+    {
+      "approved_label": "Instruments/Guitar/Electric Guitar/Loops",
+      "file_sha256": "40daa42e32114d68ee1d20ed8a2a4e3fe02e0d2108acbd8a33a7f8fdd168323e",
+      "known_distribution_after": true,
+      "margin_after": 0.2510828926330194,
+      "predicted_after": "Instruments/Guitar/Electric Guitar/Loops",
+      "predicted_before": "Instruments/Guitar/Guitar Chords/One Shots",
+      "second_after": "Instruments/Keys/Electric Piano/One Shots",
+      "top_similarity_after": 0.9577679194566551
+    },
+    {
+      "approved_label": "FX/Human and Voice FX/Scream/Long FX",
+      "file_sha256": "fae0bd856a821575b47cb1469020109a46f2b642e4aba20c101903c64f25ad9f",
+      "known_distribution_after": true,
+      "margin_after": 0.35801325745319923,
+      "predicted_after": "FX/Human and Voice FX/Scream/Long FX",
+      "predicted_before": "FX/Designed Noise FX/Siren/Long FX",
+      "second_after": "FX/Designed Noise FX/Siren/Long FX",
+      "top_similarity_after": 1.0000000706613412
+    },
+    {
+      "approved_label": "FX/Structural and Transitional FX/Risers and Builds/Generic Build/Long FX",
+      "file_sha256": "34167b6d8e673e52e6bb6f6f6b7ab1a87bf3c5ce36cad632757bb574b490bca4",
+      "known_distribution_after": true,
+      "margin_after": 0.28338909804857104,
+      "predicted_after": "FX/Structural and Transitional FX/Risers and Builds/Generic Build/Long FX",
+      "predicted_before": "FX/Structural and Transitional FX/Drops and Downlifters/Generic Downlifter/Long FX",
+      "second_after": "FX/Structural and Transitional FX/Risers and Builds/Granular Riser/Long FX",
+      "top_similarity_after": 0.9057468845324802
+    },
+    {
+      "approved_label": "Drums/Claps Snaps Slaps/Generic Clap/One Shots",
+      "file_sha256": "3ee0ae146fee51cdee78500c1f4fb094fc88fb09ae5fa35866088038e9f24d04",
+      "known_distribution_after": true,
+      "margin_after": 0.309746116577551,
+      "predicted_after": "Drums/Claps Snaps Slaps/Generic Clap/One Shots",
+      "predicted_before": "Drums/Claps Snaps Slaps/Generic Clap/One Shots",
+      "second_after": "FX/Structural and Transitional FX/Reverses and Tails/Generic Reverse/One Shots",
+      "top_similarity_after": 0.9476878774479132
+    },
+    {
+      "approved_label": "Instruments/Mixed Musical Loops/Multi Instrument/Loops",
+      "file_sha256": "1b8eafa69911d90168e821352f7fbba199405b4b7d7f4a52bd721630e194694e",
+      "known_distribution_after": true,
+      "margin_after": 0.22606821363194562,
+      "predicted_after": "Instruments/Mixed Musical Loops/Multi Instrument/Loops",
+      "predicted_before": "Instruments/Strings/String Loops/Loops",
+      "second_after": "Instruments/Keys/Rhodes/One Shots",
+      "top_similarity_after": 0.8298617020670482
+    },
+    {
+      "approved_label": "Instruments/Keys/Electric Piano/One Shots",
+      "file_sha256": "e3ea5bd6bd55fc2ac1177e41daf2498056cb7d7012d5e9e78093f80ce93bc03c",
+      "known_distribution_after": true,
+      "margin_after": 0.30942651265367294,
+      "predicted_after": "Instruments/Keys/Electric Piano/One Shots",
+      "predicted_before": "Instruments/Guitar/Guitar Chords/One Shots",
+      "second_after": "Instruments/Guitar/Electric Guitar/Loops",
+      "top_similarity_after": 1.000000091740037
+    },
+    {
+      "approved_label": "Instruments/Bass/Electric Bass/Loops",
+      "file_sha256": "4700e83c1628cb419bd670dee5a40706c9496588558601406321e2a59549ca93",
+      "known_distribution_after": true,
+      "margin_after": 0.07623477737998818,
+      "predicted_after": "Instruments/Bass/Electric Bass/Loops",
+      "predicted_before": "Instruments/Bass/Generic Bass/Loops",
+      "second_after": "Instruments/Bass/Generic Bass/Loops",
+      "top_similarity_after": 0.8752789971255729
+    },
+    {
+      "approved_label": "Instruments/Mallets and Bells/Bells and Mallets/Loops",
+      "file_sha256": "2719bdadd77149be7054783df54d661bf0eb4cd58451e69e068b711d514b3751",
+      "known_distribution_after": true,
+      "margin_after": 0.10417468168813415,
+      "predicted_after": "Instruments/Mallets and Bells/Bells and Mallets/Loops",
+      "predicted_before": "Instruments/Synths/Synth Pad/Loops",
+      "second_after": "Instruments/Synths/Synth Pad/Loops",
+      "top_similarity_after": 0.7765360635253751
+    },
+    {
+      "approved_label": "FX/Structural and Transitional FX/Risers and Builds/Granular Riser/Long FX",
+      "file_sha256": "3aca4276688b34050fed25ba1ed7da6ac7ea05cc38e6f6ac8829c44788f7d40b",
+      "known_distribution_after": true,
+      "margin_after": 0.09463741105846024,
+      "predicted_after": "FX/Structural and Transitional FX/Risers and Builds/Granular Riser/Long FX",
+      "predicted_before": "Instruments/Synths/Synth Loops/Loops",
+      "second_after": "Instruments/Synths/Synth Loops/Loops",
+      "top_similarity_after": 0.8082201841081674
+    },
+    {
+      "approved_label": "FX/Structural and Transitional FX/Risers and Builds/Granular Riser/Long FX",
+      "file_sha256": "8fc33cffedb832b0bdef04c725a0be70757fcf152683b52c43ca610397180856",
+      "known_distribution_after": true,
+      "margin_after": 0.2349956509560467,
+      "predicted_after": "FX/Structural and Transitional FX/Risers and Builds/Granular Riser/Long FX",
+      "predicted_before": "FX/Structural and Transitional FX/Drops and Downlifters/Generic Downlifter/Long FX",
+      "second_after": "FX/Structural and Transitional FX/Risers and Builds/Generic Build/Long FX",
+      "top_similarity_after": 0.8082201116179988
+    },
+    {
+      "approved_label": "Instruments/Woodwinds/Saxophone/Loops",
+      "file_sha256": "f8670575e67e39af2a1c69a18ff82becc893e259eff1ea6c9529e30ff77484d2",
+      "known_distribution_after": true,
+      "margin_after": 0.28275173803960785,
+      "predicted_after": "Instruments/Woodwinds/Saxophone/Loops",
+      "predicted_before": "Instruments/Woodwinds/Saxophone/Loops",
+      "second_after": "Instruments/Mixed Musical Loops/Multi Instrument/Loops",
+      "top_similarity_after": 0.8774577386109401
+    },
+    {
+      "approved_label": "FX/Structural and Transitional FX/Reverses and Tails/Generic Reverse/One Shots",
+      "file_sha256": "7ca5d0b15e266969282abcf21497f90a5d63a84c5c769db56f5861ca29d4606c",
+      "known_distribution_after": true,
+      "margin_after": 0.3493086043911779,
+      "predicted_after": "FX/Structural and Transitional FX/Reverses and Tails/Generic Reverse/One Shots",
+      "predicted_before": "FX/Structural and Transitional FX/Drops and Downlifters/Generic Downlifter/Long FX",
+      "second_after": "FX/Structural and Transitional FX/Drops and Downlifters/Generic Downlifter/Long FX",
+      "top_similarity_after": 0.8162341688661712
+    },
+    {
+      "approved_label": "Instruments/Strings Bowed/Violin/Loops",
+      "file_sha256": "4a2999aad852ef11ceaf32214866f6417030d1d0aec1adac958e185b26d71aa8",
+      "known_distribution_after": true,
+      "margin_after": 0.382582957811321,
+      "predicted_after": "Instruments/Strings Bowed/Violin/Loops",
+      "predicted_before": "Instruments/Strings/String Loops/Loops",
+      "second_after": "Instruments/Strings/String Loops/Loops",
+      "top_similarity_after": 0.9999999753058855
+    },
+    {
+      "approved_label": "Drums/Kick Drums/Sub Kick/One Shots",
+      "file_sha256": "eb56e19740ea0d10da906b09ba09a76db38579309ccb80c688cb1104f70d7358",
+      "known_distribution_after": true,
+      "margin_after": 0.4499017688281659,
+      "predicted_after": "Drums/Kick Drums/Sub Kick/One Shots",
+      "predicted_before": "Drums/Kick Drums/Generic Kick/One Shots",
+      "second_after": "Drums/Kick Drums/Generic Kick/One Shots",
+      "top_similarity_after": 1.0000001149262543
+    },
+    {
+      "approved_label": "Drums/Rims and Sticks/Rimshot/One Shots",
+      "file_sha256": "261e4af97aa02d86065ab7e9a8d651d336a88d25a702d0b0bb4ac9e95394cc15",
+      "known_distribution_after": true,
+      "margin_after": 0.12201363697194445,
+      "predicted_after": "Drums/Rims and Sticks/Rimshot/One Shots",
+      "predicted_before": "Drums/Rims and Sticks/Sidestick/One Shots",
+      "second_after": "Drums/Rims and Sticks/Sidestick/One Shots",
+      "top_similarity_after": 0.8960447925365167
+    },
+    {
+      "approved_label": "FX/Designed Noise FX/Siren/Long FX",
+      "file_sha256": "4fd910aaa64fa75aff3ec30c1e7ec4f72417012f8fddeca5f8b4c8a58816b8c9",
+      "known_distribution_after": true,
+      "margin_after": 0.29881948039474104,
+      "predicted_after": "FX/Designed Noise FX/Siren/Long FX",
+      "predicted_before": "FX/Designed Noise FX/Siren/Long FX",
+      "second_after": "FX/Human and Voice FX/Scream/Long FX",
+      "top_similarity_after": 0.8622497955504602
+    },
+    {
+      "approved_label": "Instruments/Voice/Vocal Loops/Loops",
+      "file_sha256": "1624c11f1c81094c288b3ca3fd621212bb060432e752c1a1b485d0e8dcdac6f1",
+      "known_distribution_after": true,
+      "margin_after": 0.24513299745747408,
+      "predicted_after": "Instruments/Voice/Vocal Loops/Loops",
+      "predicted_before": "FX/Human and Voice FX/Spoken Voice/One Shots",
+      "second_after": "FX/Human and Voice FX/Spoken Voice/One Shots",
+      "top_similarity_after": 0.9116142913198599
+    },
+    {
+      "approved_label": "FX/Human and Voice FX/Altered Voice/Long FX",
+      "file_sha256": "bc8a89cc4a46e93d3a0d10e15c3322692ff4c2097b85fb2e18f1c811ab8897fe",
+      "known_distribution_after": true,
+      "margin_after": 0.21735114182705895,
+      "predicted_after": "FX/Human and Voice FX/Altered Voice/Long FX",
+      "predicted_before": "Instruments/Voice/Vocal Loops/Loops",
+      "second_after": "Instruments/Voice/Vocal Loops/Loops",
+      "top_similarity_after": 0.7895105695413946
+    },
+    {
+      "approved_label": "FX/Human and Voice FX/Altered Voice/Long FX",
+      "file_sha256": "71b7ea4ea096ccf9cb00316c49e1a9639a1b0f671663e1fcc381f1e111a1f79f",
+      "known_distribution_after": true,
+      "margin_after": 0.2701535589689371,
+      "predicted_after": "FX/Human and Voice FX/Altered Voice/Long FX",
+      "predicted_before": "FX/Human and Voice FX/Altered Voice/Long FX",
+      "second_after": "FX/Human and Voice FX/Spoken Voice/Long FX",
+      "top_similarity_after": 0.81345736302941
+    },
+    {
+      "approved_label": "Instruments/Synths/Synth Lead/Loops",
+      "file_sha256": "0a1d13af2b461ae2270c39134529a613e81923ebd2b509d2fbdf6f68052e699c",
+      "known_distribution_after": true,
+      "margin_after": 0.30193890874485696,
+      "predicted_after": "Instruments/Synths/Synth Lead/Loops",
+      "predicted_before": "Instruments/Synths/Synth Lead/Loops",
+      "second_after": "Instruments/Synths/Synth Pluck/Loops",
+      "top_similarity_after": 0.8755245145867454
+    },
+    {
+      "approved_label": "Instruments/Mixed Musical Loops/Multi Instrument/Loops",
+      "file_sha256": "821c6a8cad0fa8575081d81632b36a89664a58ded2c998f130359032b7beefd8",
+      "known_distribution_after": true,
+      "margin_after": 0.30652518227028036,
+      "predicted_after": "Instruments/Mixed Musical Loops/Multi Instrument/Loops",
+      "predicted_before": "Instruments/Mixed Musical Loops/Multi Instrument/Loops",
+      "second_after": "Drums/Drum Loops/Full Drum Loops/Loops",
+      "top_similarity_after": 0.9295595443866029
+    },
+    {
+      "approved_label": "FX/Structural and Transitional FX/Risers and Builds/Generic Build/Long FX",
+      "file_sha256": "03208c94dcc5b0fe6a5e6e687bb55f9f36b5c29a9be5908012d463cbc23ef8c0",
+      "known_distribution_after": true,
+      "margin_after": 0.05840878956890061,
+      "predicted_after": "FX/Structural and Transitional FX/Risers and Builds/Generic Build/Long FX",
+      "predicted_before": "Instruments/Synths/Synth Loops/Loops",
+      "second_after": "FX/Structural and Transitional FX/Drops and Downlifters/Generic Downlifter/Long FX",
+      "top_similarity_after": 0.7957065978420451
+    },
+    {
+      "approved_label": "Drums/Rims and Sticks/Drum Sticks/One Shots",
+      "file_sha256": "cc90fc71bc659a22d1dbae39bcf690ff4607b78b6b07beecdd8073d2c97ef0b5",
+      "known_distribution_after": true,
+      "margin_after": 0.20305766543159043,
+      "predicted_after": "Drums/Rims and Sticks/Drum Sticks/One Shots",
+      "predicted_before": "Drums/Rims and Sticks/Sidestick/One Shots",
+      "second_after": "Drums/Rims and Sticks/Rimshot/One Shots",
+      "top_similarity_after": 0.9999999358784133
+    },
+    {
+      "approved_label": "FX/Impacts and Hits/Boom/One Shots",
+      "file_sha256": "80080b2d3e4016b916de4808b0e4621f7eae3544471070fe854c69f171e24f5d",
+      "known_distribution_after": true,
+      "margin_after": 0.4920372340029866,
+      "predicted_after": "FX/Impacts and Hits/Boom/One Shots",
+      "predicted_before": "FX/Structural and Transitional FX/Drops and Downlifters/Generic Downlifter/Long FX",
+      "second_after": "FX/Structural and Transitional FX/Risers and Builds/Generic Build/Long FX",
+      "top_similarity_after": 0.9999999290104222
+    },
+    {
+      "approved_label": "Instruments/Synths/Synth Lead/Loops",
+      "file_sha256": "9cde74d13e346609f29700eebb42beabe78afa7865b876fb257ab8f2d1320167",
+      "known_distribution_after": true,
+      "margin_after": 0.07956689236452252,
+      "predicted_after": "Instruments/Synths/Synth Lead/Loops",
+      "predicted_before": "Instruments/Synths/Synth Lead/Loops",
+      "second_after": "Instruments/Synths/Synth Pluck/Loops",
+      "top_similarity_after": 0.8529305851887612
+    },
+    {
+      "approved_label": "FX/Structural and Transitional FX/Risers and Builds/Long Riser/Long FX",
+      "file_sha256": "9b0b8b945e6857935534916a6c514bac12bfe111553cdef36e1ebdc04186fcf6",
+      "known_distribution_after": true,
+      "margin_after": 0.31010386236898324,
+      "predicted_after": "FX/Structural and Transitional FX/Risers and Builds/Long Riser/Long FX",
+      "predicted_before": "FX/Human and Voice FX/Altered Voice/Long FX",
+      "second_after": "FX/Structural and Transitional FX/Risers and Builds/Granular Riser/Long FX",
+      "top_similarity_after": 1.0000000551350379
+    },
+    {
+      "approved_label": "FX/Human and Voice FX/Altered Voice/Long FX",
+      "file_sha256": "feda5fbc24c7df2eb1d58de302a65d7fda0c36d80d700fff55b730f888bf985b",
+      "known_distribution_after": true,
+      "margin_after": 0.29140853258486366,
+      "predicted_after": "FX/Human and Voice FX/Altered Voice/Long FX",
+      "predicted_before": "FX/Human and Voice FX/Altered Voice/Long FX",
+      "second_after": "Instruments/Synths/Synth Pad/Loops",
+      "top_similarity_after": 0.8986675394514279
+    },
+    {
+      "approved_label": "Instruments/Bass/Sub Bass/Loops",
+      "file_sha256": "47075572062cf23d27ea8a6fa0ce17b179e2b2a31e528abd0d4f06e274410242",
+      "known_distribution_after": true,
+      "margin_after": 0.0914640323676097,
+      "predicted_after": "Instruments/Bass/Sub Bass/Loops",
+      "predicted_before": "Instruments/Bass/Generic Bass/Loops",
+      "second_after": "Instruments/Bass/808 Bass/Loops",
+      "top_similarity_after": 0.8713976783791391
+    }
+  ],
+  "index_path": "neural_artifacts/prototype_indexes/hf_clap/run_20260724_213454_182875/index",
+  "invalidated_evaluation_hashes": [],
+  "label_count": 57,
+  "missing_audio_hashes": [],
+  "model_id": "laion/larger_clap_music_and_speech@195c3a3e68faebb3e2088b9a79e79b43ddbda76b#snapshot=b3cc57c40aa913ea508cde7dffcccbfbfa88fe36e359577c40e9c272f989bb93#preprocess=clap-mono-processor-rate-three-position-segments-v2:max_seconds=10:max_segments=3#embedding_schema=1",
+  "previous_index_path": "neural_artifacts/prototype_indexes/hf_clap/run_20260724_212609_708253/index",
+  "production_ownership_enabled": true,
+  "provider_id": "hf_clap",
+  "schema_version": 1,
+  "source_name_policy": "audio bytes and explicit human labels only",
+  "status": "built",
+  "training_example_count": 121,
+  "training_signature": "fc41dc55c70e70a126388148e2e9acacda7363b5fce2003a85c9e8ddb6430955"
+}

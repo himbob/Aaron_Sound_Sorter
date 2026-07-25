@@ -1,0 +1,38 @@
+# Aaron Sound Sorter end-user runtime assets.
+#
+# Format:
+#   required-file <project-relative file>
+#   optional-file <project-relative file>
+#   model-dir     <project-relative directory>
+#   artifact-dir  <project-relative directory>
+#
+# Required files must exist or `make bundle` fails. Optional files are included
+# when present. Model directories are included by default and can be omitted with
+# `BUNDLE_INCLUDE_NEURAL_MODELS=0 make bundle`.
+
+# Production and learned-memory brains used by the sorter and GUI.
+required-file stage4_folder_brain.json
+required-file stage4_folder_brain_user_memory.json
+required-file stage4_physics_memory_brain.json
+required-file stage4_voter_memory_brain.json
+required-file stage4_shape_memory_brain.json
+
+# Active supporting brain-family lanes. The sorter can fall back when an older
+# lane is absent, so these remain optional rather than blocking a release.
+optional-file stage4_shape_memory_starter_brain.json
+optional-file stage4_folder_brain_baby.json
+optional-file stage4_folder_brain_core_baby.json
+optional-file stage4_folder_brain_spread_baby.json
+optional-file stage4_folder_brain_outlier_baby.json
+optional-file stage4_folder_brain_harmonic_core_baby.json
+optional-file stage4_folder_brain_harmonic_spread_baby.json
+optional-file stage4_folder_brain_harmonic_outlier_baby.json
+
+# Reviewed, pinned local neural model snapshots. These are large and should be
+# committed with Git LFS. Neural category ownership remains shadow-only.
+model-dir _models/laion_larger_clap_music_and_speech
+model-dir _models/mert_v1_95m_7d1bb4c
+
+# Compact runtime neural indexes. Development embedding caches, curation runs,
+# GUI inboxes, quarantine data, and reports are intentionally not distributed.
+artifact-dir neural_artifacts/prototype_indexes
