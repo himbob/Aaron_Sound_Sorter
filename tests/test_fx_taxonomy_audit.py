@@ -83,6 +83,36 @@ def test_role_coverage_recommends_trusted_seed_before_runtime_tuning() -> None:
     assert role_rows[0].recommendation == "seed_trusted_fx_role_panel"
 
 
+def test_future_fx_catalog_labels_remain_visible_without_brain_examples() -> None:
+    roles = (
+        FxRoleDefinition(
+            role_id="fx_foley_material_event",
+            display_name="Foley Material Event",
+            label_prefixes=("FX/Everyday Foley",),
+            target_memory_roles=(),
+            target_physics_branches=(),
+            training_goal_per_role=10,
+        ),
+    )
+    future_label = "FX/Everyday Foley/Glass/One Shots"
+    snapshot = FxAuditSnapshot(
+        roles=roles,
+        brain_counts={},
+        gui_labels={future_label},
+        locked_training_counts={},
+        user_memory_labels=set(),
+        voter_memory_ids=set(),
+        physics_memory_ids=set(),
+    )
+
+    label_rows = build_label_coverage(snapshot)
+
+    assert [row.label for row in label_rows] == [future_label]
+    assert label_rows[0].available_in_gui is True
+    assert label_rows[0].full_brain_count == 0
+    assert label_rows[0].recommendation == "seed_locked_training"
+
+
 def test_ontology_json_keeps_fx_roles_broad_and_structured() -> None:
     ontology_path = ROOT / "config" / "fx_role_ontology_v1.json"
     payload = json.loads(ontology_path.read_text(encoding="utf-8"))

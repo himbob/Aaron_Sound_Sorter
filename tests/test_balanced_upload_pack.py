@@ -40,9 +40,10 @@ def test_balanced_pack_parts_are_named_bounded_and_reconstruct_runtime(tmp_path:
         "Aaron_Sound_Sorter_End_User_Pack_test_Part_03_of_03.zip",
     ]
     assert all(path.stat().st_size < 4 * 1024 * 1024 for path in result.part_paths)
-    assert max(path.stat().st_size for path in result.part_paths) - min(
-        path.stat().st_size for path in result.part_paths
-    ) < 256 * 1024
+    assert (
+        max(path.stat().st_size for path in result.part_paths) - min(path.stat().st_size for path in result.part_paths)
+        < 256 * 1024
+    )
 
     extracted = tmp_path / "extracted"
     for part_path in result.part_paths:

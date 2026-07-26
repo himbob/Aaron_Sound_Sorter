@@ -19,6 +19,7 @@ neural = [
   "transformers>=4.51,<6",
   "scikit-learn>=1.4,<2",
   "safetensors>=0.4,<1",
+  "panns-inference==0.1.1",
 ]
 quality = [
   "pytest>=8,<9",

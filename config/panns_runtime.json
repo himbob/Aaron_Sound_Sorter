@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "enabled": true,
+  "provider": "panns_cnn14_audioset",
+  "checkpoint_path": "_models/panns_cnn14/Cnn14_mAP=0.431.pth",
+  "checkpoint_sha256": "0dc499e40e9761ef5ea061ffc77697697f277f6a960894903df3ada000e34b31",
+  "labels_path": "_models/panns_cnn14/class_labels_indices.csv",
+  "labels_sha256": "cdd1049833c4b86127c2773ac0d14a2754b6a6d0d1798002ed5c66e699708429",
+  "source_model_id": "qiuqiangkong/PANNs-Cnn14-AudioSet-mAP-0.431",
+  "source_revision": "audioset_tagging_cnn-master-2026-07-25",
+  "sample_rate": 32000,
+  "max_segment_seconds": 10.0,
+  "max_segments": 3,
+  "device": "auto",
+  "production_ownership_enabled": false,
+  "license": "MIT",
+  "checkpoint_url": "https://zenodo.org/records/3987831/files/Cnn14_mAP%3D0.431.pth?download=1",
+  "labels_url": "https://storage.googleapis.com/us_audioset/youtube_corpus/v1/csv/class_labels_indices.csv"
+}

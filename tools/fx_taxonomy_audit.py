@@ -62,7 +62,7 @@ class FxLabelCoverage:
     role_id: str
     full_brain_count: int
     locked_training_audio_count: int
-    visible_in_gui_catalog: bool
+    available_in_gui: bool
     present_in_user_memory: bool
     recommendation: str
 
@@ -76,7 +76,7 @@ class FxRoleCoverage:
     brain_label_count: int
     full_brain_audio_count: int
     locked_training_audio_count: int
-    gui_visible_label_count: int
+    gui_available_label_count: int
     user_memory_label_count: int
     voter_memory_target_count: int
     physics_memory_target_count: int
@@ -130,10 +130,7 @@ def main() -> int:
     write_summary(report_dir / "README_FX_TAXONOMY_AUDIT.txt", snapshot, label_coverage, role_coverage)
     print(f"FX labels in full brain: {len(snapshot.brain_counts)}")
     print(f"FX labels in GUI catalog: {len(snapshot.gui_labels)}")
-    print(
-        "FX full-brain labels visible in GUI catalog: "
-        f"{sum(1 for label in snapshot.brain_counts if label in snapshot.gui_labels)}"
-    )
+    print(f"FX labels available in GUI: {len(set(snapshot.brain_counts) | snapshot.gui_labels)}")
     print(
         f"FX labels with locked training audio: {sum(1 for count in snapshot.locked_training_counts.values() if count > 0)}"
     )
@@ -168,11 +165,15 @@ def load_audit_snapshot(
     resolved_voter_memory = resolve_project_path(project_root, voter_memory_path)
     resolved_physics_memory = resolve_project_path(project_root, physics_memory_path)
     brain_counts = read_fx_brain_counts(resolved_brain)
+    gui_labels = read_fx_label_set(resolved_gui_catalog)
     return FxAuditSnapshot(
         roles=load_role_definitions(resolved_ontology),
         brain_counts=brain_counts,
-        gui_labels=read_fx_label_set(resolved_gui_catalog),
-        locked_training_counts=count_locked_training_audio(resolved_training_root, brain_counts),
+        gui_labels=gui_labels,
+        locked_training_counts=count_locked_training_audio(
+            resolved_training_root,
+            set(brain_counts) | gui_labels,
+        ),
         user_memory_labels=read_fx_label_set(resolved_user_memory),
         voter_memory_ids=read_memory_identifiers(resolved_voter_memory),
         physics_memory_ids=read_memory_identifiers(resolved_physics_memory),
@@ -286,10 +287,10 @@ def add_key_or_list_identifiers(payload: Any, identifiers: set[str]) -> None:
                 collect_memory_identifiers(value, identifiers)
 
 
-def count_locked_training_audio(training_root: Path, brain_counts: dict[str, int]) -> dict[str, int]:
-    """Count trusted training audio references for each public FX brain label."""
+def count_locked_training_audio(training_root: Path, labels: set[str]) -> dict[str, int]:
+    """Count trusted training audio references for each public FX label."""
     counts: dict[str, int] = {}
-    for label in brain_counts:
+    for label in labels:
         slot_path = training_slot_for_label(training_root, label)
         counts[label] = count_audio_references(slot_path)
     return counts
@@ -313,11 +314,13 @@ def count_audio_references(slot_path: Path) -> int:
 
 
 def build_label_coverage(snapshot: FxAuditSnapshot) -> list[FxLabelCoverage]:
-    """Build one coverage row per public FX brain label."""
+    """Build one coverage row per trained or future public FX label."""
     rows: list[FxLabelCoverage] = []
-    for label, brain_count in sorted(snapshot.brain_counts.items()):
+    public_labels = set(snapshot.brain_counts) | snapshot.gui_labels
+    for label in sorted(public_labels):
+        brain_count = snapshot.brain_counts.get(label, 0)
         locked_count = snapshot.locked_training_counts.get(label, 0)
-        visible = label in snapshot.gui_labels
+        available_in_gui = label in snapshot.brain_counts or label in snapshot.gui_labels
         in_user_memory = label in snapshot.user_memory_labels
         rows.append(
             FxLabelCoverage(
@@ -325,9 +328,9 @@ def build_label_coverage(snapshot: FxAuditSnapshot) -> list[FxLabelCoverage]:
                 role_id=role_for_label(label, snapshot.roles),
                 full_brain_count=brain_count,
                 locked_training_audio_count=locked_count,
-                visible_in_gui_catalog=visible,
+                available_in_gui=available_in_gui,
                 present_in_user_memory=in_user_memory,
-                recommendation=label_recommendation(locked_count, visible, in_user_memory),
+                recommendation=label_recommendation(brain_count, locked_count, in_user_memory),
             )
         )
     return rows
@@ -341,12 +344,12 @@ def role_for_label(label: str, roles: tuple[FxRoleDefinition, ...]) -> str:
     return "fx_unmapped"
 
 
-def label_recommendation(locked_count: int, visible: bool, in_user_memory: bool) -> str:
+def label_recommendation(brain_count: int, locked_count: int, in_user_memory: bool) -> str:
     """Return the highest-priority label-level recommendation."""
     if locked_count == 0:
         return "seed_locked_training"
-    if not visible:
-        return "add_to_gui_catalog"
+    if brain_count == 0:
+        return "build_trainable_category_memory"
     if not in_user_memory:
         return "optional_memory_seed"
     return "covered"
@@ -367,10 +370,10 @@ def build_role_coverage(
             FxRoleCoverage(
                 role_id=role.role_id,
                 display_name=role.display_name,
-                brain_label_count=len(labels),
+                brain_label_count=sum(row.full_brain_count > 0 for row in labels),
                 full_brain_audio_count=sum(row.full_brain_count for row in labels),
                 locked_training_audio_count=locked_training_total,
-                gui_visible_label_count=sum(1 for row in labels if row.visible_in_gui_catalog),
+                gui_available_label_count=sum(1 for row in labels if row.available_in_gui),
                 user_memory_label_count=sum(1 for row in labels if row.present_in_user_memory),
                 voter_memory_target_count=voter_hits,
                 physics_memory_target_count=physics_hits,
@@ -404,8 +407,6 @@ def role_recommendation(
         return "seed_trusted_fx_role_panel"
     if voter_hits == 0 or physics_hits == 0:
         return "seed_memory_brains"
-    if any(not row.visible_in_gui_catalog for row in labels):
-        return "refresh_gui_taxonomy_catalog"
     return "covered"
 
 
@@ -414,10 +415,10 @@ def unmapped_role_row(unmapped_labels: list[FxLabelCoverage]) -> FxRoleCoverage:
     return FxRoleCoverage(
         role_id="fx_unmapped",
         display_name="Unmapped FX Labels",
-        brain_label_count=len(unmapped_labels),
+        brain_label_count=sum(row.full_brain_count > 0 for row in unmapped_labels),
         full_brain_audio_count=sum(row.full_brain_count for row in unmapped_labels),
         locked_training_audio_count=sum(row.locked_training_audio_count for row in unmapped_labels),
-        gui_visible_label_count=sum(1 for row in unmapped_labels if row.visible_in_gui_catalog),
+        gui_available_label_count=sum(1 for row in unmapped_labels if row.available_in_gui),
         user_memory_label_count=sum(1 for row in unmapped_labels if row.present_in_user_memory),
         voter_memory_target_count=0,
         physics_memory_target_count=0,
@@ -436,7 +437,7 @@ def write_label_coverage(path: Path, rows: list[FxLabelCoverage]) -> None:
                 "role_id",
                 "full_brain_count",
                 "locked_training_audio_count",
-                "visible_in_gui_catalog",
+                "available_in_gui",
                 "present_in_user_memory",
                 "recommendation",
             ]
@@ -448,7 +449,7 @@ def write_label_coverage(path: Path, rows: list[FxLabelCoverage]) -> None:
                     row.role_id,
                     row.full_brain_count,
                     row.locked_training_audio_count,
-                    row.visible_in_gui_catalog,
+                    row.available_in_gui,
                     row.present_in_user_memory,
                     row.recommendation,
                 ]
@@ -466,7 +467,7 @@ def write_role_coverage(path: Path, rows: list[FxRoleCoverage]) -> None:
                 "brain_label_count",
                 "full_brain_audio_count",
                 "locked_training_audio_count",
-                "gui_visible_label_count",
+                "gui_available_label_count",
                 "user_memory_label_count",
                 "voter_memory_target_count",
                 "physics_memory_target_count",
@@ -482,7 +483,7 @@ def write_role_coverage(path: Path, rows: list[FxRoleCoverage]) -> None:
                     row.brain_label_count,
                     row.full_brain_audio_count,
                     row.locked_training_audio_count,
-                    row.gui_visible_label_count,
+                    row.gui_available_label_count,
                     row.user_memory_label_count,
                     row.voter_memory_target_count,
                     row.physics_memory_target_count,
@@ -500,13 +501,13 @@ def write_summary(
 ) -> None:
     """Write a concise human-readable audit summary."""
     labels_with_training = sum(1 for row in label_rows if row.locked_training_audio_count > 0)
-    labels_visible_in_gui = sum(1 for row in label_rows if row.visible_in_gui_catalog)
+    labels_available_in_gui = sum(1 for row in label_rows if row.available_in_gui)
     empty_training = len(label_rows) - labels_with_training
     gui_catalog_only = sorted(label for label in snapshot.gui_labels if label not in snapshot.brain_counts)
     role_lines = [
         f"  {row.role_id}: {row.recommendation} "
         f"(training={row.locked_training_audio_count}/{row.training_goal}, "
-        f"gui={row.gui_visible_label_count}, voter_memory={row.voter_memory_target_count}, "
+        f"gui={row.gui_available_label_count}, voter_memory={row.voter_memory_target_count}, "
         f"physics_memory={row.physics_memory_target_count})"
         for row in role_rows
     ]
@@ -516,11 +517,12 @@ def write_summary(
         "This is diagnostic only. It does not sort audio, train brains, or change runtime behavior.",
         "",
         f"FX ontology roles: {len(snapshot.roles)}",
-        f"FX labels in full brain: {len(label_rows)}",
+        f"FX labels in full brain: {len(snapshot.brain_counts)}",
+        f"FX labels available in GUI: {labels_available_in_gui}",
         f"FX labels with locked curated training audio: {labels_with_training}",
         f"FX labels without locked curated training audio: {empty_training}",
         f"FX labels in GUI taxonomy catalog: {len(snapshot.gui_labels)}",
-        f"FX full-brain labels visible in GUI taxonomy catalog: {labels_visible_in_gui}",
+        "GUI availability is the union of active brain labels and the future-category catalog.",
         f"FX GUI-only labels absent from full brain: {len(gui_catalog_only)}",
         f"Voter-memory FX identifiers: {len(snapshot.voter_memory_ids)}",
         f"Physics-memory FX identifiers: {len(snapshot.physics_memory_ids)}",
@@ -531,7 +533,7 @@ def write_summary(
         "Interpretation:",
         "  Use this report to seed trusted FX memory panels before retuning sorter logic.",
         "  Prioritize roles with seed_trusted_fx_role_panel or seed_memory_brains.",
-        "  Refreshing the GUI catalog should expose safe destination choices; it should not narrow runtime taxonomy.",
+        "  Keep future GUI categories even when they have no trained examples yet.",
     ]
     if gui_catalog_only:
         lines.extend(["", "FX GUI-only labels absent from full brain:"])

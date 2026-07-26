@@ -16,10 +16,17 @@ from .contracts import LabelPrediction
 CALIBRATION_FEATURES = (
     "top_similarity",
     "margin",
+    "prompt_top_similarity",
+    "prompt_margin",
+    "panns_support_score",
+    "panns_contradiction_score",
     "radius_ratio",
     "label_example_count_log",
     "label_prototype_count",
     "structure_agreement",
+    "broad_family_agreement",
+    "out_of_distribution",
+    "duplicate_conflict",
 )
 
 
@@ -36,6 +43,17 @@ class ReviewFeedback:
     label_prototype_count: int
     structure_agreement: float
     created_utc: str
+    final_approved_label: str = ""
+    parent_family_accepted: bool = False
+    prompt_top_similarity: float = 0.0
+    prompt_margin: float = 0.0
+    panns_support_score: float = 0.0
+    panns_contradiction_score: float = 0.0
+    broad_family_agreement: float = 0.5
+    out_of_distribution: float = 0.0
+    duplicate_conflict: float = 0.0
+    brain_version: str = ""
+    taxonomy_version: str = ""
 
     @classmethod
     def from_prediction(
@@ -58,6 +76,8 @@ class ReviewFeedback:
             label_prototype_count=int(prediction.evidence.get("label_prototype_count", 0)),
             structure_agreement=float(structure_agreement),
             created_utc=datetime.now(timezone.utc).isoformat(),
+            final_approved_label=prediction.predicted_label if accepted else "",
+            parent_family_accepted=bool(accepted),
         )
 
 
@@ -92,10 +112,17 @@ def feedback_features(row: ReviewFeedback) -> np.ndarray:
         [
             row.top_similarity,
             row.margin,
+            row.prompt_top_similarity,
+            row.prompt_margin,
+            row.panns_support_score,
+            row.panns_contradiction_score,
             row.radius_ratio,
             float(np.log1p(row.label_example_count)),
             float(row.label_prototype_count),
             row.structure_agreement,
+            row.broad_family_agreement,
+            row.out_of_distribution,
+            row.duplicate_conflict,
         ],
         dtype=np.float64,
     )
@@ -106,6 +133,9 @@ class ConfidenceCalibrator:
 
     def __init__(self) -> None:
         self.model = None
+        self.numpy_mean: np.ndarray | None = None
+        self.numpy_scale: np.ndarray | None = None
+        self.numpy_weights: np.ndarray | None = None
         self.method = "unfitted"
 
     def fit(self, feedback: Sequence[ReviewFeedback]) -> None:
@@ -119,14 +149,89 @@ class ConfidenceCalibrator:
             from sklearn.linear_model import LogisticRegression
             from sklearn.pipeline import make_pipeline
             from sklearn.preprocessing import StandardScaler
-        except ImportError as exc:
-            raise RuntimeError("confidence calibration requires scikit-learn") from exc
+        except ImportError:
+            self._fit_numpy_logistic(x, y)
+            return
         model = make_pipeline(StandardScaler(), LogisticRegression(max_iter=2000, class_weight="balanced"))
         model.fit(x, y)
         self.model = model
+        scaler = model.named_steps["standardscaler"]
+        logistic = model.named_steps["logisticregression"]
+        self.numpy_mean = np.asarray(scaler.mean_, dtype=np.float64)
+        self.numpy_scale = np.asarray(scaler.scale_, dtype=np.float64)
+        self.numpy_weights = np.concatenate(
+            (
+                np.asarray(logistic.intercept_, dtype=np.float64),
+                np.asarray(logistic.coef_[0], dtype=np.float64),
+            )
+        )
         self.method = "logistic"
 
     def predict_probability(self, row: ReviewFeedback) -> float | None:
-        if self.model is None:
+        if self.model is not None:
+            return float(self.model.predict_proba(feedback_features(row).reshape(1, -1))[0, 1])
+        if self.numpy_mean is None or self.numpy_scale is None or self.numpy_weights is None:
             return None
-        return float(self.model.predict_proba(feedback_features(row).reshape(1, -1))[0, 1])
+        features = (feedback_features(row) - self.numpy_mean) / self.numpy_scale
+        design_row = np.concatenate((np.ones(1, dtype=np.float64), features))
+        logit = float(np.clip(design_row @ self.numpy_weights, -35.0, 35.0))
+        return float(1.0 / (1.0 + np.exp(-logit)))
+
+    def save(self, path: Path, *, metadata: dict[str, object] | None = None) -> None:
+        """Save an inspectable, dependency-free calibrator artifact."""
+        if self.numpy_mean is None or self.numpy_scale is None or self.numpy_weights is None:
+            raise ValueError("cannot save an unfitted confidence calibrator")
+        payload = {
+            "schema_version": 1,
+            "method": self.method,
+            "feature_names": list(CALIBRATION_FEATURES),
+            "feature_mean": self.numpy_mean.tolist(),
+            "feature_scale": self.numpy_scale.tolist(),
+            "weights_with_intercept": self.numpy_weights.tolist(),
+            "metadata": dict(metadata or {}),
+        }
+        output_path = Path(path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    @classmethod
+    def load(cls, path: Path) -> ConfidenceCalibrator:
+        """Load a saved calibrator without importing scikit-learn."""
+        payload = json.loads(Path(path).read_text(encoding="utf-8"))
+        if tuple(payload.get("feature_names", [])) != CALIBRATION_FEATURES:
+            raise ValueError("calibration feature contract does not match this runtime")
+        calibrator = cls()
+        calibrator.numpy_mean = np.asarray(payload["feature_mean"], dtype=np.float64)
+        calibrator.numpy_scale = np.asarray(payload["feature_scale"], dtype=np.float64)
+        calibrator.numpy_weights = np.asarray(payload["weights_with_intercept"], dtype=np.float64)
+        if calibrator.numpy_mean.shape != (len(CALIBRATION_FEATURES),):
+            raise ValueError("invalid calibration feature mean shape")
+        if calibrator.numpy_scale.shape != calibrator.numpy_mean.shape:
+            raise ValueError("invalid calibration feature scale shape")
+        if calibrator.numpy_weights.shape != (len(CALIBRATION_FEATURES) + 1,):
+            raise ValueError("invalid calibration weight shape")
+        calibrator.method = f"loaded_{payload.get('method', 'unknown')}"
+        return calibrator
+
+    def _fit_numpy_logistic(self, features: np.ndarray, outcomes: np.ndarray) -> None:
+        """Fit a deterministic NumPy fallback when scikit-learn is unavailable."""
+        mean = features.mean(axis=0)
+        scale = features.std(axis=0)
+        scale = np.where(scale > 1e-12, scale, 1.0)
+        standardized = (features - mean) / scale
+        design = np.column_stack((np.ones(len(standardized), dtype=np.float64), standardized))
+        weights = np.zeros(design.shape[1], dtype=np.float64)
+        targets = outcomes.astype(np.float64)
+        learning_rate = 0.08
+        regularization = 1e-3
+        for _ in range(2000):
+            logits = np.clip(design @ weights, -35.0, 35.0)
+            probabilities = 1.0 / (1.0 + np.exp(-logits))
+            gradient = design.T @ (probabilities - targets) / len(targets)
+            gradient[1:] += regularization * weights[1:]
+            weights -= learning_rate * gradient
+        self.model = None
+        self.numpy_mean = mean
+        self.numpy_scale = scale
+        self.numpy_weights = weights
+        self.method = "numpy_logistic"

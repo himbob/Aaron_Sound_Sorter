@@ -1,0 +1,5433 @@
+{
+  "categories": [
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Body Slap \u2014 Loops",
+      "fallback_parent": "Drums/Claps Snaps Slaps/Loops",
+      "legacy_brain_example_count": 5,
+      "manual_selection_enabled": true,
+      "path": "Drums/Claps Snaps Slaps/Body Slap/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Body Slap \u2014 One Shots",
+      "fallback_parent": "Drums/Claps Snaps Slaps/One Shots",
+      "legacy_brain_example_count": 3,
+      "manual_selection_enabled": true,
+      "path": "Drums/Claps Snaps Slaps/Body Slap/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Generic Clap \u2014 Loops",
+      "fallback_parent": "Drums/Claps Snaps Slaps/Loops",
+      "legacy_brain_example_count": 1205,
+      "manual_selection_enabled": true,
+      "path": "Drums/Claps Snaps Slaps/Generic Clap/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 2
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Generic Clap \u2014 One Shots",
+      "fallback_parent": "Drums/Claps Snaps Slaps/One Shots",
+      "legacy_brain_example_count": 4895,
+      "manual_selection_enabled": true,
+      "path": "Drums/Claps Snaps Slaps/Generic Clap/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 4
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Hand Clap \u2014 Loops",
+      "fallback_parent": "Drums/Claps Snaps Slaps/Loops",
+      "legacy_brain_example_count": 6,
+      "manual_selection_enabled": true,
+      "path": "Drums/Claps Snaps Slaps/Hand Clap/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Hand Clap \u2014 One Shots",
+      "fallback_parent": "Drums/Claps Snaps Slaps/One Shots",
+      "legacy_brain_example_count": 1209,
+      "manual_selection_enabled": true,
+      "path": "Drums/Claps Snaps Slaps/Hand Clap/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 1
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Snap \u2014 Loops",
+      "fallback_parent": "Drums/Claps Snaps Slaps/Loops",
+      "legacy_brain_example_count": 5,
+      "manual_selection_enabled": true,
+      "path": "Drums/Claps Snaps Slaps/Snap/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Snap \u2014 One Shots",
+      "fallback_parent": "Drums/Claps Snaps Slaps/One Shots",
+      "legacy_brain_example_count": 1210,
+      "manual_selection_enabled": true,
+      "path": "Drums/Claps Snaps Slaps/Snap/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Crash Cymbal \u2014 Loops",
+      "fallback_parent": "Drums/Cymbals/Loops",
+      "legacy_brain_example_count": 1,
+      "manual_selection_enabled": true,
+      "path": "Drums/Cymbals/Crash Cymbal/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Crash Cymbal \u2014 One Shots",
+      "fallback_parent": "Drums/Cymbals/One Shots",
+      "legacy_brain_example_count": 96,
+      "manual_selection_enabled": true,
+      "path": "Drums/Cymbals/Crash Cymbal/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Generic Cymbal \u2014 Loops",
+      "fallback_parent": "Drums/Cymbals/Loops",
+      "legacy_brain_example_count": 2,
+      "manual_selection_enabled": true,
+      "path": "Drums/Cymbals/Generic Cymbal/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Generic Cymbal \u2014 One Shots",
+      "fallback_parent": "Drums/Cymbals/One Shots",
+      "legacy_brain_example_count": 26,
+      "manual_selection_enabled": true,
+      "path": "Drums/Cymbals/Generic Cymbal/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Ride Cymbal \u2014 Loops",
+      "fallback_parent": "Drums/Cymbals/Loops",
+      "legacy_brain_example_count": 1,
+      "manual_selection_enabled": true,
+      "path": "Drums/Cymbals/Ride Cymbal/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Ride Cymbal \u2014 One Shots",
+      "fallback_parent": "Drums/Cymbals/One Shots",
+      "legacy_brain_example_count": 1,
+      "manual_selection_enabled": true,
+      "path": "Drums/Cymbals/Ride Cymbal/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Drum Fill \u2014 Loops",
+      "fallback_parent": "Drums/Drum Fills and Rolls/Loops",
+      "legacy_brain_example_count": 6,
+      "manual_selection_enabled": true,
+      "path": "Drums/Drum Fills and Rolls/Drum Fill/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Drum Fill \u2014 One Shots",
+      "fallback_parent": "Drums/Drum Fills and Rolls/One Shots",
+      "legacy_brain_example_count": 1,
+      "manual_selection_enabled": true,
+      "path": "Drums/Drum Fills and Rolls/Drum Fill/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Drum Roll \u2014 One Shots",
+      "fallback_parent": "Drums/Drum Fills and Rolls/One Shots",
+      "legacy_brain_example_count": 2,
+      "manual_selection_enabled": true,
+      "path": "Drums/Drum Fills and Rolls/Drum Roll/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_2_developing_suggestion_only",
+      "display_name": "Full Drum Loops \u2014 Loops",
+      "fallback_parent": "Drums/Drum Loops/Loops",
+      "legacy_brain_example_count": 2414,
+      "manual_selection_enabled": true,
+      "path": "Drums/Drum Loops/Full Drum Loops/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 9
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Drum Loops \u2014 Loops",
+      "fallback_parent": "Drums/Drum Loops",
+      "legacy_brain_example_count": 2496,
+      "manual_selection_enabled": true,
+      "path": "Drums/Drum Loops/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Closed Hat \u2014 Loops",
+      "fallback_parent": "Drums/Hi Hats/Loops",
+      "legacy_brain_example_count": 5,
+      "manual_selection_enabled": true,
+      "path": "Drums/Hi Hats/Closed Hat/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 1
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Closed Hat \u2014 One Shots",
+      "fallback_parent": "Drums/Hi Hats/One Shots",
+      "legacy_brain_example_count": 25,
+      "manual_selection_enabled": true,
+      "path": "Drums/Hi Hats/Closed Hat/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Generic Hat \u2014 Loops",
+      "fallback_parent": "Drums/Hi Hats/Loops",
+      "legacy_brain_example_count": 1816,
+      "manual_selection_enabled": true,
+      "path": "Drums/Hi Hats/Generic Hat/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 2
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Generic Hat \u2014 One Shots",
+      "fallback_parent": "Drums/Hi Hats/One Shots",
+      "legacy_brain_example_count": 128,
+      "manual_selection_enabled": true,
+      "path": "Drums/Hi Hats/Generic Hat/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 1
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Open Hat \u2014 Loops",
+      "fallback_parent": "Drums/Hi Hats/Loops",
+      "legacy_brain_example_count": 344,
+      "manual_selection_enabled": true,
+      "path": "Drums/Hi Hats/Open Hat/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 1
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Open Hat \u2014 One Shots",
+      "fallback_parent": "Drums/Hi Hats/One Shots",
+      "legacy_brain_example_count": 1244,
+      "manual_selection_enabled": true,
+      "path": "Drums/Hi Hats/Open Hat/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 2
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Generic Kick \u2014 Loops",
+      "fallback_parent": "Drums/Kick Drums/Loops",
+      "legacy_brain_example_count": 808,
+      "manual_selection_enabled": true,
+      "path": "Drums/Kick Drums/Generic Kick/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 2
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Generic Kick \u2014 One Shots",
+      "fallback_parent": "Drums/Kick Drums/One Shots",
+      "legacy_brain_example_count": 4916,
+      "manual_selection_enabled": true,
+      "path": "Drums/Kick Drums/Generic Kick/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Short Kick \u2014 One Shots",
+      "fallback_parent": "Drums/Kick Drums/One Shots",
+      "legacy_brain_example_count": 1,
+      "manual_selection_enabled": true,
+      "path": "Drums/Kick Drums/Short Kick/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Sub Kick \u2014 Loops",
+      "fallback_parent": "Drums/Kick Drums/Loops",
+      "legacy_brain_example_count": 1200,
+      "manual_selection_enabled": true,
+      "path": "Drums/Kick Drums/Sub Kick/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 2
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Sub Kick \u2014 One Shots",
+      "fallback_parent": "Drums/Kick Drums/One Shots",
+      "legacy_brain_example_count": 2068,
+      "manual_selection_enabled": true,
+      "path": "Drums/Kick Drums/Sub Kick/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 3
+    },
+    {
+      "automatic_classification_status": "tier_3_unvalidated_suggestion_only",
+      "display_name": "Kick Snare Stacks \u2014 One Shots",
+      "fallback_parent": "Drums/Layered Drum Hits/One Shots",
+      "legacy_brain_example_count": 41,
+      "manual_selection_enabled": true,
+      "path": "Drums/Layered Drum Hits/Kick Snare Stacks/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 41
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Percussion Groove \u2014 Loops",
+      "fallback_parent": "Drums/Percussion Loops/Loops",
+      "legacy_brain_example_count": 10,
+      "manual_selection_enabled": true,
+      "path": "Drums/Percussion Loops/Percussion Groove/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Agogo \u2014 Loops",
+      "fallback_parent": "Drums/Percussion/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Drums/Percussion/Agogo/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Agogo \u2014 One Shots",
+      "fallback_parent": "Drums/Percussion/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Drums/Percussion/Agogo/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Bells and Metallic Percussion \u2014 Loops",
+      "fallback_parent": "Drums/Percussion/Loops",
+      "legacy_brain_example_count": 9,
+      "manual_selection_enabled": true,
+      "path": "Drums/Percussion/Bells and Metallic Percussion/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Bells and Metallic Percussion \u2014 One Shots",
+      "fallback_parent": "Drums/Percussion/One Shots",
+      "legacy_brain_example_count": 264,
+      "manual_selection_enabled": true,
+      "path": "Drums/Percussion/Bells and Metallic Percussion/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 1
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Clave \u2014 Loops",
+      "fallback_parent": "Drums/Percussion/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Drums/Percussion/Clave/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Clave \u2014 One Shots",
+      "fallback_parent": "Drums/Percussion/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Drums/Percussion/Clave/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "future_gui_catalog"
+      ],
+      "training_example_count": 2
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Cowbell \u2014 Loops",
+      "fallback_parent": "Drums/Percussion/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Drums/Percussion/Cowbell/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Cowbell \u2014 One Shots",
+      "fallback_parent": "Drums/Percussion/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Drums/Percussion/Cowbell/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Generic Percussion \u2014 Loops",
+      "fallback_parent": "Drums/Percussion/Loops",
+      "legacy_brain_example_count": 12,
+      "manual_selection_enabled": true,
+      "path": "Drums/Percussion/Generic Percussion/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 4
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Generic Percussion \u2014 One Shots",
+      "fallback_parent": "Drums/Percussion/One Shots",
+      "legacy_brain_example_count": 55,
+      "manual_selection_enabled": true,
+      "path": "Drums/Percussion/Generic Percussion/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Guiros Scrapes and Rasps \u2014 One Shots",
+      "fallback_parent": "Drums/Percussion/One Shots",
+      "legacy_brain_example_count": 9,
+      "manual_selection_enabled": true,
+      "path": "Drums/Percussion/Guiros Scrapes and Rasps/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Shakers and Tambourines \u2014 Loops",
+      "fallback_parent": "Drums/Percussion/Loops",
+      "legacy_brain_example_count": 54,
+      "manual_selection_enabled": true,
+      "path": "Drums/Percussion/Shakers and Tambourines/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Shakers and Tambourines \u2014 One Shots",
+      "fallback_parent": "Drums/Percussion/One Shots",
+      "legacy_brain_example_count": 96,
+      "manual_selection_enabled": true,
+      "path": "Drums/Percussion/Shakers and Tambourines/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 1
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Wood Block \u2014 Loops",
+      "fallback_parent": "Drums/Percussion/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Drums/Percussion/Wood Block/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Wood Block \u2014 One Shots",
+      "fallback_parent": "Drums/Percussion/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Drums/Percussion/Wood Block/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Claves and Wood Blocks \u2014 Loops",
+      "fallback_parent": "Drums/Rims and Sticks/Loops",
+      "legacy_brain_example_count": 3,
+      "manual_selection_enabled": true,
+      "path": "Drums/Rims and Sticks/Claves and Wood Blocks/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Claves and Wood Blocks \u2014 One Shots",
+      "fallback_parent": "Drums/Rims and Sticks/One Shots",
+      "legacy_brain_example_count": 10,
+      "manual_selection_enabled": true,
+      "path": "Drums/Rims and Sticks/Claves and Wood Blocks/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Drum Sticks \u2014 Loops",
+      "fallback_parent": "Drums/Rims and Sticks/Loops",
+      "legacy_brain_example_count": 1,
+      "manual_selection_enabled": true,
+      "path": "Drums/Rims and Sticks/Drum Sticks/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Drum Sticks \u2014 One Shots",
+      "fallback_parent": "Drums/Rims and Sticks/One Shots",
+      "legacy_brain_example_count": 8,
+      "manual_selection_enabled": true,
+      "path": "Drums/Rims and Sticks/Drum Sticks/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 1
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Generic Rim or Stick \u2014 One Shots",
+      "fallback_parent": "Drums/Rims and Sticks/One Shots",
+      "legacy_brain_example_count": 9629,
+      "manual_selection_enabled": true,
+      "path": "Drums/Rims and Sticks/Generic Rim or Stick/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 1
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Rimshot \u2014 Loops",
+      "fallback_parent": "Drums/Rims and Sticks/Loops",
+      "legacy_brain_example_count": 4,
+      "manual_selection_enabled": true,
+      "path": "Drums/Rims and Sticks/Rimshot/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 2
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Rimshot \u2014 One Shots",
+      "fallback_parent": "Drums/Rims and Sticks/One Shots",
+      "legacy_brain_example_count": 3608,
+      "manual_selection_enabled": true,
+      "path": "Drums/Rims and Sticks/Rimshot/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 2
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Sidestick \u2014 Loops",
+      "fallback_parent": "Drums/Rims and Sticks/Loops",
+      "legacy_brain_example_count": 1,
+      "manual_selection_enabled": true,
+      "path": "Drums/Rims and Sticks/Sidestick/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Sidestick \u2014 One Shots",
+      "fallback_parent": "Drums/Rims and Sticks/One Shots",
+      "legacy_brain_example_count": 4804,
+      "manual_selection_enabled": true,
+      "path": "Drums/Rims and Sticks/Sidestick/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 2
+    },
+    {
+      "automatic_classification_status": "tier_2_developing_suggestion_only",
+      "display_name": "Acoustic Snare \u2014 One Shots",
+      "fallback_parent": "Drums/Snares/One Shots",
+      "legacy_brain_example_count": 69497,
+      "manual_selection_enabled": true,
+      "path": "Drums/Snares/Acoustic Snare/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 12
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Clap Snare \u2014 Loops",
+      "fallback_parent": "Drums/Snares/Loops",
+      "legacy_brain_example_count": 4,
+      "manual_selection_enabled": true,
+      "path": "Drums/Snares/Clap Snare/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Clap Snare \u2014 One Shots",
+      "fallback_parent": "Drums/Snares/One Shots",
+      "legacy_brain_example_count": 2,
+      "manual_selection_enabled": true,
+      "path": "Drums/Snares/Clap Snare/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Generic Snare \u2014 Loops",
+      "fallback_parent": "Drums/Snares/Loops",
+      "legacy_brain_example_count": 1680,
+      "manual_selection_enabled": true,
+      "path": "Drums/Snares/Generic Snare/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 3
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Generic Snare \u2014 One Shots",
+      "fallback_parent": "Drums/Snares/One Shots",
+      "legacy_brain_example_count": 1310,
+      "manual_selection_enabled": true,
+      "path": "Drums/Snares/Generic Snare/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 2
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Generic Tom \u2014 Loops",
+      "fallback_parent": "Drums/Toms/Loops",
+      "legacy_brain_example_count": 7,
+      "manual_selection_enabled": true,
+      "path": "Drums/Toms/Generic Tom/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_2_developing_suggestion_only",
+      "display_name": "Generic Tom \u2014 One Shots",
+      "fallback_parent": "Drums/Toms/One Shots",
+      "legacy_brain_example_count": 9647,
+      "manual_selection_enabled": true,
+      "path": "Drums/Toms/Generic Tom/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 8
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Bongo \u2014 Loops",
+      "fallback_parent": "Drums/World Percussion/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Drums/World Percussion/Bongo/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Bongo \u2014 One Shots",
+      "fallback_parent": "Drums/World Percussion/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Drums/World Percussion/Bongo/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Cajon \u2014 Loops",
+      "fallback_parent": "Drums/World Percussion/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Drums/World Percussion/Cajon/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Cajon \u2014 One Shots",
+      "fallback_parent": "Drums/World Percussion/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Drums/World Percussion/Cajon/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Conga \u2014 Loops",
+      "fallback_parent": "Drums/World Percussion/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Drums/World Percussion/Conga/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Conga \u2014 One Shots",
+      "fallback_parent": "Drums/World Percussion/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Drums/World Percussion/Conga/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Djembe \u2014 Loops",
+      "fallback_parent": "Drums/World Percussion/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Drums/World Percussion/Djembe/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Djembe \u2014 One Shots",
+      "fallback_parent": "Drums/World Percussion/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Drums/World Percussion/Djembe/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Tabla \u2014 Loops",
+      "fallback_parent": "Drums/World Percussion/Indian Percussion/Loops",
+      "legacy_brain_example_count": 10,
+      "manual_selection_enabled": true,
+      "path": "Drums/World Percussion/Indian Percussion/Tabla/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Tabla \u2014 One Shots",
+      "fallback_parent": "Drums/World Percussion/Indian Percussion/One Shots",
+      "legacy_brain_example_count": 33,
+      "manual_selection_enabled": true,
+      "path": "Drums/World Percussion/Indian Percussion/Tabla/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Bongo \u2014 Loops",
+      "fallback_parent": "Drums/World Percussion/Latin Percussion/Loops",
+      "legacy_brain_example_count": 10,
+      "manual_selection_enabled": true,
+      "path": "Drums/World Percussion/Latin Percussion/Bongo/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Bongo \u2014 One Shots",
+      "fallback_parent": "Drums/World Percussion/Latin Percussion/One Shots",
+      "legacy_brain_example_count": 4,
+      "manual_selection_enabled": true,
+      "path": "Drums/World Percussion/Latin Percussion/Bongo/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Conga \u2014 Loops",
+      "fallback_parent": "Drums/World Percussion/Latin Percussion/Loops",
+      "legacy_brain_example_count": 5,
+      "manual_selection_enabled": true,
+      "path": "Drums/World Percussion/Latin Percussion/Conga/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Conga \u2014 One Shots",
+      "fallback_parent": "Drums/World Percussion/Latin Percussion/One Shots",
+      "legacy_brain_example_count": 3,
+      "manual_selection_enabled": true,
+      "path": "Drums/World Percussion/Latin Percussion/Conga/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Timbale \u2014 Loops",
+      "fallback_parent": "Drums/World Percussion/Latin Percussion/Loops",
+      "legacy_brain_example_count": 1,
+      "manual_selection_enabled": true,
+      "path": "Drums/World Percussion/Latin Percussion/Timbale/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Tabla \u2014 Loops",
+      "fallback_parent": "Drums/World Percussion/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Drums/World Percussion/Tabla/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Tabla \u2014 One Shots",
+      "fallback_parent": "Drums/World Percussion/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Drums/World Percussion/Tabla/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Timbale \u2014 Loops",
+      "fallback_parent": "Drums/World Percussion/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Drums/World Percussion/Timbale/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Timbale \u2014 One Shots",
+      "fallback_parent": "Drums/World Percussion/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Drums/World Percussion/Timbale/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Bird \u2014 Long FX",
+      "fallback_parent": "FX/Animals and Creatures/Long FX",
+      "legacy_brain_example_count": 96,
+      "manual_selection_enabled": true,
+      "path": "FX/Animals and Creatures/Bird/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Bird \u2014 One Shots",
+      "fallback_parent": "FX/Animals and Creatures/One Shots",
+      "legacy_brain_example_count": 80,
+      "manual_selection_enabled": true,
+      "path": "FX/Animals and Creatures/Bird/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Cat \u2014 Long FX",
+      "fallback_parent": "FX/Animals and Creatures/Long FX",
+      "legacy_brain_example_count": 96,
+      "manual_selection_enabled": true,
+      "path": "FX/Animals and Creatures/Cat/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Cat \u2014 One Shots",
+      "fallback_parent": "FX/Animals and Creatures/One Shots",
+      "legacy_brain_example_count": 80,
+      "manual_selection_enabled": true,
+      "path": "FX/Animals and Creatures/Cat/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Cricket \u2014 Long FX",
+      "fallback_parent": "FX/Animals and Creatures/Long FX",
+      "legacy_brain_example_count": 96,
+      "manual_selection_enabled": true,
+      "path": "FX/Animals and Creatures/Cricket/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Cricket \u2014 One Shots",
+      "fallback_parent": "FX/Animals and Creatures/One Shots",
+      "legacy_brain_example_count": 13,
+      "manual_selection_enabled": true,
+      "path": "FX/Animals and Creatures/Cricket/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Dog \u2014 Long FX",
+      "fallback_parent": "FX/Animals and Creatures/Long FX",
+      "legacy_brain_example_count": 128,
+      "manual_selection_enabled": true,
+      "path": "FX/Animals and Creatures/Dog/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Dog \u2014 One Shots",
+      "fallback_parent": "FX/Animals and Creatures/One Shots",
+      "legacy_brain_example_count": 96,
+      "manual_selection_enabled": true,
+      "path": "FX/Animals and Creatures/Dog/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Glass and Metal \u2014 Long FX",
+      "fallback_parent": "FX/Crashes and Breaks/Long FX",
+      "legacy_brain_example_count": 10,
+      "manual_selection_enabled": true,
+      "path": "FX/Crashes and Breaks/Glass and Metal/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Glass and Metal \u2014 One Shots",
+      "fallback_parent": "FX/Crashes and Breaks/One Shots",
+      "legacy_brain_example_count": 10,
+      "manual_selection_enabled": true,
+      "path": "FX/Crashes and Breaks/Glass and Metal/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 1
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Alarm \u2014 Long FX",
+      "fallback_parent": "FX/Designed Noise FX/Long FX",
+      "legacy_brain_example_count": 96,
+      "manual_selection_enabled": true,
+      "path": "FX/Designed Noise FX/Alarm/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Alarm \u2014 One Shots",
+      "fallback_parent": "FX/Designed Noise FX/One Shots",
+      "legacy_brain_example_count": 32,
+      "manual_selection_enabled": true,
+      "path": "FX/Designed Noise FX/Alarm/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Beep \u2014 One Shots",
+      "fallback_parent": "FX/Designed Noise FX/One Shots",
+      "legacy_brain_example_count": 7,
+      "manual_selection_enabled": true,
+      "path": "FX/Designed Noise FX/Beep/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Blip \u2014 One Shots",
+      "fallback_parent": "FX/Designed Noise FX/One Shots",
+      "legacy_brain_example_count": 7,
+      "manual_selection_enabled": true,
+      "path": "FX/Designed Noise FX/Blip/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 2
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Formant FX \u2014 Long FX",
+      "fallback_parent": "FX/Designed Noise FX/Long FX",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "FX/Designed Noise FX/Formant FX/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Formant FX \u2014 One Shots",
+      "fallback_parent": "FX/Designed Noise FX/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "FX/Designed Noise FX/Formant FX/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Laser \u2014 Long FX",
+      "fallback_parent": "FX/Designed Noise FX/Long FX",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "FX/Designed Noise FX/Laser/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Laser \u2014 One Shots",
+      "fallback_parent": "FX/Designed Noise FX/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "FX/Designed Noise FX/Laser/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Radio and Electrical \u2014 Long FX",
+      "fallback_parent": "FX/Designed Noise FX/Long FX",
+      "legacy_brain_example_count": 10,
+      "manual_selection_enabled": true,
+      "path": "FX/Designed Noise FX/Radio and Electrical/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 1
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Radio and Electrical \u2014 One Shots",
+      "fallback_parent": "FX/Designed Noise FX/One Shots",
+      "legacy_brain_example_count": 9,
+      "manual_selection_enabled": true,
+      "path": "FX/Designed Noise FX/Radio and Electrical/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Siren \u2014 Long FX",
+      "fallback_parent": "FX/Designed Noise FX/Long FX",
+      "legacy_brain_example_count": 1226,
+      "manual_selection_enabled": true,
+      "path": "FX/Designed Noise FX/Siren/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 2
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Siren \u2014 One Shots",
+      "fallback_parent": "FX/Designed Noise FX/One Shots",
+      "legacy_brain_example_count": 2,
+      "manual_selection_enabled": true,
+      "path": "FX/Designed Noise FX/Siren/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_2_developing_suggestion_only",
+      "display_name": "Generic Glitch \u2014 Long FX",
+      "fallback_parent": "FX/Digital Mechanical Industrial Transport/Glitches and Stutters/Long FX",
+      "legacy_brain_example_count": 10,
+      "manual_selection_enabled": true,
+      "path": "FX/Digital Mechanical Industrial Transport/Glitches and Stutters/Generic Glitch/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 8
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Generic Glitch \u2014 One Shots",
+      "fallback_parent": "FX/Digital Mechanical Industrial Transport/Glitches and Stutters/One Shots",
+      "legacy_brain_example_count": 10,
+      "manual_selection_enabled": true,
+      "path": "FX/Digital Mechanical Industrial Transport/Glitches and Stutters/Generic Glitch/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Generic Stutter \u2014 Long FX",
+      "fallback_parent": "FX/Digital Mechanical Industrial Transport/Glitches and Stutters/Long FX",
+      "legacy_brain_example_count": 10,
+      "manual_selection_enabled": true,
+      "path": "FX/Digital Mechanical Industrial Transport/Glitches and Stutters/Generic Stutter/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 2
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Generic Stutter \u2014 One Shots",
+      "fallback_parent": "FX/Digital Mechanical Industrial Transport/Glitches and Stutters/One Shots",
+      "legacy_brain_example_count": 2,
+      "manual_selection_enabled": true,
+      "path": "FX/Digital Mechanical Industrial Transport/Glitches and Stutters/Generic Stutter/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Engine \u2014 Long FX",
+      "fallback_parent": "FX/Digital Mechanical Industrial Transport/Machines/Long FX",
+      "legacy_brain_example_count": 10,
+      "manual_selection_enabled": true,
+      "path": "FX/Digital Mechanical Industrial Transport/Machines/Engine/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Motor \u2014 Long FX",
+      "fallback_parent": "FX/Digital Mechanical Industrial Transport/Machines/Long FX",
+      "legacy_brain_example_count": 10,
+      "manual_selection_enabled": true,
+      "path": "FX/Digital Mechanical Industrial Transport/Machines/Motor/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Servo and Motor \u2014 Long FX",
+      "fallback_parent": "FX/Digital Mechanical Industrial Transport/Long FX",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "FX/Digital Mechanical Industrial Transport/Servo and Motor/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Servo and Motor \u2014 One Shots",
+      "fallback_parent": "FX/Digital Mechanical Industrial Transport/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "FX/Digital Mechanical Industrial Transport/Servo and Motor/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Generic Door \u2014 Long FX",
+      "fallback_parent": "FX/Everyday Foley/Doors/Long FX",
+      "legacy_brain_example_count": 96,
+      "manual_selection_enabled": true,
+      "path": "FX/Everyday Foley/Doors/Generic Door/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Generic Door \u2014 One Shots",
+      "fallback_parent": "FX/Everyday Foley/Doors/One Shots",
+      "legacy_brain_example_count": 19,
+      "manual_selection_enabled": true,
+      "path": "FX/Everyday Foley/Doors/Generic Door/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Footstep \u2014 Long FX",
+      "fallback_parent": "FX/Everyday Foley/Footsteps/Long FX",
+      "legacy_brain_example_count": 10,
+      "manual_selection_enabled": true,
+      "path": "FX/Everyday Foley/Footsteps/Footstep/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Footstep \u2014 One Shots",
+      "fallback_parent": "FX/Everyday Foley/Footsteps/One Shots",
+      "legacy_brain_example_count": 7,
+      "manual_selection_enabled": true,
+      "path": "FX/Everyday Foley/Footsteps/Footstep/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Glass \u2014 Long FX",
+      "fallback_parent": "FX/Everyday Foley/Long FX",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "FX/Everyday Foley/Glass/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Glass \u2014 One Shots",
+      "fallback_parent": "FX/Everyday Foley/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "FX/Everyday Foley/Glass/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Carkeys \u2014 Long FX",
+      "fallback_parent": "FX/Everyday Foley/Keys Coins and Small Objects/Long FX",
+      "legacy_brain_example_count": 96,
+      "manual_selection_enabled": true,
+      "path": "FX/Everyday Foley/Keys Coins and Small Objects/Carkeys/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Carkeys \u2014 One Shots",
+      "fallback_parent": "FX/Everyday Foley/Keys Coins and Small Objects/One Shots",
+      "legacy_brain_example_count": 45,
+      "manual_selection_enabled": true,
+      "path": "FX/Everyday Foley/Keys Coins and Small Objects/Carkeys/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Coins \u2014 Long FX",
+      "fallback_parent": "FX/Everyday Foley/Keys Coins and Small Objects/Long FX",
+      "legacy_brain_example_count": 96,
+      "manual_selection_enabled": true,
+      "path": "FX/Everyday Foley/Keys Coins and Small Objects/Coins/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Coins \u2014 One Shots",
+      "fallback_parent": "FX/Everyday Foley/Keys Coins and Small Objects/One Shots",
+      "legacy_brain_example_count": 96,
+      "manual_selection_enabled": true,
+      "path": "FX/Everyday Foley/Keys Coins and Small Objects/Coins/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Engine \u2014 Long FX",
+      "fallback_parent": "FX/Everyday Foley/Machines/Long FX",
+      "legacy_brain_example_count": 128,
+      "manual_selection_enabled": true,
+      "path": "FX/Everyday Foley/Machines/Engine/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Engine \u2014 One Shots",
+      "fallback_parent": "FX/Everyday Foley/Machines/One Shots",
+      "legacy_brain_example_count": 27,
+      "manual_selection_enabled": true,
+      "path": "FX/Everyday Foley/Machines/Engine/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Generic Machine \u2014 Long FX",
+      "fallback_parent": "FX/Everyday Foley/Machines/Long FX",
+      "legacy_brain_example_count": 1,
+      "manual_selection_enabled": true,
+      "path": "FX/Everyday Foley/Machines/Generic Machine/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Motor \u2014 Long FX",
+      "fallback_parent": "FX/Everyday Foley/Machines/Long FX",
+      "legacy_brain_example_count": 96,
+      "manual_selection_enabled": true,
+      "path": "FX/Everyday Foley/Machines/Motor/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Motor \u2014 One Shots",
+      "fallback_parent": "FX/Everyday Foley/Machines/One Shots",
+      "legacy_brain_example_count": 2,
+      "manual_selection_enabled": true,
+      "path": "FX/Everyday Foley/Machines/Motor/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Metal \u2014 Long FX",
+      "fallback_parent": "FX/Everyday Foley/Long FX",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "FX/Everyday Foley/Metal/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Metal \u2014 One Shots",
+      "fallback_parent": "FX/Everyday Foley/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "FX/Everyday Foley/Metal/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Paper and Cloth \u2014 Long FX",
+      "fallback_parent": "FX/Everyday Foley/Long FX",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "FX/Everyday Foley/Paper and Cloth/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Paper and Cloth \u2014 One Shots",
+      "fallback_parent": "FX/Everyday Foley/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "FX/Everyday Foley/Paper and Cloth/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Splash \u2014 Long FX",
+      "fallback_parent": "FX/Everyday Foley/Water Foley/Long FX",
+      "legacy_brain_example_count": 10,
+      "manual_selection_enabled": true,
+      "path": "FX/Everyday Foley/Water Foley/Splash/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Splash \u2014 One Shots",
+      "fallback_parent": "FX/Everyday Foley/Water Foley/One Shots",
+      "legacy_brain_example_count": 10,
+      "manual_selection_enabled": true,
+      "path": "FX/Everyday Foley/Water Foley/Splash/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Wood \u2014 Long FX",
+      "fallback_parent": "FX/Everyday Foley/Long FX",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "FX/Everyday Foley/Wood/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Wood \u2014 One Shots",
+      "fallback_parent": "FX/Everyday Foley/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "FX/Everyday Foley/Wood/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_3_unvalidated_suggestion_only",
+      "display_name": "Altered Voice \u2014 Long FX",
+      "fallback_parent": "FX/Human and Voice FX/Long FX",
+      "legacy_brain_example_count": 4800,
+      "manual_selection_enabled": true,
+      "path": "FX/Human and Voice FX/Altered Voice/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 17
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Altered Voice \u2014 One Shots",
+      "fallback_parent": "FX/Human and Voice FX/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "FX/Human and Voice FX/Altered Voice/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot"
+      ],
+      "training_example_count": 2
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Applause \u2014 Long FX",
+      "fallback_parent": "FX/Human and Voice FX/Long FX",
+      "legacy_brain_example_count": 128,
+      "manual_selection_enabled": true,
+      "path": "FX/Human and Voice FX/Applause/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Breath \u2014 Long FX",
+      "fallback_parent": "FX/Human and Voice FX/Long FX",
+      "legacy_brain_example_count": 228,
+      "manual_selection_enabled": true,
+      "path": "FX/Human and Voice FX/Breath/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 1
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Crowd \u2014 Long FX",
+      "fallback_parent": "FX/Human and Voice FX/Long FX",
+      "legacy_brain_example_count": 96,
+      "manual_selection_enabled": true,
+      "path": "FX/Human and Voice FX/Crowd/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Crowd \u2014 One Shots",
+      "fallback_parent": "FX/Human and Voice FX/One Shots",
+      "legacy_brain_example_count": 7,
+      "manual_selection_enabled": true,
+      "path": "FX/Human and Voice FX/Crowd/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Mouth Sounds \u2014 Long FX",
+      "fallback_parent": "FX/Human and Voice FX/Long FX",
+      "legacy_brain_example_count": 2,
+      "manual_selection_enabled": true,
+      "path": "FX/Human and Voice FX/Mouth Sounds/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_2_developing_suggestion_only",
+      "display_name": "Mouth Sounds \u2014 One Shots",
+      "fallback_parent": "FX/Human and Voice FX/One Shots",
+      "legacy_brain_example_count": 253,
+      "manual_selection_enabled": true,
+      "path": "FX/Human and Voice FX/Mouth Sounds/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 5
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Scream \u2014 Long FX",
+      "fallback_parent": "FX/Human and Voice FX/Long FX",
+      "legacy_brain_example_count": 1,
+      "manual_selection_enabled": true,
+      "path": "FX/Human and Voice FX/Scream/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 1
+    },
+    {
+      "automatic_classification_status": "tier_3_unvalidated_suggestion_only",
+      "display_name": "Spoken Voice \u2014 Long FX",
+      "fallback_parent": "FX/Human and Voice FX/Long FX",
+      "legacy_brain_example_count": 3696,
+      "manual_selection_enabled": true,
+      "path": "FX/Human and Voice FX/Spoken Voice/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 19
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Spoken Voice \u2014 One Shots",
+      "fallback_parent": "FX/Human and Voice FX/One Shots",
+      "legacy_brain_example_count": 1296,
+      "manual_selection_enabled": true,
+      "path": "FX/Human and Voice FX/Spoken Voice/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 2
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Boom \u2014 Long FX",
+      "fallback_parent": "FX/Impacts and Hits/Long FX",
+      "legacy_brain_example_count": 96,
+      "manual_selection_enabled": true,
+      "path": "FX/Impacts and Hits/Boom/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 1
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Boom \u2014 One Shots",
+      "fallback_parent": "FX/Impacts and Hits/One Shots",
+      "legacy_brain_example_count": 17,
+      "manual_selection_enabled": true,
+      "path": "FX/Impacts and Hits/Boom/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 2
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Generic Impact \u2014 Long FX",
+      "fallback_parent": "FX/Impacts and Hits/Long FX",
+      "legacy_brain_example_count": 1210,
+      "manual_selection_enabled": true,
+      "path": "FX/Impacts and Hits/Generic Impact/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 1
+    },
+    {
+      "automatic_classification_status": "tier_2_developing_suggestion_only",
+      "display_name": "Generic Impact \u2014 One Shots",
+      "fallback_parent": "FX/Impacts and Hits/One Shots",
+      "legacy_brain_example_count": 2177,
+      "manual_selection_enabled": true,
+      "path": "FX/Impacts and Hits/Generic Impact/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 7
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Short Impact \u2014 Long FX",
+      "fallback_parent": "FX/Impacts and Hits/Long FX",
+      "legacy_brain_example_count": 14,
+      "manual_selection_enabled": true,
+      "path": "FX/Impacts and Hits/Short Impact/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Short Impact \u2014 One Shots",
+      "fallback_parent": "FX/Impacts and Hits/One Shots",
+      "legacy_brain_example_count": 1,
+      "manual_selection_enabled": true,
+      "path": "FX/Impacts and Hits/Short Impact/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Slam \u2014 Long FX",
+      "fallback_parent": "FX/Impacts and Hits/Long FX",
+      "legacy_brain_example_count": 96,
+      "manual_selection_enabled": true,
+      "path": "FX/Impacts and Hits/Slam/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Slam \u2014 One Shots",
+      "fallback_parent": "FX/Impacts and Hits/One Shots",
+      "legacy_brain_example_count": 96,
+      "manual_selection_enabled": true,
+      "path": "FX/Impacts and Hits/Slam/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Sub Hit \u2014 Long FX",
+      "fallback_parent": "FX/Impacts and Hits/Long FX",
+      "legacy_brain_example_count": 5,
+      "manual_selection_enabled": true,
+      "path": "FX/Impacts and Hits/Sub Hit/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Sub Hit \u2014 One Shots",
+      "fallback_parent": "FX/Impacts and Hits/One Shots",
+      "legacy_brain_example_count": 10,
+      "manual_selection_enabled": true,
+      "path": "FX/Impacts and Hits/Sub Hit/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Generic Downlifter \u2014 Long FX",
+      "fallback_parent": "FX/Structural and Transitional FX/Drops and Downlifters/Long FX",
+      "legacy_brain_example_count": 1210,
+      "manual_selection_enabled": true,
+      "path": "FX/Structural and Transitional FX/Drops and Downlifters/Generic Downlifter/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 1
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Generic Drop or Downlifter \u2014 Long FX",
+      "fallback_parent": "FX/Structural and Transitional FX/Drops and Downlifters/Long FX",
+      "legacy_brain_example_count": 6,
+      "manual_selection_enabled": true,
+      "path": "FX/Structural and Transitional FX/Drops and Downlifters/Generic Drop or Downlifter/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Generic Reverse \u2014 Long FX",
+      "fallback_parent": "FX/Structural and Transitional FX/Reverses and Tails/Long FX",
+      "legacy_brain_example_count": 15,
+      "manual_selection_enabled": true,
+      "path": "FX/Structural and Transitional FX/Reverses and Tails/Generic Reverse/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Generic Reverse \u2014 One Shots",
+      "fallback_parent": "FX/Structural and Transitional FX/Reverses and Tails/One Shots",
+      "legacy_brain_example_count": 1205,
+      "manual_selection_enabled": true,
+      "path": "FX/Structural and Transitional FX/Reverses and Tails/Generic Reverse/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 1
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Reverse Cymbal \u2014 Long FX",
+      "fallback_parent": "FX/Structural and Transitional FX/Reverses and Tails/Long FX",
+      "legacy_brain_example_count": 5,
+      "manual_selection_enabled": true,
+      "path": "FX/Structural and Transitional FX/Reverses and Tails/Reverse Cymbal/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Generic Build \u2014 Long FX",
+      "fallback_parent": "FX/Structural and Transitional FX/Risers and Builds/Long FX",
+      "legacy_brain_example_count": 1,
+      "manual_selection_enabled": true,
+      "path": "FX/Structural and Transitional FX/Risers and Builds/Generic Build/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 4
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Generic Riser \u2014 Long FX",
+      "fallback_parent": "FX/Structural and Transitional FX/Risers and Builds/Long FX",
+      "legacy_brain_example_count": 1217,
+      "manual_selection_enabled": true,
+      "path": "FX/Structural and Transitional FX/Risers and Builds/Generic Riser/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 2
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Generic Riser \u2014 One Shots",
+      "fallback_parent": "FX/Structural and Transitional FX/Risers and Builds/One Shots",
+      "legacy_brain_example_count": 6,
+      "manual_selection_enabled": true,
+      "path": "FX/Structural and Transitional FX/Risers and Builds/Generic Riser/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Granular Riser \u2014 Long FX",
+      "fallback_parent": "FX/Structural and Transitional FX/Risers and Builds/Long FX",
+      "legacy_brain_example_count": 1,
+      "manual_selection_enabled": true,
+      "path": "FX/Structural and Transitional FX/Risers and Builds/Granular Riser/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 4
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Long Riser \u2014 Long FX",
+      "fallback_parent": "FX/Structural and Transitional FX/Risers and Builds/Long FX",
+      "legacy_brain_example_count": 2402,
+      "manual_selection_enabled": true,
+      "path": "FX/Structural and Transitional FX/Risers and Builds/Long Riser/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 3
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Short Riser \u2014 Long FX",
+      "fallback_parent": "FX/Structural and Transitional FX/Risers and Builds/Long FX",
+      "legacy_brain_example_count": 2,
+      "manual_selection_enabled": true,
+      "path": "FX/Structural and Transitional FX/Risers and Builds/Short Riser/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Short Riser \u2014 One Shots",
+      "fallback_parent": "FX/Structural and Transitional FX/Risers and Builds/One Shots",
+      "legacy_brain_example_count": 1,
+      "manual_selection_enabled": true,
+      "path": "FX/Structural and Transitional FX/Risers and Builds/Short Riser/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Synth Riser \u2014 Long FX",
+      "fallback_parent": "FX/Structural and Transitional FX/Risers and Builds/Long FX",
+      "legacy_brain_example_count": 9,
+      "manual_selection_enabled": true,
+      "path": "FX/Structural and Transitional FX/Risers and Builds/Synth Riser/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Generic Whoosh or Sweep \u2014 Long FX",
+      "fallback_parent": "FX/Structural and Transitional FX/Sweeps and Whooshes/Long FX",
+      "legacy_brain_example_count": 96,
+      "manual_selection_enabled": true,
+      "path": "FX/Structural and Transitional FX/Sweeps and Whooshes/Generic Whoosh or Sweep/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 1
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Generic Whoosh or Sweep \u2014 One Shots",
+      "fallback_parent": "FX/Structural and Transitional FX/Sweeps and Whooshes/One Shots",
+      "legacy_brain_example_count": 96,
+      "manual_selection_enabled": true,
+      "path": "FX/Structural and Transitional FX/Sweeps and Whooshes/Generic Whoosh or Sweep/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Atmosphere \u2014 Long FX",
+      "fallback_parent": "FX/Textures/Drones and Atmospheres/Long FX",
+      "legacy_brain_example_count": 1210,
+      "manual_selection_enabled": true,
+      "path": "FX/Textures/Drones and Atmospheres/Atmosphere/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 2
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Atmosphere \u2014 One Shots",
+      "fallback_parent": "FX/Textures/Drones and Atmospheres/One Shots",
+      "legacy_brain_example_count": 5,
+      "manual_selection_enabled": true,
+      "path": "FX/Textures/Drones and Atmospheres/Atmosphere/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Drone \u2014 Long FX",
+      "fallback_parent": "FX/Textures/Drones and Atmospheres/Long FX",
+      "legacy_brain_example_count": 2,
+      "manual_selection_enabled": true,
+      "path": "FX/Textures/Drones and Atmospheres/Drone/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Drone \u2014 One Shots",
+      "fallback_parent": "FX/Textures/Drones and Atmospheres/One Shots",
+      "legacy_brain_example_count": 3,
+      "manual_selection_enabled": true,
+      "path": "FX/Textures/Drones and Atmospheres/Drone/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Granular \u2014 Long FX",
+      "fallback_parent": "FX/Textures/Granular and Sandy Textures/Long FX",
+      "legacy_brain_example_count": 863,
+      "manual_selection_enabled": true,
+      "path": "FX/Textures/Granular and Sandy Textures/Granular/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 1
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Coffee Shop Ambience \u2014 Long FX",
+      "fallback_parent": "FX/Textures/Natural Ambience/Long FX",
+      "legacy_brain_example_count": 1,
+      "manual_selection_enabled": true,
+      "path": "FX/Textures/Natural Ambience/Coffee Shop Ambience/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Fire \u2014 Long FX",
+      "fallback_parent": "FX/Textures/Natural Ambience/Long FX",
+      "legacy_brain_example_count": 96,
+      "manual_selection_enabled": true,
+      "path": "FX/Textures/Natural Ambience/Fire/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Fire \u2014 One Shots",
+      "fallback_parent": "FX/Textures/Natural Ambience/One Shots",
+      "legacy_brain_example_count": 29,
+      "manual_selection_enabled": true,
+      "path": "FX/Textures/Natural Ambience/Fire/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Ocean \u2014 Long FX",
+      "fallback_parent": "FX/Textures/Natural Ambience/Long FX",
+      "legacy_brain_example_count": 53,
+      "manual_selection_enabled": true,
+      "path": "FX/Textures/Natural Ambience/Ocean/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Ocean \u2014 One Shots",
+      "fallback_parent": "FX/Textures/Natural Ambience/One Shots",
+      "legacy_brain_example_count": 4,
+      "manual_selection_enabled": true,
+      "path": "FX/Textures/Natural Ambience/Ocean/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Rain \u2014 Long FX",
+      "fallback_parent": "FX/Textures/Natural Ambience/Long FX",
+      "legacy_brain_example_count": 96,
+      "manual_selection_enabled": true,
+      "path": "FX/Textures/Natural Ambience/Rain/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Rain \u2014 One Shots",
+      "fallback_parent": "FX/Textures/Natural Ambience/One Shots",
+      "legacy_brain_example_count": 2,
+      "manual_selection_enabled": true,
+      "path": "FX/Textures/Natural Ambience/Rain/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Thunder \u2014 Long FX",
+      "fallback_parent": "FX/Textures/Natural Ambience/Long FX",
+      "legacy_brain_example_count": 128,
+      "manual_selection_enabled": true,
+      "path": "FX/Textures/Natural Ambience/Thunder/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Thunder \u2014 One Shots",
+      "fallback_parent": "FX/Textures/Natural Ambience/One Shots",
+      "legacy_brain_example_count": 7,
+      "manual_selection_enabled": true,
+      "path": "FX/Textures/Natural Ambience/Thunder/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Water \u2014 Long FX",
+      "fallback_parent": "FX/Textures/Natural Ambience/Long FX",
+      "legacy_brain_example_count": 128,
+      "manual_selection_enabled": true,
+      "path": "FX/Textures/Natural Ambience/Water/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Water \u2014 One Shots",
+      "fallback_parent": "FX/Textures/Natural Ambience/One Shots",
+      "legacy_brain_example_count": 38,
+      "manual_selection_enabled": true,
+      "path": "FX/Textures/Natural Ambience/Water/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Waves \u2014 Long FX",
+      "fallback_parent": "FX/Textures/Natural Ambience/Long FX",
+      "legacy_brain_example_count": 96,
+      "manual_selection_enabled": true,
+      "path": "FX/Textures/Natural Ambience/Waves/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Waves \u2014 One Shots",
+      "fallback_parent": "FX/Textures/Natural Ambience/One Shots",
+      "legacy_brain_example_count": 2,
+      "manual_selection_enabled": true,
+      "path": "FX/Textures/Natural Ambience/Waves/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Wind \u2014 Long FX",
+      "fallback_parent": "FX/Textures/Natural Ambience/Long FX",
+      "legacy_brain_example_count": 128,
+      "manual_selection_enabled": true,
+      "path": "FX/Textures/Natural Ambience/Wind/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Wind \u2014 One Shots",
+      "fallback_parent": "FX/Textures/Natural Ambience/One Shots",
+      "legacy_brain_example_count": 16,
+      "manual_selection_enabled": true,
+      "path": "FX/Textures/Natural Ambience/Wind/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Hiss \u2014 Long FX",
+      "fallback_parent": "FX/Textures/Noise and Static/Long FX",
+      "legacy_brain_example_count": 96,
+      "manual_selection_enabled": true,
+      "path": "FX/Textures/Noise and Static/Hiss/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Hiss \u2014 One Shots",
+      "fallback_parent": "FX/Textures/Noise and Static/One Shots",
+      "legacy_brain_example_count": 20,
+      "manual_selection_enabled": true,
+      "path": "FX/Textures/Noise and Static/Hiss/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Static \u2014 Long FX",
+      "fallback_parent": "FX/Textures/Noise and Static/Long FX",
+      "legacy_brain_example_count": 1,
+      "manual_selection_enabled": true,
+      "path": "FX/Textures/Noise and Static/Static/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 1
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Vinyl Noise \u2014 Long FX",
+      "fallback_parent": "FX/Textures/Noise and Static/Long FX",
+      "legacy_brain_example_count": 37,
+      "manual_selection_enabled": true,
+      "path": "FX/Textures/Noise and Static/Vinyl Noise/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Vinyl Noise \u2014 One Shots",
+      "fallback_parent": "FX/Textures/Noise and Static/One Shots",
+      "legacy_brain_example_count": 2,
+      "manual_selection_enabled": true,
+      "path": "FX/Textures/Noise and Static/Vinyl Noise/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "White Noise \u2014 Long FX",
+      "fallback_parent": "FX/Textures/Noise and Static/Long FX",
+      "legacy_brain_example_count": 3,
+      "manual_selection_enabled": true,
+      "path": "FX/Textures/Noise and Static/White Noise/Long FX",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "808 Bass \u2014 Loops",
+      "fallback_parent": "Instruments/Bass/Loops",
+      "legacy_brain_example_count": 9,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Bass/808 Bass/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 1
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "808 Bass \u2014 One Shots",
+      "fallback_parent": "Instruments/Bass/One Shots",
+      "legacy_brain_example_count": 9,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Bass/808 Bass/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 1
+    },
+    {
+      "automatic_classification_status": "tier_2_developing_suggestion_only",
+      "display_name": "Electric Bass \u2014 Loops",
+      "fallback_parent": "Instruments/Bass/Loops",
+      "legacy_brain_example_count": 2409,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Bass/Electric Bass/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 7
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Electric Bass \u2014 One Shots",
+      "fallback_parent": "Instruments/Bass/One Shots",
+      "legacy_brain_example_count": 9,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Bass/Electric Bass/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Generic Bass \u2014 Loops",
+      "fallback_parent": "Instruments/Bass/Loops",
+      "legacy_brain_example_count": 3609,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Bass/Generic Bass/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 3
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Generic Bass \u2014 One Shots",
+      "fallback_parent": "Instruments/Bass/One Shots",
+      "legacy_brain_example_count": 9,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Bass/Generic Bass/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Sub Bass \u2014 Loops",
+      "fallback_parent": "Instruments/Bass/Loops",
+      "legacy_brain_example_count": 7,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Bass/Sub Bass/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 3
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Sub Bass \u2014 One Shots",
+      "fallback_parent": "Instruments/Bass/One Shots",
+      "legacy_brain_example_count": 6,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Bass/Sub Bass/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Synth Bass \u2014 Loops",
+      "fallback_parent": "Instruments/Bass/Loops",
+      "legacy_brain_example_count": 2467,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Bass/Synth Bass/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 3
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Synth Bass \u2014 One Shots",
+      "fallback_parent": "Instruments/Bass/One Shots",
+      "legacy_brain_example_count": 5,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Bass/Synth Bass/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Upright Bass \u2014 Loops",
+      "fallback_parent": "Instruments/Bass/Loops",
+      "legacy_brain_example_count": 11,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Bass/Upright Bass/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Brass and Woodwinds \u2014 Loops",
+      "fallback_parent": "Instruments/Brass and Woodwinds",
+      "legacy_brain_example_count": 2,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Brass and Woodwinds/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Loops \u2014 One Shots",
+      "fallback_parent": "Instruments/Brass and Woodwinds/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Brass and Woodwinds/Loops/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Stabs \u2014 One Shots",
+      "fallback_parent": "Instruments/Brass and Woodwinds/One Shots",
+      "legacy_brain_example_count": 1,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Brass and Woodwinds/Stabs/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Brass Section \u2014 Loops",
+      "fallback_parent": "Instruments/Brass/Loops",
+      "legacy_brain_example_count": 1200,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Brass/Brass Section/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "future_gui_catalog",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 1
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Brass Section \u2014 One Shots",
+      "fallback_parent": "Instruments/Brass/One Shots",
+      "legacy_brain_example_count": 1200,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Brass/Brass Section/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "future_gui_catalog",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 1
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "French Horn \u2014 Loops",
+      "fallback_parent": "Instruments/Brass/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Brass/French Horn/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "French Horn \u2014 One Shots",
+      "fallback_parent": "Instruments/Brass/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Brass/French Horn/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Horns \u2014 Loops",
+      "fallback_parent": "Instruments/Brass/Loops",
+      "legacy_brain_example_count": 10,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Brass/Horns/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Horns \u2014 One Shots",
+      "fallback_parent": "Instruments/Brass/One Shots",
+      "legacy_brain_example_count": 9,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Brass/Horns/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Trombone \u2014 Loops",
+      "fallback_parent": "Instruments/Brass/Loops",
+      "legacy_brain_example_count": 1,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Brass/Trombone/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Trumpet \u2014 Loops",
+      "fallback_parent": "Instruments/Brass/Loops",
+      "legacy_brain_example_count": 58,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Brass/Trumpet/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Trumpet \u2014 One Shots",
+      "fallback_parent": "Instruments/Brass/One Shots",
+      "legacy_brain_example_count": 51,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Brass/Trumpet/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Tuba \u2014 Loops",
+      "fallback_parent": "Instruments/Brass/Loops",
+      "legacy_brain_example_count": 2,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Brass/Tuba/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Tuba \u2014 One Shots",
+      "fallback_parent": "Instruments/Brass/One Shots",
+      "legacy_brain_example_count": 10,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Brass/Tuba/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Acoustic Guitar \u2014 Loops",
+      "fallback_parent": "Instruments/Guitar/Loops",
+      "legacy_brain_example_count": 1259,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Guitar/Acoustic Guitar/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 3
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Acoustic Guitar \u2014 One Shots",
+      "fallback_parent": "Instruments/Guitar/One Shots",
+      "legacy_brain_example_count": 80,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Guitar/Acoustic Guitar/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_2_developing_suggestion_only",
+      "display_name": "Electric Guitar \u2014 Loops",
+      "fallback_parent": "Instruments/Guitar/Loops",
+      "legacy_brain_example_count": 59,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Guitar/Electric Guitar/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 6
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Electric Guitar \u2014 One Shots",
+      "fallback_parent": "Instruments/Guitar/One Shots",
+      "legacy_brain_example_count": 96,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Guitar/Electric Guitar/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Guitar Chords \u2014 Loops",
+      "fallback_parent": "Instruments/Guitar/Loops",
+      "legacy_brain_example_count": 3,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Guitar/Guitar Chords/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Guitar Chords \u2014 One Shots",
+      "fallback_parent": "Instruments/Guitar/One Shots",
+      "legacy_brain_example_count": 1209,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Guitar/Guitar Chords/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 1
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Guitar Loops \u2014 Loops",
+      "fallback_parent": "Instruments/Guitar/Loops",
+      "legacy_brain_example_count": 1217,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Guitar/Guitar Loops/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Guitar Plucks \u2014 Loops",
+      "fallback_parent": "Instruments/Guitar/Loops",
+      "legacy_brain_example_count": 3,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Guitar/Guitar Plucks/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Nylon Guitar \u2014 Loops",
+      "fallback_parent": "Instruments/Guitar/Loops",
+      "legacy_brain_example_count": 10,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Guitar/Nylon Guitar/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 1
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Clavinet \u2014 Loops",
+      "fallback_parent": "Instruments/Keys/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Keys/Clavinet/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Clavinet \u2014 One Shots",
+      "fallback_parent": "Instruments/Keys/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Keys/Clavinet/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Electric Piano \u2014 Loops",
+      "fallback_parent": "Instruments/Keys/Loops",
+      "legacy_brain_example_count": 2408,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Keys/Electric Piano/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "future_gui_catalog",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 3
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Electric Piano \u2014 One Shots",
+      "fallback_parent": "Instruments/Keys/One Shots",
+      "legacy_brain_example_count": 5,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Keys/Electric Piano/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "future_gui_catalog",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 1
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Harpsichord \u2014 Loops",
+      "fallback_parent": "Instruments/Keys/Loops",
+      "legacy_brain_example_count": 1,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Keys/Harpsichord/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_2_developing_suggestion_only",
+      "display_name": "Keys Loops \u2014 Loops",
+      "fallback_parent": "Instruments/Keys/Loops",
+      "legacy_brain_example_count": 7215,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Keys/Keys Loops/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 5
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Organ \u2014 Loops",
+      "fallback_parent": "Instruments/Keys/Loops",
+      "legacy_brain_example_count": 9,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Keys/Organ/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "future_gui_catalog",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Organ \u2014 One Shots",
+      "fallback_parent": "Instruments/Keys/One Shots",
+      "legacy_brain_example_count": 8,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Keys/Organ/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "future_gui_catalog",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_2_developing_suggestion_only",
+      "display_name": "Piano \u2014 Loops",
+      "fallback_parent": "Instruments/Keys/Loops",
+      "legacy_brain_example_count": 7379,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Keys/Piano/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "future_gui_catalog",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 12
+    },
+    {
+      "automatic_classification_status": "tier_3_unvalidated_suggestion_only",
+      "display_name": "Piano \u2014 One Shots",
+      "fallback_parent": "Instruments/Keys/One Shots",
+      "legacy_brain_example_count": 30,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Keys/Piano/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "future_gui_catalog",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 30
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Processed Keys \u2014 Loops",
+      "fallback_parent": "Instruments/Keys/Loops",
+      "legacy_brain_example_count": 7,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Keys/Processed Keys/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_2_developing_suggestion_only",
+      "display_name": "Rhodes \u2014 Loops",
+      "fallback_parent": "Instruments/Keys/Loops",
+      "legacy_brain_example_count": 1208,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Keys/Rhodes/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 5
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Rhodes \u2014 One Shots",
+      "fallback_parent": "Instruments/Keys/One Shots",
+      "legacy_brain_example_count": 6,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Keys/Rhodes/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 1
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Wurlitzer \u2014 Loops",
+      "fallback_parent": "Instruments/Keys/Loops",
+      "legacy_brain_example_count": 4,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Keys/Wurlitzer/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 1
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Wurlitzer \u2014 One Shots",
+      "fallback_parent": "Instruments/Keys/One Shots",
+      "legacy_brain_example_count": 7,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Keys/Wurlitzer/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_2_developing_suggestion_only",
+      "display_name": "Bells and Mallets \u2014 Loops",
+      "fallback_parent": "Instruments/Mallets and Bells/Loops",
+      "legacy_brain_example_count": 1208,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Mallets and Bells/Bells and Mallets/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 5
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Bells and Mallets \u2014 One Shots",
+      "fallback_parent": "Instruments/Mallets and Bells/One Shots",
+      "legacy_brain_example_count": 9,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Mallets and Bells/Bells and Mallets/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Celesta \u2014 Loops",
+      "fallback_parent": "Instruments/Mallets and Bells/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Mallets and Bells/Celesta/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Celesta \u2014 One Shots",
+      "fallback_parent": "Instruments/Mallets and Bells/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Mallets and Bells/Celesta/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Glockenspiel \u2014 Loops",
+      "fallback_parent": "Instruments/Mallets and Bells/Loops",
+      "legacy_brain_example_count": 1,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Mallets and Bells/Glockenspiel/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "future_gui_catalog",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Glockenspiel \u2014 One Shots",
+      "fallback_parent": "Instruments/Mallets and Bells/One Shots",
+      "legacy_brain_example_count": 10,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Mallets and Bells/Glockenspiel/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "future_gui_catalog",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Handpan \u2014 Loops",
+      "fallback_parent": "Instruments/Mallets and Bells/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Mallets and Bells/Handpan/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Handpan \u2014 One Shots",
+      "fallback_parent": "Instruments/Mallets and Bells/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Mallets and Bells/Handpan/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Kalimba \u2014 Loops",
+      "fallback_parent": "Instruments/Mallets and Bells/Loops",
+      "legacy_brain_example_count": 1,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Mallets and Bells/Kalimba/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Kalimba \u2014 One Shots",
+      "fallback_parent": "Instruments/Mallets and Bells/One Shots",
+      "legacy_brain_example_count": 1,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Mallets and Bells/Kalimba/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Marimba \u2014 Loops",
+      "fallback_parent": "Instruments/Mallets and Bells/Loops",
+      "legacy_brain_example_count": 7,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Mallets and Bells/Marimba/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "future_gui_catalog",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 1
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Marimba \u2014 One Shots",
+      "fallback_parent": "Instruments/Mallets and Bells/One Shots",
+      "legacy_brain_example_count": 9,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Mallets and Bells/Marimba/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "future_gui_catalog",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Music Box \u2014 Loops",
+      "fallback_parent": "Instruments/Mallets and Bells/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Mallets and Bells/Music Box/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Music Box \u2014 One Shots",
+      "fallback_parent": "Instruments/Mallets and Bells/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Mallets and Bells/Music Box/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Steel Pan \u2014 Loops",
+      "fallback_parent": "Instruments/Mallets and Bells/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Mallets and Bells/Steel Pan/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Steel Pan \u2014 One Shots",
+      "fallback_parent": "Instruments/Mallets and Bells/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Mallets and Bells/Steel Pan/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Vibraphone \u2014 Loops",
+      "fallback_parent": "Instruments/Mallets and Bells/Loops",
+      "legacy_brain_example_count": 8,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Mallets and Bells/Vibraphone/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "future_gui_catalog",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Vibraphone \u2014 One Shots",
+      "fallback_parent": "Instruments/Mallets and Bells/One Shots",
+      "legacy_brain_example_count": 2,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Mallets and Bells/Vibraphone/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Xylophone \u2014 Loops",
+      "fallback_parent": "Instruments/Mallets and Bells/Loops",
+      "legacy_brain_example_count": 10,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Mallets and Bells/Xylophone/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Xylophone \u2014 One Shots",
+      "fallback_parent": "Instruments/Mallets and Bells/One Shots",
+      "legacy_brain_example_count": 9,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Mallets and Bells/Xylophone/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_3_unvalidated_suggestion_only",
+      "display_name": "Multi Instrument \u2014 Loops",
+      "fallback_parent": "Instruments/Mixed Musical Loops/Loops",
+      "legacy_brain_example_count": 12005,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Mixed Musical Loops/Multi Instrument/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 20
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Balalaika \u2014 Loops",
+      "fallback_parent": "Instruments/Plucked Strings/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Plucked Strings/Balalaika/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Balalaika \u2014 One Shots",
+      "fallback_parent": "Instruments/Plucked Strings/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Plucked Strings/Balalaika/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Banjo \u2014 Loops",
+      "fallback_parent": "Instruments/Plucked Strings/Loops",
+      "legacy_brain_example_count": 7,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Plucked Strings/Banjo/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Banjo \u2014 One Shots",
+      "fallback_parent": "Instruments/Plucked Strings/One Shots",
+      "legacy_brain_example_count": 3,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Plucked Strings/Banjo/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Bouzouki \u2014 Loops",
+      "fallback_parent": "Instruments/Plucked Strings/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Plucked Strings/Bouzouki/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Bouzouki \u2014 One Shots",
+      "fallback_parent": "Instruments/Plucked Strings/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Plucked Strings/Bouzouki/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Charango \u2014 Loops",
+      "fallback_parent": "Instruments/Plucked Strings/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Plucked Strings/Charango/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Charango \u2014 One Shots",
+      "fallback_parent": "Instruments/Plucked Strings/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Plucked Strings/Charango/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Dulcimer \u2014 Loops",
+      "fallback_parent": "Instruments/Plucked Strings/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Plucked Strings/Dulcimer/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Dulcimer \u2014 One Shots",
+      "fallback_parent": "Instruments/Plucked Strings/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Plucked Strings/Dulcimer/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Guzheng \u2014 Loops",
+      "fallback_parent": "Instruments/Plucked Strings/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Plucked Strings/Guzheng/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Guzheng \u2014 One Shots",
+      "fallback_parent": "Instruments/Plucked Strings/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Plucked Strings/Guzheng/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Harp \u2014 Loops",
+      "fallback_parent": "Instruments/Plucked Strings/Loops",
+      "legacy_brain_example_count": 7,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Plucked Strings/Harp/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Harp \u2014 One Shots",
+      "fallback_parent": "Instruments/Plucked Strings/One Shots",
+      "legacy_brain_example_count": 10,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Plucked Strings/Harp/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Koto \u2014 Loops",
+      "fallback_parent": "Instruments/Plucked Strings/Loops",
+      "legacy_brain_example_count": 1330,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Plucked Strings/Koto/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "future_gui_catalog",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 1
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Koto \u2014 One Shots",
+      "fallback_parent": "Instruments/Plucked Strings/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Plucked Strings/Koto/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "future_gui_catalog"
+      ],
+      "training_example_count": 2
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Lute \u2014 Loops",
+      "fallback_parent": "Instruments/Plucked Strings/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Plucked Strings/Lute/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Lute \u2014 One Shots",
+      "fallback_parent": "Instruments/Plucked Strings/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Plucked Strings/Lute/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Mandolin \u2014 Loops",
+      "fallback_parent": "Instruments/Plucked Strings/Loops",
+      "legacy_brain_example_count": 1,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Plucked Strings/Mandolin/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Mandolin \u2014 One Shots",
+      "fallback_parent": "Instruments/Plucked Strings/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Plucked Strings/Mandolin/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Oud \u2014 Loops",
+      "fallback_parent": "Instruments/Plucked Strings/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Plucked Strings/Oud/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Oud \u2014 One Shots",
+      "fallback_parent": "Instruments/Plucked Strings/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Plucked Strings/Oud/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Pipa \u2014 Loops",
+      "fallback_parent": "Instruments/Plucked Strings/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Plucked Strings/Pipa/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Pipa \u2014 One Shots",
+      "fallback_parent": "Instruments/Plucked Strings/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Plucked Strings/Pipa/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Shamisen \u2014 Loops",
+      "fallback_parent": "Instruments/Plucked Strings/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Plucked Strings/Shamisen/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Shamisen \u2014 One Shots",
+      "fallback_parent": "Instruments/Plucked Strings/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Plucked Strings/Shamisen/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Sitar \u2014 Loops",
+      "fallback_parent": "Instruments/Plucked Strings/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Plucked Strings/Sitar/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Sitar \u2014 One Shots",
+      "fallback_parent": "Instruments/Plucked Strings/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Plucked Strings/Sitar/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Ukulele \u2014 Loops",
+      "fallback_parent": "Instruments/Plucked Strings/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Plucked Strings/Ukulele/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Ukulele \u2014 One Shots",
+      "fallback_parent": "Instruments/Plucked Strings/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Plucked Strings/Ukulele/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Zither \u2014 Loops",
+      "fallback_parent": "Instruments/Plucked Strings/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Plucked Strings/Zither/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Zither \u2014 One Shots",
+      "fallback_parent": "Instruments/Plucked Strings/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Plucked Strings/Zither/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Cello \u2014 Loops",
+      "fallback_parent": "Instruments/Strings Bowed/Loops",
+      "legacy_brain_example_count": 8,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Strings Bowed/Cello/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "future_gui_catalog",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Cello \u2014 One Shots",
+      "fallback_parent": "Instruments/Strings Bowed/One Shots",
+      "legacy_brain_example_count": 2,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Strings Bowed/Cello/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "future_gui_catalog",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Double Bass \u2014 Loops",
+      "fallback_parent": "Instruments/Strings Bowed/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Strings Bowed/Double Bass/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Double Bass \u2014 One Shots",
+      "fallback_parent": "Instruments/Strings Bowed/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Strings Bowed/Double Bass/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Pizzicato Strings \u2014 Loops",
+      "fallback_parent": "Instruments/Strings Bowed/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Strings Bowed/Pizzicato Strings/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Pizzicato Strings \u2014 One Shots",
+      "fallback_parent": "Instruments/Strings Bowed/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Strings Bowed/Pizzicato Strings/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "String Drones \u2014 Loops",
+      "fallback_parent": "Instruments/Strings Bowed/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Strings Bowed/String Drones/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "String Drones \u2014 One Shots",
+      "fallback_parent": "Instruments/Strings Bowed/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Strings Bowed/String Drones/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "String Section \u2014 Loops",
+      "fallback_parent": "Instruments/Strings Bowed/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Strings Bowed/String Section/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "String Section \u2014 One Shots",
+      "fallback_parent": "Instruments/Strings Bowed/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Strings Bowed/String Section/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "String Stabs \u2014 Loops",
+      "fallback_parent": "Instruments/Strings Bowed/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Strings Bowed/String Stabs/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "String Stabs \u2014 One Shots",
+      "fallback_parent": "Instruments/Strings Bowed/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Strings Bowed/String Stabs/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Viola \u2014 Loops",
+      "fallback_parent": "Instruments/Strings Bowed/Loops",
+      "legacy_brain_example_count": 10,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Strings Bowed/Viola/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "future_gui_catalog",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Viola \u2014 One Shots",
+      "fallback_parent": "Instruments/Strings Bowed/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Strings Bowed/Viola/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Violin \u2014 Loops",
+      "fallback_parent": "Instruments/Strings Bowed/Loops",
+      "legacy_brain_example_count": 1210,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Strings Bowed/Violin/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "future_gui_catalog",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 2
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Violin \u2014 One Shots",
+      "fallback_parent": "Instruments/Strings Bowed/One Shots",
+      "legacy_brain_example_count": 1,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Strings Bowed/Violin/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "future_gui_catalog",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "String Drones \u2014 One Shots",
+      "fallback_parent": "Instruments/Strings/One Shots",
+      "legacy_brain_example_count": 1,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Strings/String Drones/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "String Loops \u2014 Loops",
+      "fallback_parent": "Instruments/Strings/Loops",
+      "legacy_brain_example_count": 2411,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Strings/String Loops/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 3
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "String Plucks \u2014 Loops",
+      "fallback_parent": "Instruments/Strings/Loops",
+      "legacy_brain_example_count": 1,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Strings/String Plucks/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Strings Sustains \u2014 Loops",
+      "fallback_parent": "Instruments/Strings/Loops",
+      "legacy_brain_example_count": 2,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Strings/Strings Sustains/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Synth Arp \u2014 Loops",
+      "fallback_parent": "Instruments/Synths/Loops",
+      "legacy_brain_example_count": 1210,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Synths/Synth Arp/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 3
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Synth Arp \u2014 One Shots",
+      "fallback_parent": "Instruments/Synths/One Shots",
+      "legacy_brain_example_count": 5,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Synths/Synth Arp/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Synth Chord \u2014 Loops",
+      "fallback_parent": "Instruments/Synths/Loops",
+      "legacy_brain_example_count": 7,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Synths/Synth Chord/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 1
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Synth Chord \u2014 One Shots",
+      "fallback_parent": "Instruments/Synths/One Shots",
+      "legacy_brain_example_count": 10,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Synths/Synth Chord/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Synth Drone \u2014 Loops",
+      "fallback_parent": "Instruments/Synths/Loops",
+      "legacy_brain_example_count": 1,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Synths/Synth Drone/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Synth Drone \u2014 One Shots",
+      "fallback_parent": "Instruments/Synths/One Shots",
+      "legacy_brain_example_count": 2,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Synths/Synth Drone/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Synth Lead \u2014 Loops",
+      "fallback_parent": "Instruments/Synths/Loops",
+      "legacy_brain_example_count": 2456,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Synths/Synth Lead/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 4
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Synth Lead \u2014 One Shots",
+      "fallback_parent": "Instruments/Synths/One Shots",
+      "legacy_brain_example_count": 9,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Synths/Synth Lead/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Synth Loops \u2014 Loops",
+      "fallback_parent": "Instruments/Synths/Loops",
+      "legacy_brain_example_count": 1208,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Synths/Synth Loops/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Synth One Shots \u2014 One Shots",
+      "fallback_parent": "Instruments/Synths/One Shots",
+      "legacy_brain_example_count": 14,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Synths/Synth One Shots/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_2_developing_suggestion_only",
+      "display_name": "Synth Pad \u2014 Loops",
+      "fallback_parent": "Instruments/Synths/Loops",
+      "legacy_brain_example_count": 7210,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Synths/Synth Pad/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 8
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Synth Pad \u2014 One Shots",
+      "fallback_parent": "Instruments/Synths/One Shots",
+      "legacy_brain_example_count": 2,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Synths/Synth Pad/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Synth Pluck \u2014 Loops",
+      "fallback_parent": "Instruments/Synths/Loops",
+      "legacy_brain_example_count": 8,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Synths/Synth Pluck/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 2
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Synth Pluck \u2014 One Shots",
+      "fallback_parent": "Instruments/Synths/One Shots",
+      "legacy_brain_example_count": 4,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Synths/Synth Pluck/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Synth Stab \u2014 Loops",
+      "fallback_parent": "Instruments/Synths/Loops",
+      "legacy_brain_example_count": 1,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Synths/Synth Stab/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Synth Stab \u2014 One Shots",
+      "fallback_parent": "Instruments/Synths/One Shots",
+      "legacy_brain_example_count": 6,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Synths/Synth Stab/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Choir \u2014 Loops",
+      "fallback_parent": "Instruments/Voice/Loops",
+      "legacy_brain_example_count": 6,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Voice/Choir/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Voice \u2014 Loops",
+      "fallback_parent": "Instruments/Voice",
+      "legacy_brain_example_count": 25,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Voice/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_2_developing_suggestion_only",
+      "display_name": "Phrase \u2014 One Shots",
+      "fallback_parent": "Instruments/Voice/One Shots",
+      "legacy_brain_example_count": 3609,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Voice/Phrase/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 12
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Vocal Chops \u2014 Loops",
+      "fallback_parent": "Instruments/Voice/Loops",
+      "legacy_brain_example_count": 10,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Voice/Vocal Chops/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_3_unvalidated_suggestion_only",
+      "display_name": "Vocal Loops \u2014 Loops",
+      "fallback_parent": "Instruments/Voice/Loops",
+      "legacy_brain_example_count": 16497,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Voice/Vocal Loops/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 20
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Vocal One Shots \u2014 One Shots",
+      "fallback_parent": "Instruments/Voice/One Shots",
+      "legacy_brain_example_count": 12,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Voice/Vocal One Shots/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 2
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Bass Clarinet \u2014 Loops",
+      "fallback_parent": "Instruments/Woodwinds/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Woodwinds/Bass Clarinet/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Bass Clarinet \u2014 One Shots",
+      "fallback_parent": "Instruments/Woodwinds/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Woodwinds/Bass Clarinet/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Bassoon \u2014 Loops",
+      "fallback_parent": "Instruments/Woodwinds/Loops",
+      "legacy_brain_example_count": 6,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Woodwinds/Bassoon/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "future_gui_catalog",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Bassoon \u2014 One Shots",
+      "fallback_parent": "Instruments/Woodwinds/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Woodwinds/Bassoon/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Clarinet \u2014 Loops",
+      "fallback_parent": "Instruments/Woodwinds/Loops",
+      "legacy_brain_example_count": 1,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Woodwinds/Clarinet/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "future_gui_catalog",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Clarinet \u2014 One Shots",
+      "fallback_parent": "Instruments/Woodwinds/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Woodwinds/Clarinet/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Duduk \u2014 Loops",
+      "fallback_parent": "Instruments/Woodwinds/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Woodwinds/Duduk/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Duduk \u2014 One Shots",
+      "fallback_parent": "Instruments/Woodwinds/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Woodwinds/Duduk/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Flute \u2014 Loops",
+      "fallback_parent": "Instruments/Woodwinds/Loops",
+      "legacy_brain_example_count": 1206,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Woodwinds/Flute/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "future_gui_catalog",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 1
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Flute \u2014 One Shots",
+      "fallback_parent": "Instruments/Woodwinds/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Woodwinds/Flute/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Harmonica \u2014 Loops",
+      "fallback_parent": "Instruments/Woodwinds/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Woodwinds/Harmonica/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Harmonica \u2014 One Shots",
+      "fallback_parent": "Instruments/Woodwinds/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Woodwinds/Harmonica/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Oboe \u2014 Loops",
+      "fallback_parent": "Instruments/Woodwinds/Loops",
+      "legacy_brain_example_count": 6,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Woodwinds/Oboe/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "future_gui_catalog",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Oboe \u2014 One Shots",
+      "fallback_parent": "Instruments/Woodwinds/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Woodwinds/Oboe/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Ocarina \u2014 Loops",
+      "fallback_parent": "Instruments/Woodwinds/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Woodwinds/Ocarina/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Ocarina \u2014 One Shots",
+      "fallback_parent": "Instruments/Woodwinds/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Woodwinds/Ocarina/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Pan Pipe Recorder Whistle \u2014 Loops",
+      "fallback_parent": "Instruments/Woodwinds/Loops",
+      "legacy_brain_example_count": 3,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Woodwinds/Pan Pipe Recorder Whistle/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Pan Pipe Recorder Whistle \u2014 One Shots",
+      "fallback_parent": "Instruments/Woodwinds/One Shots",
+      "legacy_brain_example_count": 7,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Woodwinds/Pan Pipe Recorder Whistle/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Piccolo \u2014 Loops",
+      "fallback_parent": "Instruments/Woodwinds/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Woodwinds/Piccolo/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Piccolo \u2014 One Shots",
+      "fallback_parent": "Instruments/Woodwinds/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Woodwinds/Piccolo/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Recorder \u2014 Loops",
+      "fallback_parent": "Instruments/Woodwinds/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Woodwinds/Recorder/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Recorder \u2014 One Shots",
+      "fallback_parent": "Instruments/Woodwinds/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Woodwinds/Recorder/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Alto \u2014 Loops",
+      "fallback_parent": "Instruments/Woodwinds/Saxophone/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Woodwinds/Saxophone/Alto/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Alto \u2014 One Shots",
+      "fallback_parent": "Instruments/Woodwinds/Saxophone/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Woodwinds/Saxophone/Alto/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Baritone \u2014 Loops",
+      "fallback_parent": "Instruments/Woodwinds/Saxophone/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Woodwinds/Saxophone/Baritone/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Baritone \u2014 One Shots",
+      "fallback_parent": "Instruments/Woodwinds/Saxophone/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Woodwinds/Saxophone/Baritone/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Bass \u2014 Loops",
+      "fallback_parent": "Instruments/Woodwinds/Saxophone/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Woodwinds/Saxophone/Bass/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Bass \u2014 One Shots",
+      "fallback_parent": "Instruments/Woodwinds/Saxophone/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Woodwinds/Saxophone/Bass/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_3_unvalidated_suggestion_only",
+      "display_name": "Saxophone \u2014 Loops",
+      "fallback_parent": "Instruments/Woodwinds/Loops",
+      "legacy_brain_example_count": 36007,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Woodwinds/Saxophone/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 31
+    },
+    {
+      "automatic_classification_status": "tier_1_sparse_suggestion_only",
+      "display_name": "Saxophone \u2014 One Shots",
+      "fallback_parent": "Instruments/Woodwinds/One Shots",
+      "legacy_brain_example_count": 10,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Woodwinds/Saxophone/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 3
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Soprano \u2014 Loops",
+      "fallback_parent": "Instruments/Woodwinds/Saxophone/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Woodwinds/Saxophone/Soprano/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Soprano \u2014 One Shots",
+      "fallback_parent": "Instruments/Woodwinds/Saxophone/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Woodwinds/Saxophone/Soprano/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Tenor \u2014 Loops",
+      "fallback_parent": "Instruments/Woodwinds/Saxophone/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Woodwinds/Saxophone/Tenor/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Tenor \u2014 One Shots",
+      "fallback_parent": "Instruments/Woodwinds/Saxophone/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Woodwinds/Saxophone/Tenor/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Shakuhachi \u2014 Loops",
+      "fallback_parent": "Instruments/Woodwinds/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Woodwinds/Shakuhachi/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Shakuhachi \u2014 One Shots",
+      "fallback_parent": "Instruments/Woodwinds/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/Woodwinds/Shakuhachi/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Accordion \u2014 Loops",
+      "fallback_parent": "Instruments/World and Special Instruments/Loops",
+      "legacy_brain_example_count": 1,
+      "manual_selection_enabled": true,
+      "path": "Instruments/World and Special Instruments/Accordion/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Accordion \u2014 One Shots",
+      "fallback_parent": "Instruments/World and Special Instruments/One Shots",
+      "legacy_brain_example_count": 5,
+      "manual_selection_enabled": true,
+      "path": "Instruments/World and Special Instruments/Accordion/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Bagpipe \u2014 Loops",
+      "fallback_parent": "Instruments/World and Special Instruments/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/World and Special Instruments/Bagpipe/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Bagpipe \u2014 One Shots",
+      "fallback_parent": "Instruments/World and Special Instruments/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/World and Special Instruments/Bagpipe/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Didgeridoo \u2014 Loops",
+      "fallback_parent": "Instruments/World and Special Instruments/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/World and Special Instruments/Didgeridoo/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Didgeridoo \u2014 One Shots",
+      "fallback_parent": "Instruments/World and Special Instruments/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/World and Special Instruments/Didgeridoo/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Handpan \u2014 Loops",
+      "fallback_parent": "Instruments/World and Special Instruments/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/World and Special Instruments/Handpan/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Handpan \u2014 One Shots",
+      "fallback_parent": "Instruments/World and Special Instruments/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/World and Special Instruments/Handpan/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Harmonica \u2014 Loops",
+      "fallback_parent": "Instruments/World and Special Instruments/Loops",
+      "legacy_brain_example_count": 7,
+      "manual_selection_enabled": true,
+      "path": "Instruments/World and Special Instruments/Harmonica/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Harmonica \u2014 One Shots",
+      "fallback_parent": "Instruments/World and Special Instruments/One Shots",
+      "legacy_brain_example_count": 7,
+      "manual_selection_enabled": true,
+      "path": "Instruments/World and Special Instruments/Harmonica/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "curated_training_slot",
+        "legacy_brain_seed"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Mbira \u2014 Loops",
+      "fallback_parent": "Instruments/World and Special Instruments/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/World and Special Instruments/Mbira/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Mbira \u2014 One Shots",
+      "fallback_parent": "Instruments/World and Special Instruments/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/World and Special Instruments/Mbira/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Melodica \u2014 Loops",
+      "fallback_parent": "Instruments/World and Special Instruments/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/World and Special Instruments/Melodica/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Melodica \u2014 One Shots",
+      "fallback_parent": "Instruments/World and Special Instruments/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/World and Special Instruments/Melodica/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Steel Pan \u2014 Loops",
+      "fallback_parent": "Instruments/World and Special Instruments/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/World and Special Instruments/Steel Pan/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Steel Pan \u2014 One Shots",
+      "fallback_parent": "Instruments/World and Special Instruments/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/World and Special Instruments/Steel Pan/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Theremin \u2014 Loops",
+      "fallback_parent": "Instruments/World and Special Instruments/Loops",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/World and Special Instruments/Theremin/Loops",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    },
+    {
+      "automatic_classification_status": "tier_0_manual_only",
+      "display_name": "Theremin \u2014 One Shots",
+      "fallback_parent": "Instruments/World and Special Instruments/One Shots",
+      "legacy_brain_example_count": 0,
+      "manual_selection_enabled": true,
+      "path": "Instruments/World and Special Instruments/Theremin/One Shots",
+      "prototype_count": 0,
+      "sources": [
+        "future_gui_catalog"
+      ],
+      "training_example_count": 0
+    }
+  ],
+  "description": "Frozen end-user category registry. Visibility is independent from classifier readiness; runtime audio evidence never uses source filenames or paths.",
+  "schema_version": 1,
+  "taxonomy_version": "2026-07-25"
+}

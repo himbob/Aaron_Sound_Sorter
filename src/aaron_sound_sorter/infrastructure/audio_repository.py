@@ -71,7 +71,12 @@ class AudioInputRepository:
                     files.append(path)
             files.sort()
             if not files:
-                raise ValueError(f"No audio files found inside ZIP input: {resolved}")
+                detected_types = _zip_member_suffixes(resolved)
+                type_summary = ", ".join(detected_types[:8]) or "no regular files"
+                raise ValueError(
+                    "No supported audio files found inside ZIP input: "
+                    f"{resolved}. The archive is readable; detected file types: {type_summary}"
+                )
             return PreparedAudioInput(source_root=extract_root, audio_files=files, cleanup_root=None)
         raise ValueError(f"Expected audio file, ZIP, or folder input: {resolved}")
 
@@ -122,6 +127,17 @@ def is_audio_file(path: Path) -> bool:
     if path.name.startswith("._") or path.name.startswith("."):
         return False
     return path.suffix.lower() in AUDIO_EXTS
+
+
+def _zip_member_suffixes(zip_path: Path) -> tuple[str, ...]:
+    """Return file-format suffixes for explaining a valid non-audio ZIP."""
+    with zipfile.ZipFile(zip_path, "r") as archive:
+        suffixes = {
+            Path(info.filename).suffix.casefold() or "[no extension]"
+            for info in archive.infolist()
+            if not info.is_dir()
+        }
+    return tuple(sorted(suffixes))
 
 
 def _raise_if_cancelled(cancel_requested: Callable[[], bool] | None) -> None:

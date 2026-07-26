@@ -4,11 +4,34 @@ from __future__ import annotations
 
 import json
 import subprocess
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from .gui_training import DEFAULT_TRAINING_CONFIG
+
+
+@dataclass(frozen=True)
+class NeuralPromptSuggestion:
+    """One read-only detailed CLAP taxonomy suggestion for GUI display."""
+
+    path: str
+    positive_score: float
+    negative_score: float
+    prompt_margin: float
+    top_positive_prompt: str
+    top_positive_similarity: float
+    top_negative_prompt: str
+    top_negative_similarity: float
+
+
+@dataclass(frozen=True)
+class NeuralEventSuggestion:
+    """One raw independent AudioSet event for GUI display."""
+
+    label: str
+    score: float
 
 
 @dataclass(frozen=True)
@@ -28,6 +51,21 @@ class NeuralRuntimePrediction:
     exact_training_match: bool = False
     ownership_ready: bool = False
     ownership_block_reason: str = ""
+    semantic_family: str = ""
+    semantic_second_family: str = ""
+    semantic_top_score: float = 0.0
+    semantic_second_score: float = 0.0
+    semantic_margin: float = 0.0
+    semantic_family_scores: Mapping[str, float] = field(default_factory=dict)
+    prompt_brain_status: str = "unavailable"
+    prompt_suggestions: tuple[NeuralPromptSuggestion, ...] = ()
+    panns_status: str = "unavailable"
+    panns_model_id: str = ""
+    panns_events: tuple[NeuralEventSuggestion, ...] = ()
+    panns_support_score: float = 0.0
+    panns_contradiction_score: float = 0.0
+    panns_supporting_events: tuple[NeuralEventSuggestion, ...] = ()
+    panns_contradicting_events: tuple[NeuralEventSuggestion, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -208,4 +246,50 @@ def _prediction_from_mapping(payload: Any) -> NeuralRuntimePrediction:
         exact_training_match=bool(payload.get("exact_training_match", False)),
         ownership_ready=bool(payload.get("ownership_ready", False)),
         ownership_block_reason=str(payload.get("ownership_block_reason", "")),
+        semantic_family=str(payload.get("semantic_family", "")),
+        semantic_second_family=str(payload.get("semantic_second_family", "")),
+        semantic_top_score=float(payload.get("semantic_top_score", 0.0)),
+        semantic_second_score=float(payload.get("semantic_second_score", 0.0)),
+        semantic_margin=float(payload.get("semantic_margin", 0.0)),
+        semantic_family_scores={
+            str(family): float(score) for family, score in dict(payload.get("semantic_family_scores", {})).items()
+        },
+        prompt_brain_status=str(payload.get("prompt_brain_status", "unavailable")),
+        prompt_suggestions=tuple(
+            _prompt_suggestion_from_mapping(suggestion) for suggestion in payload.get("prompt_suggestions", [])
+        ),
+        panns_status=str(payload.get("panns_status", "unavailable")),
+        panns_model_id=str(payload.get("panns_model_id", "")),
+        panns_events=tuple(_event_suggestion_from_mapping(event) for event in payload.get("panns_events", [])),
+        panns_support_score=float(payload.get("panns_support_score", 0.0)),
+        panns_contradiction_score=float(payload.get("panns_contradiction_score", 0.0)),
+        panns_supporting_events=tuple(
+            _event_suggestion_from_mapping(event) for event in payload.get("panns_supporting_events", [])
+        ),
+        panns_contradicting_events=tuple(
+            _event_suggestion_from_mapping(event) for event in payload.get("panns_contradicting_events", [])
+        ),
     )
+
+
+def _prompt_suggestion_from_mapping(payload: Any) -> NeuralPromptSuggestion:
+    """Parse one detailed prompt suggestion from subprocess JSON."""
+    if not isinstance(payload, dict):
+        raise TypeError("prompt suggestion must be an object")
+    return NeuralPromptSuggestion(
+        path=str(payload["path"]),
+        positive_score=float(payload["positive_score"]),
+        negative_score=float(payload["negative_score"]),
+        prompt_margin=float(payload["prompt_margin"]),
+        top_positive_prompt=str(payload.get("top_positive_prompt", "")),
+        top_positive_similarity=float(payload.get("top_positive_similarity", 0.0)),
+        top_negative_prompt=str(payload.get("top_negative_prompt", "")),
+        top_negative_similarity=float(payload.get("top_negative_similarity", 0.0)),
+    )
+
+
+def _event_suggestion_from_mapping(payload: Any) -> NeuralEventSuggestion:
+    """Parse one PANNs AudioSet event from subprocess JSON."""
+    if not isinstance(payload, dict):
+        raise TypeError("PANNs event must be an object")
+    return NeuralEventSuggestion(label=str(payload["label"]), score=float(payload["score"]))

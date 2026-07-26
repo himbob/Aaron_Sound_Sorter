@@ -40,6 +40,12 @@ Archived documents are history, not current authority.
   audio or derived duplicates.
 - CLAP may own a GUI proposal only inside a learned neighborhood with compatible
   measured structure; unknown cross-family conflicts go to Review.
+- Detailed CLAP prompts and PANNs events remain separate evidence lanes. PANNs
+  may support or contradict a broad family but may not own a detailed folder.
+- A GUI relabel that conflicts with a locked seed requires two identical human
+  approvals before the prototype target changes.
+- Build review queues from decoded audio, embeddings, measured structure, and
+  content hashes. Filename-search review builders are forbidden.
 - Never delete old brains or trainers without a reversible migration report.
 
 ## Public repository safety

@@ -193,12 +193,42 @@ class PrototypeIndex:
         self.prototypes = tuple(prototypes)
         self._matrix = np.vstack([proto.vector for proto in self.prototypes]).astype(np.float32)
 
-    def predict(self, record: EmbeddingRecord, *, radius_slack: float = 0.08) -> LabelPrediction:
-        """Return the closest learned label and its neighborhood evidence."""
+    def predict(
+        self,
+        record: EmbeddingRecord,
+        *,
+        radius_slack: float = 0.08,
+        exact_label: str | None = None,
+    ) -> LabelPrediction:
+        """Return learned label evidence, honoring an exact approved label.
+
+        Args:
+            record: Source-name-blind embedding for the audio content.
+            radius_slack: Conservative distance added to learned radii.
+            exact_label: Human-approved label for this exact content hash. An
+                exact label selects that label before prototype generalization.
+
+        Returns:
+            Neural evidence for the exact approved label or nearest prototype.
+
+        Raises:
+            ValueError: If the exact label is absent from the active index.
+
+        Side Effects:
+            None.
+        """
         ranking = self._rank_labels(record)
-        best_label, (best_score, best_idx) = ranking[0]
-        if len(ranking) > 1:
-            second_label, (second_score, _) = ranking[1]
+        prototype_winner_label, (prototype_winner_score, _) = ranking[0]
+        if exact_label is None:
+            best_label, (best_score, best_idx) = ranking[0]
+        else:
+            exact_rows = [row for row in ranking if row[0] == exact_label]
+            if not exact_rows:
+                raise ValueError(f"exact training label is absent from active index: {exact_label}")
+            best_label, (best_score, best_idx) = exact_rows[0]
+        competitors = [row for row in ranking if row[0] != best_label]
+        if competitors:
+            second_label, (second_score, _) = competitors[0]
         else:
             second_label, second_score = "", -1.0
         proto = self.prototypes[best_idx]
@@ -206,7 +236,8 @@ class PrototypeIndex:
         category_spread = float(self.metadata.label_spread_p95.get(best_label, 0.0))
         allowed_radius = max(radius_slack, proto.radius_p95 + radius_slack, category_spread + radius_slack)
         radius_ratio = distance / max(allowed_radius, 1e-9)
-        known = bool(distance <= allowed_radius)
+        known = bool(exact_label is not None or distance <= allowed_radius)
+        prediction_mode = "exact_human_training_label" if exact_label is not None else "prototype_nearest_label"
         return LabelPrediction(
             provider_id=record.provider_id,
             model_id=record.model_id,
@@ -227,6 +258,9 @@ class PrototypeIndex:
                 "category_spread_p95": category_spread,
                 "encoder_reliability": "unavailable",
                 "objective_structure_agreement": "unavailable",
+                "prediction_mode": prediction_mode,
+                "prototype_winner_label": prototype_winner_label,
+                "prototype_winner_similarity": prototype_winner_score,
                 "trainer_warning_count": "unavailable",
             },
         )

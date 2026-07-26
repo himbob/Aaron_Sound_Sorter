@@ -218,6 +218,18 @@ The command-line entry point is `tools/neural_audio_lab.py`. Mac helper commands
 under `commands/neural/`. Model download is disabled by default inside providers; a
 reviewed model snapshot must be deliberately prefetched and then referenced by local path.
 
+The implemented foundation panel keeps these lanes separate:
+
+- Aaron prototypes: trained local identity memory and the only neural detailed-folder owner;
+- broad CLAP: conservative family compatibility evidence;
+- detailed CLAP prompts: read-only category suggestions;
+- PANNs Cnn14/AudioSet: broad support and contradiction events;
+- exact human memory: content-hash-matched supervision.
+
+Scores are never averaged into one mystery number. PANNs and detailed CLAP do
+not own detailed folders. Cluster review partitions measured structure first,
+then broad semantic family, and retains every candidate exactly once.
+
 ## 8. Verified cache identity
 
 One cache entry is an atomic `.npz` containing both normalized vector and JSON

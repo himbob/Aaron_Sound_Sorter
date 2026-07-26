@@ -10,7 +10,7 @@ import shutil
 import traceback
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
@@ -41,16 +41,22 @@ from aaron_sound_sorter.infrastructure.report_writer import (
 )
 from aaron_sound_sorter.neural_audio.authority import (
     has_decisive_loop_structure,
+    neural_conflict_families,
     neural_defers_to_exact_human_teacher,
-    neural_owner_family,
+    neural_disagreement_requires_review,
+    neural_panns_contradicts,
+    neural_semantic_compatibility,
     neural_structure_conflicts,
 )
+from aaron_sound_sorter.neural_audio.calibration import ReviewFeedback, ReviewFeedbackStore
 from aaron_sound_sorter.neural_audio.gui_training import NeuralTrainingInbox
+from aaron_sound_sorter.neural_audio.hashing import sha256_file
 from aaron_sound_sorter.neural_audio.runtime import (
     NeuralRuntimeBatch,
     NeuralRuntimePrediction,
     run_configured_neural_predictions,
 )
+from aaron_sound_sorter.neural_audio.semantic_panel import compatible_semantic_families
 from aaron_sound_sorter.taxonomy_contracts import (
     STRUCTURE_TERMINALS,
     TOP_LEVEL_TAXONOMY_FAMILIES,
@@ -59,6 +65,7 @@ from aaron_sound_sorter.taxonomy_contracts import (
     normalize_taxonomy_path,
     taxonomy_label_contract,
 )
+from aaron_sound_sorter.taxonomy_registry import TaxonomyRegistry
 from aaron_sound_sorter.voters.base import Voter
 from aaron_sound_sorter.voters.brain_recall import BalancedRecallBrainVoter, FullBrainVoter
 from aaron_sound_sorter.voters.physics_voter import PhysicsVoter
@@ -68,6 +75,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_BRAIN = "stage4_folder_brain.json"
 DEFAULT_GUI_BRAIN_CONFIG = Path("config/gui_brains.yaml")
 DEFAULT_GUI_TAXONOMY_CATALOG = Path("config/gui_taxonomy_catalog.json")
+DEFAULT_CANONICAL_TAXONOMY = Path("config/canonical_taxonomy.json")
+DEFAULT_TAXONOMY_ALIASES = Path("config/taxonomy_aliases.json")
 DEFAULT_MASTER_TAXONOMY_LEDGER = Path("Aaron_Master_Attribute_Classification_Ledger_v1_0.json")
 DEFAULT_TRAINING_TAXONOMY_ROOT = Path("training/locked_curated_v1")
 SORTED_ROOT_NAME = "Aaron_Sorted_Sounds"
@@ -698,6 +707,9 @@ class TrainingCorrectionImporter:
         reused_existing_paths: list[Path] = []
         errors: list[str] = []
         skipped_count = 0
+        calibration_store = ReviewFeedbackStore(
+            self.project_root / "neural_artifacts" / "calibration_feedback" / "review_feedback.jsonl"
+        )
         for row in session.rows:
             if not row.is_corrected:
                 continue
@@ -705,9 +717,23 @@ class TrainingCorrectionImporter:
             manifest_rows.append(row_record)
             if row_record["status"] == "staged":
                 staged_paths.append(Path(row_record["staged_path"]))
+                feedback = calibration_feedback_from_preview_row(
+                    row,
+                    duplicate_conflict=int(row_record.get("superseded_conflicting_training_count", "0") or 0) > 0,
+                    brain_version=str(session.brain_path),
+                )
+                if feedback is not None:
+                    calibration_store.append(feedback)
                 continue
             if row_record["status"] == "duplicate_existing":
                 reused_existing_paths.append(Path(row_record["staged_path"]))
+                feedback = calibration_feedback_from_preview_row(
+                    row,
+                    duplicate_conflict=int(row_record.get("superseded_conflicting_training_count", "0") or 0) > 0,
+                    brain_version=str(session.brain_path),
+                )
+                if feedback is not None:
+                    calibration_store.append(feedback)
                 continue
             skipped_count += 1
             errors.append(f"{row.row_id}: {row.display_name}: {row_record['message']}")
@@ -1104,7 +1130,8 @@ def _raise_if_preview_cancelled(cancel_requested: CancelRequestedCallback | None
 def preview_row_from_result(index: int, result: SortFileResult) -> PreviewRow:
     """Adapt one classifier result into a GUI preview row."""
     decision = result.decision
-    folder = str(decision.folder_path or decision.final_label or "_TO_REVIEW/Unknown")
+    raw_folder = str(decision.folder_path or decision.final_label or "_TO_REVIEW/Unknown")
+    folder = normalize_taxonomy_label(raw_folder)
     return PreviewRow(
         row_id=f"{index:05d}",
         source_path=result.source_path,
@@ -1156,6 +1183,34 @@ def _apply_neural_prediction(row: PreviewRow, prediction: NeuralRuntimePredictio
     row.neural_similarity = prediction.top_similarity
     row.neural_margin = prediction.margin
     row.neural_radius_ratio = prediction.radius_ratio
+    row.neural_semantic_family = prediction.semantic_family
+    row.neural_semantic_score = prediction.semantic_top_score
+    row.neural_semantic_margin = prediction.semantic_margin
+    row.neural_prompt_status = prediction.prompt_brain_status
+    row.neural_prompt_suggestions = [
+        {
+            "path": suggestion.path,
+            "positive_score": suggestion.positive_score,
+            "negative_score": suggestion.negative_score,
+            "prompt_margin": suggestion.prompt_margin,
+            "top_positive_prompt": suggestion.top_positive_prompt,
+            "top_positive_similarity": suggestion.top_positive_similarity,
+            "top_negative_prompt": suggestion.top_negative_prompt,
+            "top_negative_similarity": suggestion.top_negative_similarity,
+        }
+        for suggestion in prediction.prompt_suggestions
+    ]
+    row.panns_status = prediction.panns_status
+    row.panns_model_id = prediction.panns_model_id
+    row.panns_events = [{"label": event.label, "score": event.score} for event in prediction.panns_events]
+    row.panns_support_score = prediction.panns_support_score
+    row.panns_contradiction_score = prediction.panns_contradiction_score
+    row.panns_supporting_events = [
+        {"label": event.label, "score": event.score} for event in prediction.panns_supporting_events
+    ]
+    row.panns_contradicting_events = [
+        {"label": event.label, "score": event.score} for event in prediction.panns_contradicting_events
+    ]
     if neural_label and neural_label not in row.candidate_folders:
         row.candidate_folders.insert(0, neural_label)
 
@@ -1168,7 +1223,10 @@ def _apply_neural_prediction(row: PreviewRow, prediction: NeuralRuntimePredictio
         f"exact_training={prediction.exact_training_match}, "
         f"similarity={prediction.top_similarity:.3f}, "
         f"margin={prediction.margin:.3f}, "
-        f"radius_ratio={prediction.radius_ratio:.3f})"
+        f"radius_ratio={prediction.radius_ratio:.3f}, "
+        f"semantic={prediction.semantic_family or 'none'}, "
+        f"semantic_score={prediction.semantic_top_score:.3f}, "
+        f"semantic_margin={prediction.semantic_margin:.3f})"
     )
     row.diagnostic_summary = f"{row.diagnostic_summary}; {neural_summary}"
     if not is_valid_taxonomy_label(neural_label):
@@ -1176,6 +1234,33 @@ def _apply_neural_prediction(row: PreviewRow, prediction: NeuralRuntimePredictio
 
     legacy_label = row.proposed_folder
     if prediction.ownership_ready:
+        if neural_panns_contradicts(prediction):
+            event_names = ", ".join(event.label for event in prediction.panns_contradicting_events[:3])
+            row.neural_ownership_ready = False
+            row.neural_ownership_reason = "panns_family_contradiction"
+            row.proposed_folder = "_TO_REVIEW/Measured Role Conflict"
+            row.approved_folder = row.proposed_folder
+            row.final_top = "_TO_REVIEW"
+            row.consensus_status = "neural_panns_family_conflict_review"
+            row.decision_reason = (
+                "Learned memory matched, but independent PANNs audio events "
+                f"contradicted its source family ({event_names}); forcing human review."
+            )
+            return
+        semantic_assessment = neural_semantic_compatibility(prediction, neural_label)
+        if semantic_assessment.contradictory:
+            row.neural_ownership_ready = False
+            row.neural_ownership_reason = semantic_assessment.reason
+            row.proposed_folder = "_TO_REVIEW/Measured Role Conflict"
+            row.approved_folder = row.proposed_folder
+            row.final_top = "_TO_REVIEW"
+            row.consensus_status = "neural_semantic_family_conflict_review"
+            row.decision_reason = (
+                "Learned memory matched, but independent audio-only semantics "
+                f"contradicted its source family ({prediction.semantic_family} vs {neural_label}); "
+                "forcing human review."
+            )
+            return
         if row.result is not None and neural_structure_conflicts(row.result, neural_label):
             row.proposed_folder = "_TO_REVIEW/Measured Role Conflict"
             row.approved_folder = row.proposed_folder
@@ -1201,16 +1286,20 @@ def _apply_neural_prediction(row: PreviewRow, prediction: NeuralRuntimePredictio
         row.neural_ownership_reason = "defer_to_exact_human_teacher"
         return
 
-    legacy_owner = neural_owner_family(legacy_label)
-    neural_owner = neural_owner_family(neural_label)
-    if legacy_owner and neural_owner and legacy_owner != neural_owner:
+    if neural_disagreement_requires_review(
+        prediction,
+        legacy_label,
+        neural_label,
+        result=row.result,
+    ):
+        neural_family, legacy_family = neural_conflict_families(neural_label, legacy_label)
         row.proposed_folder = "_TO_REVIEW/Measured Role Conflict"
         row.approved_folder = row.proposed_folder
         row.final_top = "_TO_REVIEW"
         row.consensus_status = "neural_legacy_owner_conflict_review"
         row.decision_reason = (
             "Neural audio was not ready for production ownership and disagreed with the "
-            f"legacy source family ({neural_owner} vs {legacy_owner}); forcing human review."
+            f"legacy source family ({neural_family} vs {legacy_family}); forcing human review."
         )
 
 
@@ -1381,6 +1470,12 @@ def load_available_labels(
         writer. They are not sorting evidence and must not influence voters.
     """
     label_set = set()
+    if project_root is not None:
+        root = Path(project_root).expanduser().resolve()
+        registry_path = root / DEFAULT_CANONICAL_TAXONOMY
+        if registry_path.is_file():
+            registry = TaxonomyRegistry.load(registry_path, root / DEFAULT_TAXONOMY_ALIASES)
+            return REVIEW_LABELS + registry.manual_labels()
     if isinstance(brain_path, BrainFamilyConfig):
         label_set.update(load_brain_family_taxonomy_labels(brain_path))
     else:
@@ -1678,6 +1773,18 @@ def preview_manifest_fields() -> list[str]:
         "neural_similarity",
         "neural_margin",
         "neural_radius_ratio",
+        "neural_semantic_family",
+        "neural_semantic_score",
+        "neural_semantic_margin",
+        "neural_prompt_status",
+        "neural_prompt_suggestions_json",
+        "panns_status",
+        "panns_model_id",
+        "panns_events_json",
+        "panns_support_score",
+        "panns_contradiction_score",
+        "panns_supporting_events_json",
+        "panns_contradicting_events_json",
     ]
 
 
@@ -1711,6 +1818,18 @@ def preview_row_to_csv(row: PreviewRow) -> dict[str, str]:
         "neural_similarity": f"{row.neural_similarity:.8f}",
         "neural_margin": f"{row.neural_margin:.8f}",
         "neural_radius_ratio": f"{row.neural_radius_ratio:.8f}",
+        "neural_semantic_family": row.neural_semantic_family,
+        "neural_semantic_score": f"{row.neural_semantic_score:.8f}",
+        "neural_semantic_margin": f"{row.neural_semantic_margin:.8f}",
+        "neural_prompt_status": row.neural_prompt_status,
+        "neural_prompt_suggestions_json": json.dumps(row.neural_prompt_suggestions, sort_keys=True),
+        "panns_status": row.panns_status,
+        "panns_model_id": row.panns_model_id,
+        "panns_events_json": json.dumps(row.panns_events, sort_keys=True),
+        "panns_support_score": f"{row.panns_support_score:.8f}",
+        "panns_contradiction_score": f"{row.panns_contradiction_score:.8f}",
+        "panns_supporting_events_json": json.dumps(row.panns_supporting_events, sort_keys=True),
+        "panns_contradicting_events_json": json.dumps(row.panns_contradicting_events, sort_keys=True),
     }
 
 
@@ -1725,6 +1844,20 @@ def correction_evidence(row: PreviewRow) -> dict[str, Any]:
         "read_status": row.read_status,
         "consensus_status": row.consensus_status,
         "decision_reason": row.decision_reason,
+        "neural_foundation_evidence": {
+            "trained_memory_label": row.neural_folder,
+            "trained_memory_similarity": row.neural_similarity,
+            "trained_memory_margin": row.neural_margin,
+            "trained_memory_exact_match": row.neural_exact_training_match,
+            "clap_broad_family": row.neural_semantic_family,
+            "clap_broad_score": row.neural_semantic_score,
+            "clap_broad_margin": row.neural_semantic_margin,
+            "clap_detailed_suggestions": row.neural_prompt_suggestions,
+            "panns_events": row.panns_events,
+            "panns_support_score": row.panns_support_score,
+            "panns_contradiction_score": row.panns_contradiction_score,
+            "source_name_policy": "audio waveform, content hash, and explicit human target only",
+        },
     }
     if row.result is None:
         return payload
@@ -1741,6 +1874,53 @@ def correction_evidence(row: PreviewRow) -> dict[str, Any]:
         }
     )
     return payload
+
+
+def calibration_feedback_from_preview_row(
+    row: PreviewRow,
+    *,
+    duplicate_conflict: bool = False,
+    brain_version: str = "",
+    taxonomy_version: str = "2026-07-25",
+) -> ReviewFeedback | None:
+    """Convert one explicit GUI correction into separated calibration evidence."""
+    predicted_label = normalize_taxonomy_label(row.neural_folder)
+    approved_label = normalize_taxonomy_label(row.approved_folder)
+    if row.neural_known_distribution is None or not predicted_label or not approved_label:
+        return None
+    prompt = row.neural_prompt_suggestions[0] if row.neural_prompt_suggestions else {}
+    compatible_families = compatible_semantic_families(predicted_label)
+    if not row.neural_semantic_family or not compatible_families:
+        broad_family_agreement = 0.5
+    else:
+        broad_family_agreement = 1.0 if row.neural_semantic_family in compatible_families else 0.0
+    structure_agreement = 1.0
+    if row.result is not None and neural_structure_conflicts(row.result, predicted_label):
+        structure_agreement = 0.0
+    return ReviewFeedback(
+        file_sha256=sha256_file(row.source_path),
+        provider_id="foundation_panel",
+        predicted_label=predicted_label,
+        accepted=predicted_label == approved_label,
+        top_similarity=float(row.neural_similarity),
+        margin=float(row.neural_margin),
+        radius_ratio=float(row.neural_radius_ratio),
+        label_example_count=max(0, int(row.neural_label_example_count)),
+        label_prototype_count=0,
+        structure_agreement=structure_agreement,
+        created_utc=datetime.now(timezone.utc).isoformat(),
+        final_approved_label=approved_label,
+        parent_family_accepted=predicted_label.split("/", 1)[0] == approved_label.split("/", 1)[0],
+        prompt_top_similarity=float(prompt.get("positive_score", 0.0)),
+        prompt_margin=float(prompt.get("prompt_margin", 0.0)),
+        panns_support_score=float(row.panns_support_score),
+        panns_contradiction_score=float(row.panns_contradiction_score),
+        broad_family_agreement=broad_family_agreement,
+        out_of_distribution=0.0 if row.neural_known_distribution else 1.0,
+        duplicate_conflict=1.0 if duplicate_conflict else 0.0,
+        brain_version=str(brain_version),
+        taxonomy_version=str(taxonomy_version),
+    )
 
 
 def timestamp() -> str:

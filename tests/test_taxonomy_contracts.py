@@ -24,6 +24,14 @@ def test_one_shot_named_category_does_not_keep_loop_terminal() -> None:
     assert canonicalize_taxonomy_label(label) == "Instruments/Voice/Vocal One Shots/One Shots"
 
 
+def test_explicit_loop_category_without_terminal_gains_loop_terminal() -> None:
+    contract = taxonomy_label_contract("Instruments/Synths/Synth Loops")
+
+    assert contract.canonical_label == "Instruments/Synths/Synth Loops/Loops"
+    assert "inferred_explicit_loop_category_terminal" in contract.reasons
+    assert is_trainable_taxonomy_label(contract.canonical_label)
+
+
 def test_fx_loop_terminal_is_not_trainable() -> None:
     label = "FX/Structural and Transitional FX/Risers and Builds/Generic Riser/Loops"
 

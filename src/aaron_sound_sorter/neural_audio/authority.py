@@ -21,6 +21,10 @@ from .runtime import (
     NeuralRuntimePrediction,
     run_configured_neural_predictions,
 )
+from .semantic_panel import (
+    SemanticCompatibilityAssessment,
+    assess_semantic_label_compatibility,
+)
 
 MEASURED_CONFLICT_REVIEW = "_TO_REVIEW/Measured Role Conflict"
 
@@ -91,6 +95,42 @@ def apply_neural_prediction_to_result(
 
     legacy_label = canonicalize_taxonomy_label(result.decision.folder_path or result.decision.final_label)
     if prediction.ownership_ready:
+        if neural_panns_contradicts(prediction):
+            event_names = ", ".join(event.label for event in prediction.panns_contradicting_events[:3])
+            reason = (
+                "Learned memory matched, but independent PANNs audio events "
+                f"contradicted its source family ({event_names}); forcing human review."
+            )
+            return _replace_decision(
+                result,
+                folder_path=MEASURED_CONFLICT_REVIEW,
+                final_top="_TO_REVIEW",
+                consensus_status="neural_panns_family_conflict_review",
+                reason=reason,
+                neural_evidence=evidence,
+            )
+        semantic_assessment = neural_semantic_compatibility(prediction, neural_label)
+        evidence["semantic_compatibility"] = {
+            "contradictory": semantic_assessment.contradictory,
+            "reason": semantic_assessment.reason,
+            "compatible_families": list(semantic_assessment.compatible_families),
+            "best_compatible_score": semantic_assessment.best_compatible_score,
+            "contradiction_gap": semantic_assessment.contradiction_gap,
+        }
+        if semantic_assessment.contradictory:
+            reason = (
+                "Learned memory matched, but independent audio-only semantics "
+                f"contradicted its source family ({prediction.semantic_family} vs {neural_label}); "
+                "forcing human review."
+            )
+            return _replace_decision(
+                result,
+                folder_path=MEASURED_CONFLICT_REVIEW,
+                final_top="_TO_REVIEW",
+                consensus_status="neural_semantic_family_conflict_review",
+                reason=reason,
+                neural_evidence=evidence,
+            )
         if neural_structure_conflicts(result, neural_label):
             reason = (
                 "Neural identity had production-ready evidence, but its terminal contradicted measured audio structure."
@@ -120,12 +160,16 @@ def apply_neural_prediction_to_result(
         evidence["authority_action"] = "defer_to_exact_human_teacher"
         return result
 
-    legacy_owner = neural_owner_family(legacy_label)
-    neural_owner = neural_owner_family(neural_label)
-    if legacy_owner and neural_owner and legacy_owner != neural_owner:
+    if neural_disagreement_requires_review(
+        prediction,
+        legacy_label,
+        neural_label,
+        result=result,
+    ):
+        neural_family, legacy_family = neural_conflict_families(neural_label, legacy_label)
         reason = (
             "Neural audio was not ready for production ownership and disagreed "
-            f"with the legacy source family ({neural_owner} vs {legacy_owner}); "
+            f"with the legacy source family ({neural_family} vs {legacy_family}); "
             "forcing human review."
         )
         return _replace_decision(
@@ -149,6 +193,97 @@ def neural_defers_to_exact_human_teacher(
     )
 
 
+def neural_semantic_compatibility(
+    prediction: NeuralRuntimePrediction,
+    neural_label: str,
+) -> SemanticCompatibilityAssessment:
+    """Compare a learned label with independent audio-only source evidence.
+
+    Args:
+        prediction: Runtime prediction carrying zero-shot family scores.
+        neural_label: Canonical learned taxonomy label.
+
+    Returns:
+        Semantic compatibility assessment used only as a Review guardrail.
+
+    Side Effects:
+        None.
+    """
+    assessment = assess_semantic_label_compatibility(
+        neural_label,
+        predicted_family=prediction.semantic_family,
+        top_score=prediction.semantic_top_score,
+        family_scores=prediction.semantic_family_scores,
+    )
+    if (
+        assessment.contradictory
+        and prediction.panns_support_score > prediction.panns_contradiction_score
+        and prediction.panns_supporting_events
+    ):
+        return SemanticCompatibilityAssessment(
+            False,
+            "panns_independent_support_overrules_clap_veto",
+            assessment.compatible_families,
+            assessment.best_compatible_score,
+            assessment.contradiction_gap,
+        )
+    return assessment
+
+
+def neural_panns_contradicts(prediction: NeuralRuntimePrediction) -> bool:
+    """Return whether mapped PANNs events independently reject the label."""
+    return bool(
+        prediction.panns_contradicting_events and prediction.panns_contradiction_score > prediction.panns_support_score
+    )
+
+
+def neural_disagreement_requires_review(
+    prediction: NeuralRuntimePrediction,
+    legacy_label: str,
+    neural_label: str,
+    *,
+    result: SortFileResult | None = None,
+) -> bool:
+    """Return whether weak neural and legacy source identities require review.
+
+    Unknown neural predictions cannot own a label, but their disagreement is
+    still useful negative evidence. Broad family conflicts and meaningful
+    within-family source conflicts therefore go to Review. Closely related
+    tonal families, such as keys and synths, remain together so sparse neural
+    evidence does not create unnecessary review churn.
+    """
+    if prediction.ownership_ready:
+        return False
+    neural_family, legacy_family = neural_conflict_families(neural_label, legacy_label)
+    if not neural_family or not legacy_family or neural_family == legacy_family:
+        return False
+    neural_owner = neural_owner_family(neural_label)
+    legacy_owner = neural_owner_family(legacy_label)
+    if neural_owner != legacy_owner:
+        return True
+    if neural_family in {"instruments_broad", "fx_broad"} or legacy_family in {
+        "instruments_broad",
+        "fx_broad",
+    }:
+        return False
+    if neural_source_family(prediction.second_label) == legacy_family:
+        return False
+    if result is not None and _measured_trace_supports_source_family(result, neural_family):
+        return False
+    return True
+
+
+def neural_conflict_families(neural_label: str, legacy_label: str) -> tuple[str, str]:
+    """Return comparable source-family names for a neural/legacy disagreement."""
+    neural_owner = neural_owner_family(neural_label)
+    legacy_owner = neural_owner_family(legacy_label)
+    if neural_owner and legacy_owner and neural_owner != legacy_owner:
+        return neural_owner, legacy_owner
+    neural_source = neural_source_family(neural_label)
+    legacy_source = neural_source_family(legacy_label)
+    return neural_source, legacy_source
+
+
 def neural_owner_family(label: str) -> str:
     """Return the broad source-family contract used for conflict Review."""
     normalized = canonicalize_taxonomy_label(label)
@@ -166,6 +301,79 @@ def neural_owner_family(label: str) -> str:
     if "voice" in lowered or "vocal" in lowered:
         return "voice"
     return ""
+
+
+def neural_source_family(label: str) -> str:
+    """Return a source-identity group used only to detect unsafe disagreement."""
+    normalized = canonicalize_taxonomy_label(label)
+    parts = normalized.split("/")
+    if normalized.startswith("Instruments/Voice/"):
+        return "voice_musical"
+    if normalized.startswith("FX/Human and Voice FX/"):
+        return "voice_effect"
+    if normalized.startswith("Drums/") and len(parts) > 1:
+        drum_family = parts[1]
+        drum_groups = {
+            "Claps Snaps Slaps": "drums_backbeat",
+            "Cymbals": "drums_cymbal",
+            "Drum Fills and Rolls": "drums_ensemble",
+            "Drum Loops": "drums_ensemble",
+            "Hi Hats": "drums_cymbal",
+            "Kick Drums": "drums_kick",
+            "Percussion": "drums_percussion",
+            "Percussion Loops": "drums_percussion",
+            "Rims and Sticks": "drums_backbeat",
+            "Snares": "drums_backbeat",
+            "Toms": "drums_tom",
+            "World Percussion": "drums_percussion",
+        }
+        return drum_groups.get(drum_family, f"drums_{drum_family.casefold().replace(' ', '_')}")
+    if normalized.startswith("Instruments/") and len(parts) > 1:
+        instrument_family = parts[1]
+        instrument_groups = {
+            "Bass": "instruments_bass",
+            "Brass": "instruments_winds",
+            "Guitar": "instruments_strings",
+            "Instrument Loops": "instruments_broad",
+            "Keys": "instruments_keyed_tonal",
+            "Mallets and Bells": "instruments_keyed_tonal",
+            "Mixed Musical Loops": "instruments_mixed",
+            "Plucked Strings": "instruments_strings",
+            "Strings": "instruments_strings",
+            "Strings Bowed": "instruments_strings",
+            "Synths": "instruments_keyed_tonal",
+            "Winds": "instruments_winds",
+            "Woodwinds": "instruments_winds",
+        }
+        return instrument_groups.get(
+            instrument_family,
+            f"instruments_{instrument_family.casefold().replace(' ', '_')}",
+        )
+    if normalized.startswith("FX/") and len(parts) > 1:
+        fx_family = parts[1]
+        if fx_family == "Hybrid Designed FX":
+            return "fx_broad"
+        return f"fx_{fx_family.casefold().replace(' ', '_')}"
+    return neural_owner_family(normalized)
+
+
+def _measured_trace_supports_source_family(result: SortFileResult, source_family: str) -> bool:
+    """Return whether strong pre-neural measured evidence supports a source family."""
+    trace = result.decision.authority_trace
+    if not isinstance(trace, dict):
+        return False
+    for claim_name in ("raw_claim", "winner_after_pick", "final_claim"):
+        claim = trace.get(claim_name)
+        if not isinstance(claim, dict):
+            continue
+        claim_path = str(claim.get("path", ""))
+        try:
+            strength = float(claim.get("strength", 0.0))
+        except (TypeError, ValueError):
+            strength = 0.0
+        if strength >= 0.85 and neural_source_family(claim_path) == source_family:
+            return True
+    return False
 
 
 def neural_structure_conflicts(result: SortFileResult, neural_label: str) -> bool:
@@ -293,6 +501,20 @@ def _prediction_evidence(prediction: NeuralRuntimePrediction) -> dict[str, Any]:
         "exact_training_match": prediction.exact_training_match,
         "ownership_ready": prediction.ownership_ready,
         "ownership_reason": prediction.ownership_block_reason,
+        "semantic_family": prediction.semantic_family,
+        "semantic_second_family": prediction.semantic_second_family,
+        "semantic_top_score": prediction.semantic_top_score,
+        "semantic_second_score": prediction.semantic_second_score,
+        "semantic_margin": prediction.semantic_margin,
+        "semantic_family_scores": dict(prediction.semantic_family_scores),
+        "panns_support_score": prediction.panns_support_score,
+        "panns_contradiction_score": prediction.panns_contradiction_score,
+        "panns_supporting_events": [
+            {"label": event.label, "score": event.score} for event in prediction.panns_supporting_events
+        ],
+        "panns_contradicting_events": [
+            {"label": event.label, "score": event.score} for event in prediction.panns_contradicting_events
+        ],
         "source_name_policy": "audio waveform and content hash only",
     }
 

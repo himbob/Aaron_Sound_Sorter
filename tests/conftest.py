@@ -15,6 +15,7 @@ from __future__ import annotations
 import os
 import shutil
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
 from typing import TextIO
@@ -33,6 +34,14 @@ LOCKED_SMOKE_AUDIO_DIR = PROJECT_ROOT / "tests" / "acceptance" / "locked_smoke_v
 GENERATED_ROOT = PROJECT_ROOT / "_reports" / "generated_private_regression_audio"
 
 WaveFactory = Callable[[str], np.ndarray]
+
+
+@dataclass(frozen=True)
+class LockedSample:
+    """Declare private fixture bytes and an explicit synthetic fallback role."""
+
+    source_name: str
+    fallback_factory: WaveFactory
 
 
 def pytest_sessionstart(session) -> None:  # type: ignore[no-untyped-def]
@@ -83,7 +92,7 @@ def _acquire_pytest_session_lock(session) -> None:  # type: ignore[no-untyped-de
     session.config._aaron_pytest_lock_handle = lock_handle
 
 
-def _link_generated_fixture_dir(folder_name: str, samples: dict[str, WaveFactory | str]) -> None:
+def _link_generated_fixture_dir(folder_name: str, samples: dict[str, WaveFactory | LockedSample]) -> None:
     """Create a generated fixture directory and link the test's expected path.
 
     The fixture materializer should never abort pytest just because a copied
@@ -102,9 +111,14 @@ def _link_generated_fixture_dir(folder_name: str, samples: dict[str, WaveFactory
     for sample_name, source in samples.items():
         target = generated / sample_name
         target.parent.mkdir(parents=True, exist_ok=True)
-        if isinstance(source, str):
-            source_path = LOCKED_SMOKE_AUDIO_DIR / source
-            _copy_locked_sample_or_write_fallback(source_path, target, sample_name)
+        if isinstance(source, LockedSample):
+            source_path = LOCKED_SMOKE_AUDIO_DIR / source.source_name
+            _copy_locked_sample_or_write_fallback(
+                source_path,
+                target,
+                fallback_factory=source.fallback_factory,
+                sample_name=sample_name,
+            )
         else:
             fixtures.write_wav(target, source(sample_name))
     if expected.is_symlink() or expected.exists():
@@ -115,7 +129,13 @@ def _link_generated_fixture_dir(folder_name: str, samples: dict[str, WaveFactory
     expected.symlink_to(generated, target_is_directory=True)
 
 
-def _copy_locked_sample_or_write_fallback(source_path: Path, target: Path, sample_name: str) -> None:
+def _copy_locked_sample_or_write_fallback(
+    source_path: Path,
+    target: Path,
+    *,
+    fallback_factory: WaveFactory,
+    sample_name: str,
+) -> None:
     """Copy fixture audio bytes, or synthesize a stable fallback WAV.
 
     ``shutil.copy2`` can fail during ``copystat`` on some external/macOS
@@ -133,29 +153,7 @@ def _copy_locked_sample_or_write_fallback(source_path: Path, target: Path, sampl
             return
         except OSError:
             temporary_target.unlink(missing_ok=True)
-    fixtures.write_wav(target, _fallback_for_name(sample_name))
-
-
-def _fallback_for_name(sample_name: str) -> np.ndarray:
-    """Return a conservative fallback role for a generated sample name."""
-    name = sample_name.lower()
-    if "vocal" in name or "voice" in name or "dojo" in name or "stab" in name:
-        return fixtures.synth_voice_like(230.0, dur=0.9)
-    if "sax" in name or "brass" in name:
-        return fixtures.synth_harmonic_phrase(360.0, dur=2.5)
-    if "piano" in name or "keys" in name or "chords" in name:
-        return fixtures.synth_piano_like(392.0, dur=2.4)
-    if "bass" in name:
-        return _synth_bass_loop(sample_name)
-    if "drum" in name or "beat" in name:
-        return fixtures.synth_drum_loop(sample_name, dur=2.4)
-    if "riser" in name or "police" in name or "fx" in name:
-        return fixtures.synth_fx_hit(dur=2.0)
-    if "29793" in name:
-        return fixtures.synth_tone(110.0, dur=0.35)
-    if "16791" in name:
-        return fixtures.synth_percussion_hit(dur=0.25)
-    return fixtures.synth_tone(440.0, dur=1.2)
+    fixtures.write_wav(target, fallback_factory(sample_name))
 
 
 def _synth_bass_loop(sample_name: str, dur: float = 2.4) -> np.ndarray:
@@ -187,11 +185,36 @@ def _generated_percussion_hit(sample_name: str) -> np.ndarray:
     return fixtures.synth_percussion_hit(dur=0.25)
 
 
+def _generated_voice(sample_name: str) -> np.ndarray:
+    del sample_name
+    return fixtures.synth_voice_like(230.0, dur=0.9)
+
+
+def _generated_sax(sample_name: str) -> np.ndarray:
+    del sample_name
+    return fixtures.synth_harmonic_phrase(360.0, dur=2.5)
+
+
+def _generated_piano(sample_name: str) -> np.ndarray:
+    del sample_name
+    return fixtures.synth_piano_like(392.0, dur=2.4)
+
+
+def _generated_fx(sample_name: str) -> np.ndarray:
+    del sample_name
+    return fixtures.synth_fx_hit(dur=2.0)
+
+
+def _locked(source_name: str, fallback_factory: WaveFactory) -> LockedSample:
+    """Pair private fixture bytes with an explicit, source-name-blind fallback."""
+    return LockedSample(source_name, fallback_factory)
+
+
 def _ensure_v23_voice_short_hit_guard() -> None:
     _link_generated_fixture_dir(
         "regression_audio_v23_voice_short_hit_guard",
         {
-            "DOJO_CGNB_Female_Vocal_Shot_01_D.wav": "DOJO_CGNB_Female_Vocal_Shot_01_D.wav",
+            "DOJO_CGNB_Female_Vocal_Shot_01_D.wav": _locked("DOJO_CGNB_Female_Vocal_Shot_01_D.wav", _generated_voice),
             "29793.wav": _generated_low_hit,
             "16791.wav": _generated_percussion_hit,
         },
@@ -226,9 +249,9 @@ def _ensure_v24_drum_loop_steal_guard() -> None:
         {
             **drum_loops,
             **bass_loops,
-            "AA_JBL_78bpm_Cm_Sax_Loop_1.wav": "AA_JBL_78bpm_Cm_Sax_Loop_1.wav",
-            "DOJO_FBP_Female_Vocal_Shout.wav": "DOJO_FBP_Female_Vocal_Shout.wav",
-            "DOJO_CGNB_Female_Vocal_Shot_01_D.wav": "DOJO_CGNB_Female_Vocal_Shot_01_D.wav",
+            "AA_JBL_78bpm_Cm_Sax_Loop_1.wav": _locked("AA_JBL_78bpm_Cm_Sax_Loop_1.wav", _generated_sax),
+            "DOJO_FBP_Female_Vocal_Shout.wav": _locked("DOJO_FBP_Female_Vocal_Shout.wav", _generated_voice),
+            "DOJO_CGNB_Female_Vocal_Shot_01_D.wav": _locked("DOJO_CGNB_Female_Vocal_Shot_01_D.wav", _generated_voice),
         },
     )
 
@@ -237,12 +260,15 @@ def _ensure_v25_transition_reverb() -> None:
     _link_generated_fixture_dir(
         "regression_audio_v25_transition_reverb",
         {
-            "GrimyHipHop_Saxophone_26_Fm_Melody_Dark_Dusty_Warm_Loop_84bpm.wav": (
-                "GrimyHipHop_Saxophone_15_Fm_Melody_Dark_Dusty_Warm_Loop_84bpm.wav"
+            "GrimyHipHop_Saxophone_26_Fm_Melody_Dark_Dusty_Warm_Loop_84bpm.wav": _locked(
+                "GrimyHipHop_Saxophone_15_Fm_Melody_Dark_Dusty_Warm_Loop_84bpm.wav",
+                _generated_sax,
             ),
-            "Riser Short Effect.wav": "Riser Short Effect.wav",
-            "US_CHV2_Vocal_female_shouts_processed_13.wav": "DOJO_FBP_Female_Vocal_Shout.wav",
-            "Piano 1 - 80 Bpm - Key C.wav": "Piano 1 - 80 Bpm - Key C.wav",
+            "Riser Short Effect.wav": _locked("Riser Short Effect.wav", _generated_fx),
+            "US_CHV2_Vocal_female_shouts_processed_13.wav": _locked(
+                "DOJO_FBP_Female_Vocal_Shout.wav", _generated_voice
+            ),
+            "Piano 1 - 80 Bpm - Key C.wav": _locked("Piano 1 - 80 Bpm - Key C.wav", _generated_piano),
         },
     )
 
@@ -251,8 +277,8 @@ def _ensure_v26_fx_smoke_reverb() -> None:
     _link_generated_fixture_dir(
         "regression_audio_v26_fx_smoke_reverb",
         {
-            "HipHopTapes_29_Saxophone_D#m_90bpm.wav": "HipHopTapes_29_Saxophone_D#m_90bpm.wav",
-            "SCY093_02_Sax_Loop_KeyAbm_89bpm_01.wav": "SCY097_03_Sax_Loop_KeyEm_90bpm_01.wav",
+            "HipHopTapes_29_Saxophone_D#m_90bpm.wav": _locked("HipHopTapes_29_Saxophone_D#m_90bpm.wav", _generated_sax),
+            "SCY093_02_Sax_Loop_KeyAbm_89bpm_01.wav": _locked("SCY097_03_Sax_Loop_KeyEm_90bpm_01.wav", _generated_sax),
             "ABOUTME_94_DRUMLOOP.wav": _generated_drum_loop,
         },
     )
@@ -262,21 +288,30 @@ def _ensure_v28_fx_zip_matrix() -> None:
     _link_generated_fixture_dir(
         "regression_audio_v28_fx_zip_matrix",
         {
-            "AA_JBL_78bpm_Cm_Sax_Loop_1.wav": "AA_JBL_78bpm_Cm_Sax_Loop_1.wav",
-            "AMV_VRNB1_102_brass_saxophone_loop_cranesinthesky_Am.wav": (
-                "Brass_Saxophone_RnB_Multi_Instrument_F_Minor_80BPM.wav"
+            "AA_JBL_78bpm_Cm_Sax_Loop_1.wav": _locked("AA_JBL_78bpm_Cm_Sax_Loop_1.wav", _generated_sax),
+            "AMV_VRNB1_102_brass_saxophone_loop_cranesinthesky_Am.wav": _locked(
+                "Brass_Saxophone_RnB_Multi_Instrument_F_Minor_80BPM.wav",
+                _generated_sax,
             ),
-            "EWS_Keys_resampled_HipHop_RnB_G_Major_88BPM.wav": "EWS_Keys_resampled_HipHop_RnB_G_Major_88BPM.wav",
-            "WS2_KIT_1_Electric_Piano_Chords_Fm_101BPM.wav": "WS2_KIT_1_Electric_Piano_Chords_Fm_101BPM.wav",
+            "EWS_Keys_resampled_HipHop_RnB_G_Major_88BPM.wav": _locked(
+                "EWS_Keys_resampled_HipHop_RnB_G_Major_88BPM.wav", _generated_piano
+            ),
+            "WS2_KIT_1_Electric_Piano_Chords_Fm_101BPM.wav": _locked(
+                "WS2_KIT_1_Electric_Piano_Chords_Fm_101BPM.wav", _generated_piano
+            ),
             "GS_Synth_Gangsta_Lead_G#min_97bpm.wav": lambda name: fixtures.synth_tone(520.0, dur=1.9),
             "MS_TLV1_03_The Way It Is_Synth Lead 1_Eminor_98bpm_Wet.wav": lambda name: fixtures.synth_tone(
                 440.0, dur=2.0
             ),
-            "Money_vocals_female_rap_110bpm.wav": "Money_vocals_female_rap_110bpm.wav",
-            "Phonk_Rap_Vocals_26_keyCmin_151bpm.wav": "Phonk_Rap_Vocals_26_keyCmin_151bpm.wav",
-            "Vocal Phrase We Up 140bpm.wav": "DOJO_FBP_Female_Vocal_Shout.wav",
-            "Stab 3.wav": "DOJO_CGNB_Female_Vocal_Shot_01_D.wav",
-            "MS_O_01_Outlaw_Fx Police_D#minor_91bpm_Wet.wav": "MS_O_01_Outlaw_Fx Police_D#minor_91bpm_Wet.wav",
+            "Money_vocals_female_rap_110bpm.wav": _locked("Money_vocals_female_rap_110bpm.wav", _generated_fx),
+            "Phonk_Rap_Vocals_26_keyCmin_151bpm.wav": _locked(
+                "Phonk_Rap_Vocals_26_keyCmin_151bpm.wav", _generated_voice
+            ),
+            "Vocal Phrase We Up 140bpm.wav": _locked("Vocal Phrase We Up 140bpm.wav", _generated_fx),
+            "Stab 3.wav": _locked("Stab 3.wav", _generated_fx),
+            "MS_O_01_Outlaw_Fx Police_D#minor_91bpm_Wet.wav": _locked(
+                "MS_O_01_Outlaw_Fx Police_D#minor_91bpm_Wet.wav", _generated_fx
+            ),
             "2.Drum Loop_1_100bpm.wav": _generated_drum_loop,
             "ABOUTME_94_DRUMLOOP.wav": _generated_drum_loop,
         },
@@ -339,16 +374,18 @@ def _ensure_uploaded_regression_audio() -> None:
     _link_generated_fixture_dir(
         "regression_audio",
         {
-            "04_Dmn_176bpm_bass.wav": "MS_TLV1_03_The Way It Is_Bass_Eminor_98bpm_Dry.wav",
-            "04.bass_92bpm_Em.wav": "MS_TLV1_03_The Way It Is_Bass_Eminor_98bpm_Dry.wav",
-            "DOJO_CGNB_Female_Vocal_Shot_01_D.wav": "DOJO_CGNB_Female_Vocal_Shot_01_D.wav",
+            "04_Dmn_176bpm_bass.wav": _locked(
+                "MS_TLV1_03_The Way It Is_Bass_Eminor_98bpm_Dry.wav", _generated_bass_loop
+            ),
+            "04.bass_92bpm_Em.wav": _locked("MS_TLV1_03_The Way It Is_Bass_Eminor_98bpm_Dry.wav", _generated_bass_loop),
+            "DOJO_CGNB_Female_Vocal_Shot_01_D.wav": _locked("DOJO_CGNB_Female_Vocal_Shot_01_D.wav", _generated_voice),
             "Drumloop_hats_Dark_Rap_140BPM.wav": _generated_drum_loop,
             "GangstaFunk_Cmaj_96bpm.wav": lambda name: fixtures.synth_piano_like(220.0, dur=2.4),
             "SCY095_03_Drums_Top_Loop_90bpm_01.wav": _generated_drum_loop,
-            "1.Saxophone_1_110bpm_Am.wav": "AA_JBL_78bpm_Cm_Sax_Loop_1.wav",
-            "HipHopTapes_28_Saxophone_D#m_90bpm.wav": "HipHopTapes_28_Saxophone_D#m_90bpm.wav",
-            "Vocal Phrase We Up 140bpm.wav": "DOJO_FBP_Female_Vocal_Shout.wav",
+            "1.Saxophone_1_110bpm_Am.wav": _locked("AA_JBL_78bpm_Cm_Sax_Loop_1.wav", _generated_sax),
+            "HipHopTapes_28_Saxophone_D#m_90bpm.wav": _locked("HipHopTapes_28_Saxophone_D#m_90bpm.wav", _generated_sax),
+            "Vocal Phrase We Up 140bpm.wav": _locked("Vocal Phrase We Up 140bpm.wav", _generated_fx),
             "Compton_Fmin_100bpm.wav": _generated_drum_loop,
-            "AV5_5_94bpm_Hit 2.wav": "AV5_5_94bpm_Hit 2.wav",
+            "AV5_5_94bpm_Hit 2.wav": _locked("AV5_5_94bpm_Hit 2.wav", _generated_drum_loop),
         },
     )

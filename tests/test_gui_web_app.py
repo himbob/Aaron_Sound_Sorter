@@ -70,6 +70,8 @@ def test_web_gui_shell_contains_core_controls() -> None:
     assert "waitForAudioReady" in html
     assert "categoryHints" in html
     assert "Detected category options" in html
+    assert "Neural Audio (plain English)" in html
+    assert "neural_explanation_lines" in html
     assert "categoryModal" in html
     assert "Choose Approved Folder" in html
     assert "Apply Approved Folder" in html
@@ -176,6 +178,7 @@ def test_session_payload_preserves_preview_rows() -> None:
         "Drums/Kick Drums/Generic Kick/One Shots",
         "FX/Impacts and Hits/Boom/One Shots",
     ]
+    assert payload["rows"][0]["neural_explanation_lines"] == ["Neural audio: unavailable for this preview."]
 
 
 def test_apply_overrides_updates_approved_folder_only() -> None:

@@ -18,4 +18,4 @@ def test_uploaded_belize_loop_is_not_voice() -> None:
     label = _run_one("belize87bpm_8bars_UNKWN (Bbm).wav")
     low = label.lower()
     assert "voice" not in low and "vocal" not in low, label
-    assert label.startswith("Instruments/") or label.startswith("FX/"), label
+    assert label.startswith(("Instruments/", "FX/", "_TO_REVIEW/")), label

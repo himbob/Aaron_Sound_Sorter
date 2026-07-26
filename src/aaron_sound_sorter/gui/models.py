@@ -50,6 +50,20 @@ class PreviewRow:
         neural_similarity: Cosine similarity to the winning prototype.
         neural_margin: Similarity lead over the second label.
         neural_radius_ratio: Distance relative to the learned label radius.
+        neural_semantic_family: Independent audio/text source-family winner.
+        neural_semantic_score: Similarity for the semantic family winner.
+        neural_semantic_margin: Lead over the second semantic family.
+        neural_prompt_status: Availability state for the read-only detailed
+            CLAP prompt brain.
+        neural_prompt_suggestions: Experimental detailed category suggestions
+            with their audible supporting prompts and raw scores.
+        panns_status: Availability state for the independent PANNs lane.
+        panns_model_id: Pinned PANNs checkpoint and preprocessing identity.
+        panns_events: Raw broad AudioSet events for human-visible evidence.
+        panns_support_score: Strongest mapped event supporting trained memory.
+        panns_contradiction_score: Strongest mapped event rejecting trained memory.
+        panns_supporting_events: Mapped broad events supporting trained memory.
+        panns_contradicting_events: Mapped broad events rejecting trained memory.
         result: Full in-memory sort result used for correction evidence. Tests
             may provide ``None`` when only export behavior is under test.
 
@@ -83,6 +97,18 @@ class PreviewRow:
     neural_similarity: float = 0.0
     neural_margin: float = 0.0
     neural_radius_ratio: float = 0.0
+    neural_semantic_family: str = ""
+    neural_semantic_score: float = 0.0
+    neural_semantic_margin: float = 0.0
+    neural_prompt_status: str = "unavailable"
+    neural_prompt_suggestions: list[dict[str, str | float]] = field(default_factory=list)
+    panns_status: str = "unavailable"
+    panns_model_id: str = ""
+    panns_events: list[dict[str, str | float]] = field(default_factory=list)
+    panns_support_score: float = 0.0
+    panns_contradiction_score: float = 0.0
+    panns_supporting_events: list[dict[str, str | float]] = field(default_factory=list)
+    panns_contradicting_events: list[dict[str, str | float]] = field(default_factory=list)
     result: SortFileResult | None = field(default=None, repr=False)
 
     @property

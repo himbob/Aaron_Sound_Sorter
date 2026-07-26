@@ -131,7 +131,12 @@ def canonicalize_structure_terminal(label: str) -> tuple[str, list[str]]:
     if len(parts) < 2:
         return label, []
     terminal = parts[-1]
+    body_text = " ".join(parts).lower().replace("_", " ").replace("-", " ")
     if terminal not in STRUCTURE_TERMINALS:
+        if explicit_loop_category_text(body_text):
+            return "/".join([*parts, "Loops"]), ["inferred_explicit_loop_category_terminal"]
+        if explicit_one_shot_category_text(body_text):
+            return "/".join([*parts, "One Shots"]), ["inferred_explicit_one_shot_category_terminal"]
         return label, []
     body_parts = parts[:-1]
     body_text = " ".join(body_parts).lower().replace("_", " ").replace("-", " ")

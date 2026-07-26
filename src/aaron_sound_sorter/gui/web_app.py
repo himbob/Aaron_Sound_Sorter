@@ -25,6 +25,7 @@ from aaron_sound_sorter.gui.incremental_brain_update import (
     corrections_from_import_manifest,
 )
 from aaron_sound_sorter.gui.models import PreviewRow, SortPreviewSession, TrainingImportSummary
+from aaron_sound_sorter.gui.neural_explanations import neural_evidence_lines
 from aaron_sound_sorter.gui.preview_service import (
     PreviewCancelled,
     SortPlanExporter,
@@ -101,6 +102,7 @@ class BrainTrainingJob:
     neural_report_path: str = ""
     neural_training_example_count: int = 0
     neural_label_count: int = 0
+    neural_pending_conflict_count: int = 0
     errors: list[str] = field(default_factory=list)
     started_at: float = field(default_factory=time.time)
     updated_at: float = field(default_factory=time.time)
@@ -693,6 +695,8 @@ def run_brain_training_job(job: BrainTrainingJob, project_root: Path) -> None:
                 job.neural_report_path = str(neural_summary.get("report_path", ""))
                 job.neural_training_example_count = int(neural_summary.get("training_example_count", 0))
                 job.neural_label_count = int(neural_summary.get("label_count", 0))
+                pending_conflicts = list(neural_summary.get("pending_training_conflicts", []))
+                job.neural_pending_conflict_count = len(pending_conflicts)
                 log_handle.write(
                     f"Neural status: {job.neural_status}; "
                     f"examples={job.neural_training_example_count}; "
@@ -700,6 +704,12 @@ def run_brain_training_job(job: BrainTrainingJob, project_root: Path) -> None:
                 )
                 log_handle.write(f"Neural index: {job.neural_index_path or '-'}\n")
                 log_handle.write(f"Neural report: {job.neural_report_path or '-'}\n")
+                for conflict in pending_conflicts:
+                    log_handle.write(
+                        "Neural relabel awaiting one more confirmation: "
+                        f"locked={conflict.get('locked_label', '')}; "
+                        f"proposed={conflict.get('proposed_label', '')}\n"
+                    )
                 for prediction in neural_summary.get("correction_predictions", []):
                     log_handle.write(
                         "Neural correction verification: "
@@ -758,6 +768,11 @@ def run_brain_training_job(job: BrainTrainingJob, project_root: Path) -> None:
             if neural_built
             else "CLAP evidence was queued for a later rebuild."
         )
+        if job.neural_pending_conflict_count:
+            neural_message += (
+                f" {job.neural_pending_conflict_count} locked-label relabel(s) need the same choice "
+                "one more time before neural training changes them."
+            )
         legacy_message = (
             f" Transitional memories refreshed from {legacy_summary.applied_correction_count} correction(s)."
             if legacy_summary is not None
@@ -797,6 +812,7 @@ def training_job_to_payload(job: BrainTrainingJob) -> dict[str, Any]:
         "neural_report_path": job.neural_report_path,
         "neural_training_example_count": job.neural_training_example_count,
         "neural_label_count": job.neural_label_count,
+        "neural_pending_conflict_count": job.neural_pending_conflict_count,
         "errors": job.errors,
         "started_at": job.started_at,
         "updated_at": job.updated_at,
@@ -939,6 +955,19 @@ def row_to_payload(index: int, row: PreviewRow) -> dict[str, Any]:
         "neural_similarity": row.neural_similarity,
         "neural_margin": row.neural_margin,
         "neural_radius_ratio": row.neural_radius_ratio,
+        "neural_semantic_family": row.neural_semantic_family,
+        "neural_semantic_score": row.neural_semantic_score,
+        "neural_semantic_margin": row.neural_semantic_margin,
+        "neural_prompt_status": row.neural_prompt_status,
+        "neural_prompt_suggestions": row.neural_prompt_suggestions,
+        "panns_status": row.panns_status,
+        "panns_model_id": row.panns_model_id,
+        "panns_events": row.panns_events,
+        "panns_support_score": row.panns_support_score,
+        "panns_contradiction_score": row.panns_contradiction_score,
+        "panns_supporting_events": row.panns_supporting_events,
+        "panns_contradicting_events": row.panns_contradicting_events,
+        "neural_explanation_lines": neural_evidence_lines(row),
         "is_corrected": row.is_corrected,
     }
 
@@ -2841,6 +2870,9 @@ function refreshSelectedRowDetails() {{
     `Decision:  ${{row.consensus_status}}`,
     `Top:       ${{row.final_top}}`,
     `Duration:  ${{Number(row.duration_sec || 0).toFixed(2)}}s`,
+    "",
+    "Neural Audio (plain English):",
+    ...(Array.isArray(row.neural_explanation_lines) ? row.neural_explanation_lines : ["Neural audio: unavailable for this preview."]),
     rowIsCorrected(row) ? "" : "",
     rowIsCorrected(row) ? "Correction staged: export will use the approved folder. Train Brains From Corrections teaches future runs." : "",
     "",

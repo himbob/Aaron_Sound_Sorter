@@ -544,7 +544,9 @@ def print_selection_summary(selected_files: Sequence[SelectedFile]) -> None:
     category_sizes: dict[str, int] = {}
     category_counts: dict[str, int] = {}
     for selected_file in selected_files:
-        category_sizes[selected_file.category] = category_sizes.get(selected_file.category, 0) + selected_file.size_bytes
+        category_sizes[selected_file.category] = (
+            category_sizes.get(selected_file.category, 0) + selected_file.size_bytes
+        )
         category_counts[selected_file.category] = category_counts.get(selected_file.category, 0) + 1
     print("Bundle selection:")
     for category in sorted(category_sizes):

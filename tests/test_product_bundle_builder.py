@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from pathlib import Path
 import zipfile
+from pathlib import Path
 
 import pytest
 
 from tools.build_product_bundle import ProductBundleRequest, build_product_bundle, select_product_files
-
 
 REQUIRED_BRAINS = (
     "stage4_folder_brain.json",
@@ -60,7 +59,9 @@ def make_project(tmp_path: Path) -> Path:
     return project_root
 
 
-def make_request(project_root: Path, *, include_neural_models: bool = True, dry_run: bool = True) -> ProductBundleRequest:
+def make_request(
+    project_root: Path, *, include_neural_models: bool = True, dry_run: bool = True
+) -> ProductBundleRequest:
     return ProductBundleRequest(
         project_root=project_root,
         bundle_name="Aaron_Product_Test",

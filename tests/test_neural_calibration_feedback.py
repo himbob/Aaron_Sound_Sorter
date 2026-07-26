@@ -1,3 +1,4 @@
+import builtins
 from pathlib import Path
 
 from aaron_sound_sorter.neural_audio.calibration import (
@@ -37,3 +38,38 @@ def test_feedback_store_and_logistic_calibration(tmp_path: Path) -> None:
     assert accepted_probability is not None
     assert rejected_probability is not None
     assert accepted_probability > rejected_probability
+
+
+def test_calibration_has_numpy_fallback_without_scikit_learn(monkeypatch) -> None:
+    original_import = builtins.__import__
+
+    def import_without_sklearn(name, *args, **kwargs):
+        if name.startswith("sklearn"):
+            raise ImportError("scikit-learn intentionally unavailable")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", import_without_sklearn)
+    calibrator = ConfidenceCalibrator()
+    calibrator.fit([feedback(index, accepted=index % 2 == 0) for index in range(30)])
+
+    accepted_probability = calibrator.predict_probability(feedback(100, True))
+    rejected_probability = calibrator.predict_probability(feedback(101, False))
+    assert calibrator.method == "numpy_logistic"
+    assert accepted_probability is not None
+    assert rejected_probability is not None
+    assert accepted_probability > rejected_probability
+
+
+def test_calibrator_round_trip_is_dependency_free(tmp_path: Path) -> None:
+    calibrator = ConfidenceCalibrator()
+    calibrator.fit([feedback(index, accepted=index % 2 == 0) for index in range(30)])
+    artifact = tmp_path / "calibrator.json"
+
+    calibrator.save(artifact, metadata={"purpose": "test"})
+    loaded = ConfidenceCalibrator.load(artifact)
+
+    expected = calibrator.predict_probability(feedback(100, True))
+    actual = loaded.predict_probability(feedback(100, True))
+    assert expected is not None
+    assert actual is not None
+    assert abs(expected - actual) < 1e-9

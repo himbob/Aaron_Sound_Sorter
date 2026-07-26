@@ -7,7 +7,7 @@ should pin and prefetch a reviewed model snapshot.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -35,6 +35,7 @@ class HuggingFaceClapProvider:
     allow_network: bool = False
     max_segment_seconds: float = 10.0
     max_segments: int = 3
+    text_batch_size: int = 64
 
     _processor: Any = None
     _model: Any = None
@@ -165,3 +166,46 @@ class HuggingFaceClapProvider:
             segment_count=len(vectors),
             sample_rate=target_rate,
         )
+
+    def embed_texts(self, prompts: Sequence[str]) -> np.ndarray:
+        """Return normalized CLAP text embeddings for semantic audio prompts.
+
+        Args:
+            prompts: Non-empty natural-language descriptions of audible sound
+                content. Paths and filenames must never be included.
+
+        Returns:
+            A two-dimensional array containing one normalized embedding per
+            prompt, in input order.
+
+        Raises:
+            ValueError: If no usable prompt is supplied.
+            RuntimeError: If the configured CLAP model lacks text features.
+
+        Side Effects:
+            Lazily loads the configured local CLAP model.
+
+        Important Constraints:
+            Prompts describe audible concepts only. This method must not encode
+            source filenames, folder names, or sample-pack metadata.
+        """
+        cleaned_prompts = [str(prompt).strip() for prompt in prompts if str(prompt).strip()]
+        if not cleaned_prompts:
+            raise ValueError("at least one semantic audio prompt is required")
+        self._load()
+        import torch
+
+        if not hasattr(self._model, "get_text_features"):
+            raise RuntimeError(f"model does not expose get_text_features(): {self.model_name_or_path}")
+        if self.text_batch_size < 1:
+            raise ValueError("text_batch_size must be positive")
+        normalized_rows: list[np.ndarray] = []
+        for start in range(0, len(cleaned_prompts), self.text_batch_size):
+            prompt_batch = cleaned_prompts[start : start + self.text_batch_size]
+            inputs = self._processor(text=prompt_batch, padding=True, return_tensors="pt")
+            inputs = {name: value.to(self._resolved_device) for name, value in inputs.items()}
+            with torch.inference_mode():
+                output = self._model.get_text_features(**inputs)
+            rows = output.detach().float().cpu().numpy()
+            normalized_rows.extend(l2_normalize(row) for row in rows)
+        return np.vstack(normalized_rows).astype(np.float32)

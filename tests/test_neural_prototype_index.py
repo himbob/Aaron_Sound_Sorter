@@ -82,6 +82,29 @@ def test_label_similarities_exposes_content_scores_without_source_names() -> Non
     assert scores["Instruments/Woodwinds/Saxophone"] > scores["Instruments/Voice/Vocal Loops"]
 
 
+def test_exact_human_label_precedes_prototype_generalization() -> None:
+    corrected = rec("p", "m", 3, [0.0, 1.0])
+    index = PrototypeIndexBuilder(max_prototypes_per_label=1).build(
+        {
+            "Approved/A": [
+                rec("p", "m", 1, [1.0, 0.0]),
+                rec("p", "m", 2, [1.0, 0.0]),
+                corrected,
+            ],
+            "Prototype/B": [rec("p", "m", 4, [0.0, 1.0])],
+        }
+    )
+
+    assert index.predict(corrected).predicted_label == "Prototype/B"
+    exact = index.predict(corrected, exact_label="Approved/A")
+
+    assert exact.predicted_label == "Approved/A"
+    assert exact.second_label == "Prototype/B"
+    assert exact.known_distribution is True
+    assert exact.evidence["prediction_mode"] == "exact_human_training_label"
+    assert exact.evidence["prototype_winner_label"] == "Prototype/B"
+
+
 def test_failed_index_replacement_restores_previous_index(tmp_path, monkeypatch) -> None:
     original = PrototypeIndexBuilder().build(
         {

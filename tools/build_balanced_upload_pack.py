@@ -152,7 +152,9 @@ The installer verifies SHA-256 checksums before extracting the code and AI runti
 """
 
 
-def write_stored_member(archive: zipfile.ZipFile, source_path: Path, archive_name: str, *, executable: bool = False) -> None:
+def write_stored_member(
+    archive: zipfile.ZipFile, source_path: Path, archive_name: str, *, executable: bool = False
+) -> None:
     """Store one file without trying to recompress already-compressed payloads."""
     info = zipfile.ZipInfo(archive_name)
     info.compress_type = zipfile.ZIP_STORED

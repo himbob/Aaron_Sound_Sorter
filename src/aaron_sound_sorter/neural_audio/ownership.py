@@ -16,8 +16,8 @@ class OwnershipAssessment:
         reason: Compact machine-readable reason for the decision.
         label_example_count: Distinct training examples behind the winning
             label.
-        exact_training_match: Whether the audio hash and predicted label match
-            an explicit row in the active training manifest.
+        exact_training_match: Whether the audio hash maps to an unambiguous
+            explicit label in the active training manifest.
 
     Side Effects:
         None.
@@ -44,8 +44,9 @@ def assess_prototype_ownership(
 
     Args:
         prediction: Source-name-blind prototype evidence for one audio file.
-        exact_training_match: True only when the content hash and winning label
-            match the active training manifest.
+        exact_training_match: True when the content hash maps to an unambiguous
+            human-approved label in the active training manifest. The exact
+            label is selected before this ownership check.
         minimum_margin: Required cosine-similarity lead for unseen audio.
         minimum_label_examples: Required distinct examples for unseen audio.
 

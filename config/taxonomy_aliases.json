@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "taxonomy_version": "2026-07-25",
+  "description": "Deprecated internal taxonomy paths resolved before GUI display or supervised training. Source filenames and folders are never inputs.",
+  "exact_aliases": {
+    "Drums/Drum Loops/Full Drum Loops/One Shots": "Drums/Drum Loops/Full Drum Loops/Loops",
+    "Instruments/Guitar/Guitar Loops/One Shots": "Instruments/Guitar/Guitar Loops/Loops",
+    "Instruments/Keys/Keys Loops/One Shots": "Instruments/Keys/Keys Loops/Loops",
+    "Instruments/Strings/String Loops/One Shots": "Instruments/Strings/String Loops/Loops",
+    "Instruments/Synths/Synth One Shots/Loops": "Instruments/Synths/Synth One Shots/One Shots",
+    "Instruments/Voice/Vocal One Shots/Loops": "Instruments/Voice/Vocal One Shots/One Shots"
+  },
+  "prefix_aliases": {
+    "Drums/Kicks": "Drums/Kick Drums",
+    "Instruments/Keys/Celesta": "Instruments/Mallets and Bells/Celesta",
+    "Instruments/Keys/Music Box": "Instruments/Mallets and Bells/Music Box",
+    "Instruments/Keys/Synth Lead": "Instruments/Synths/Synth Lead",
+    "Instruments/Keys/Synth Pad": "Instruments/Synths/Synth Pad",
+    "Instruments/Mallets": "Instruments/Mallets and Bells",
+    "Instruments/Winds": "Instruments/Woodwinds"
+  }
+}

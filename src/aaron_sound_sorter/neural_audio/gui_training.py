@@ -46,6 +46,8 @@ INBOX_FIELDS = (
 TRAINABLE_IMPORT_STATUSES = frozenset({"staged", "duplicate_existing"})
 DEFAULT_INBOX_ROOT = Path("neural_artifacts") / "gui_training_inbox"
 DEFAULT_TRAINING_CONFIG = Path("config") / "neural_training.json"
+EXACT_TRAINING_POLICY = "content_hash_approved_label_v1"
+LOCKED_SEED_OVERRIDE_CONFIRMATIONS = 2
 
 
 @dataclass(frozen=True)
@@ -97,6 +99,22 @@ class CorrectionPrediction:
     top_similarity_after: float
     margin_after: float
     known_distribution_after: bool
+    prototype_predicted_after: str = ""
+
+
+@dataclass(frozen=True)
+class PendingTrainingConflict:
+    """One GUI relabel awaiting deliberate confirmation.
+
+    A single GUI click must not silently replace a locked human seed for the
+    same decoded audio. Repeating the same explicit relabel confirms intent.
+    """
+
+    file_sha256: str
+    locked_label: str
+    proposed_label: str
+    confirmation_count: int
+    required_confirmation_count: int = LOCKED_SEED_OVERRIDE_CONFIRMATIONS
 
 
 @dataclass(frozen=True)
@@ -113,6 +131,7 @@ class NeuralPrototypeBuildSummary:
     correction_predictions: tuple[CorrectionPrediction, ...]
     missing_audio_hashes: tuple[str, ...]
     invalidated_evaluation_hashes: tuple[str, ...]
+    pending_training_conflicts: tuple[PendingTrainingConflict, ...]
     report_path: Path | None
 
 
@@ -277,9 +296,13 @@ class NeuralPrototypeTrainer:
         """Build and activate a new version while retaining older versions."""
         base_rows = _read_csv(self.base_split_path)
         inbox_rows = _read_csv(self.inbox_path)
+        eligible_inbox_rows, pending_training_conflicts = _partition_confirmed_inbox_rows(
+            base_rows,
+            inbox_rows,
+        )
         wanted_hashes = {
             str(row.get("file_sha256", "")).strip()
-            for row in [*base_rows, *inbox_rows]
+            for row in [*base_rows, *eligible_inbox_rows]
             if str(row.get("file_sha256", "")).strip()
         }
         training_hash_paths = _training_paths_by_hash(self.training_root, wanted_hashes)
@@ -291,7 +314,7 @@ class NeuralPrototypeTrainer:
             only_training_use=True,
         )
         correction_examples, missing_corrections = _examples_from_rows(
-            inbox_rows,
+            eligible_inbox_rows,
             project_root=self.project_root,
             sample_library_root=self.sample_library_root,
             training_hash_paths=training_hash_paths,
@@ -310,6 +333,7 @@ class NeuralPrototypeTrainer:
                 correction_predictions=(),
                 missing_audio_hashes=tuple(sorted({*missing_base, *missing_corrections})),
                 invalidated_evaluation_hashes=(),
+                pending_training_conflicts=pending_training_conflicts,
                 report_path=None,
             )
 
@@ -320,6 +344,7 @@ class NeuralPrototypeTrainer:
             max_prototypes_per_label=self.builder.max_prototypes_per_label,
             keep_fraction=self.builder.keep_fraction,
             production_ownership_enabled=self.production_ownership_enabled,
+            pending_training_conflicts=pending_training_conflicts,
         )
         with _exclusive_rebuild_lock(self.index_root / ".rebuild.lock"):
             existing = self._matching_active_build(training_signature)
@@ -332,6 +357,7 @@ class NeuralPrototypeTrainer:
                 examples=examples,
                 missing_audio_hashes=tuple(sorted({*missing_base, *missing_corrections})),
                 training_signature=training_signature,
+                pending_training_conflicts=pending_training_conflicts,
             )
 
     def _build_version(
@@ -343,6 +369,7 @@ class NeuralPrototypeTrainer:
         examples: Sequence[NeuralTrainingExample],
         missing_audio_hashes: tuple[str, ...],
         training_signature: str,
+        pending_training_conflicts: tuple[PendingTrainingConflict, ...],
     ) -> NeuralPrototypeBuildSummary:
         """Build one new version after acquiring the rebuild lock."""
         baseline_index = self._build_index(base_examples) if base_examples else None
@@ -379,8 +406,10 @@ class NeuralPrototypeTrainer:
             "training_signature": training_signature,
             "invalidated_evaluation_hashes": list(invalidated_evaluation_hashes),
             "correction_predictions": [asdict(row) for row in correction_predictions],
+            "pending_training_conflicts": [asdict(row) for row in pending_training_conflicts],
             "source_name_policy": "audio bytes and explicit human labels only",
             "production_ownership_enabled": self.production_ownership_enabled,
+            "exact_training_policy": EXACT_TRAINING_POLICY,
         }
         report_path.write_text(json.dumps(report_payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         return NeuralPrototypeBuildSummary(
@@ -394,6 +423,7 @@ class NeuralPrototypeTrainer:
             correction_predictions=correction_predictions,
             missing_audio_hashes=missing_audio_hashes,
             invalidated_evaluation_hashes=invalidated_evaluation_hashes,
+            pending_training_conflicts=pending_training_conflicts,
             report_path=report_path,
         )
 
@@ -424,6 +454,9 @@ class NeuralPrototypeTrainer:
                 correction_predictions=predictions,
                 missing_audio_hashes=tuple(payload.get("missing_audio_hashes", [])),
                 invalidated_evaluation_hashes=tuple(payload.get("invalidated_evaluation_hashes", [])),
+                pending_training_conflicts=tuple(
+                    PendingTrainingConflict(**row) for row in payload.get("pending_training_conflicts", [])
+                ),
                 report_path=report_path,
             )
         except (OSError, TypeError, ValueError, KeyError, json.JSONDecodeError):
@@ -446,7 +479,8 @@ class NeuralPrototypeTrainer:
         for example in correction_examples:
             record = self.cache.get_or_compute(example.audio_path, self.provider)
             predicted_before = baseline_index.predict(record).predicted_label if baseline_index else ""
-            after = updated_index.predict(record)
+            prototype_after = updated_index.predict(record)
+            after = updated_index.predict(record, exact_label=example.label)
             rows.append(
                 CorrectionPrediction(
                     file_sha256=example.file_sha256,
@@ -457,6 +491,7 @@ class NeuralPrototypeTrainer:
                     top_similarity_after=after.top_similarity,
                     margin_after=after.margin,
                     known_distribution_after=after.known_distribution,
+                    prototype_predicted_after=prototype_after.predicted_label,
                 )
             )
         return tuple(rows)
@@ -521,6 +556,7 @@ def _training_signature(
     max_prototypes_per_label: int,
     keep_fraction: float,
     production_ownership_enabled: bool,
+    pending_training_conflicts: Sequence[PendingTrainingConflict] = (),
 ) -> str:
     """Hash content identities, explicit labels, and model/build settings."""
     payload = {
@@ -529,7 +565,12 @@ def _training_signature(
         "max_prototypes_per_label": max_prototypes_per_label,
         "keep_fraction": keep_fraction,
         "production_ownership_enabled": production_ownership_enabled,
+        "exact_training_policy": EXACT_TRAINING_POLICY,
         "examples": sorted((example.file_sha256, example.label) for example in examples),
+        "pending_training_conflicts": sorted(
+            (conflict.file_sha256, conflict.locked_label, conflict.proposed_label, conflict.confirmation_count)
+            for conflict in pending_training_conflicts
+        ),
     }
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(canonical).hexdigest()
@@ -739,14 +780,90 @@ def _examples_from_rows(
     return examples, missing
 
 
+def _partition_confirmed_inbox_rows(
+    base_rows: Sequence[Mapping[str, str]],
+    inbox_rows: Sequence[Mapping[str, str]],
+) -> tuple[list[Mapping[str, str]], tuple[PendingTrainingConflict, ...]]:
+    """Hold a one-click relabel when it conflicts with a locked training seed.
+
+    The comparison uses content identity plus explicit supervised labels. A
+    second identical GUI approval confirms that the user intends to replace
+    the older locked label. Source names and paths never participate.
+    """
+    locked_labels_by_identity: dict[str, str] = {}
+    for row in base_rows:
+        if row.get("allowed_use") != TRAINING_USE:
+            continue
+        label = str(row.get("intended_label") or row.get("approved_folder") or "").strip()
+        if not is_trainable_taxonomy_label(label):
+            continue
+        for identity in _row_content_identities(row):
+            locked_labels_by_identity.setdefault(identity, label)
+
+    eligible: list[Mapping[str, str]] = []
+    pending: list[PendingTrainingConflict] = []
+    for row in inbox_rows:
+        proposed_label = str(row.get("approved_folder") or row.get("intended_label") or "").strip()
+        locked_label = next(
+            (
+                locked_labels_by_identity[identity]
+                for identity in _row_content_identities(row)
+                if identity in locked_labels_by_identity
+            ),
+            "",
+        )
+        try:
+            confirmation_count = int(str(row.get("confirmation_count", "0") or "0"))
+        except ValueError:
+            confirmation_count = 0
+        if (
+            locked_label
+            and proposed_label
+            and locked_label != proposed_label
+            and confirmation_count < LOCKED_SEED_OVERRIDE_CONFIRMATIONS
+        ):
+            pending.append(
+                PendingTrainingConflict(
+                    file_sha256=str(row.get("file_sha256", "")).strip(),
+                    locked_label=locked_label,
+                    proposed_label=proposed_label,
+                    confirmation_count=confirmation_count,
+                )
+            )
+            continue
+        eligible.append(row)
+    return eligible, tuple(sorted(pending, key=lambda conflict: conflict.file_sha256))
+
+
+def _row_content_identities(row: Mapping[str, str]) -> tuple[str, ...]:
+    """Return strongest-to-weakest content identities for one manifest row."""
+    values = (
+        str(row.get("normalized_audio_sha256", "")).strip(),
+        str(row.get("decoded_audio_sha256", "")).strip(),
+        str(row.get("file_sha256", "")).strip(),
+        str(row.get("duplicate_group_id", "")).strip(),
+    )
+    return tuple(dict.fromkeys(value for value in values if value))
+
+
 def _merge_examples(
     base_examples: Sequence[NeuralTrainingExample],
     corrections: Sequence[NeuralTrainingExample],
 ) -> list[NeuralTrainingExample]:
-    by_group = {example.duplicate_group_id: example for example in base_examples}
+    by_content = {_example_content_identity(example): example for example in base_examples}
     for correction in corrections:
-        by_group[correction.duplicate_group_id] = correction
-    return [by_group[key] for key in sorted(by_group)]
+        by_content[_example_content_identity(correction)] = correction
+    return [by_content[key] for key in sorted(by_content)]
+
+
+def _example_content_identity(example: NeuralTrainingExample) -> str:
+    """Return the strongest available decoded-audio identity for merging."""
+    return (
+        example.normalized_audio_sha256
+        or example.decoded_audio_sha256
+        or example.file_sha256
+        or example.duplicate_group_id
+    )
 
 
 def _evaluation_overlap_hashes(

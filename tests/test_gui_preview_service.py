@@ -19,6 +19,7 @@ from aaron_sound_sorter.gui.preview_service import (
     SortPreviewService,
     TrainingCorrectionImporter,
     apply_neural_runtime_authority,
+    calibration_feedback_from_preview_row,
     correction_evidence,
     detected_candidate_folders,
     gui_worker_count,
@@ -29,6 +30,7 @@ from aaron_sound_sorter.gui.preview_service import (
     write_corrections_csv,
 )
 from aaron_sound_sorter.neural_audio.runtime import (
+    NeuralEventSuggestion,
     NeuralRuntimeBatch,
     NeuralRuntimePrediction,
 )
@@ -74,18 +76,26 @@ def _neural_prediction(
     *,
     known: bool,
     row_id: str = "00001",
+    second_label: str = "Instruments/Mixed Musical Loops/Multi Instrument/Loops",
     margin: float = 0.26,
     label_example_count: int = 4,
     exact_training_match: bool = False,
     ownership_ready: bool | None = None,
     ownership_reason: str = "supported_separated_neighborhood",
+    semantic_family: str = "",
+    semantic_top_score: float = 0.0,
+    semantic_family_scores: dict[str, float] | None = None,
+    panns_support_score: float = 0.0,
+    panns_contradiction_score: float = 0.0,
+    panns_supporting_events: tuple[NeuralEventSuggestion, ...] = (),
+    panns_contradicting_events: tuple[NeuralEventSuggestion, ...] = (),
 ) -> NeuralRuntimePrediction:
     ready = known if ownership_ready is None else ownership_ready
     return NeuralRuntimePrediction(
         row_id=row_id,
         file_sha256="a" * 64,
         predicted_label=label,
-        second_label="Instruments/Mixed Musical Loops/Multi Instrument/Loops",
+        second_label=second_label,
         top_similarity=0.81,
         second_similarity=0.55,
         margin=margin,
@@ -95,6 +105,13 @@ def _neural_prediction(
         exact_training_match=exact_training_match,
         ownership_ready=ready,
         ownership_block_reason=ownership_reason,
+        semantic_family=semantic_family,
+        semantic_top_score=semantic_top_score,
+        semantic_family_scores=semantic_family_scores or {},
+        panns_support_score=panns_support_score,
+        panns_contradiction_score=panns_contradiction_score,
+        panns_supporting_events=panns_supporting_events,
+        panns_contradicting_events=panns_contradicting_events,
     )
 
 
@@ -339,6 +356,83 @@ def test_exact_human_training_match_owns_even_for_sparse_label(tmp_path: Path) -
     assert row.neural_exact_training_match is True
 
 
+def test_exact_voice_training_cannot_override_decisive_nonvoice_semantics(tmp_path: Path) -> None:
+    row = _row(
+        _audio_file(tmp_path, "display_only.wav"),
+        proposed="FX/Impacts and Hits/Generic Impact/One Shots",
+    )
+
+    apply_neural_runtime_authority(
+        [row],
+        _neural_batch(
+            _neural_prediction(
+                "Instruments/Voice/Voice Phrase One Shots/One Shots",
+                known=True,
+                exact_training_match=True,
+                ownership_ready=True,
+                ownership_reason="exact_human_training_match",
+                semantic_family="fx_impact",
+                semantic_top_score=0.24,
+                semantic_family_scores={"fx_impact": 0.24, "human_voice": 0.11},
+            )
+        ),
+    )
+
+    assert row.proposed_folder == "_TO_REVIEW/Measured Role Conflict"
+    assert row.consensus_status == "neural_semantic_family_conflict_review"
+    assert row.neural_ownership_ready is False
+    assert row.neural_ownership_reason == "semantic_family_contradiction"
+
+
+def test_panns_voice_support_prevents_weak_clap_veto_in_gui(tmp_path: Path) -> None:
+    label = "Instruments/Voice/Phrase/One Shots"
+    row = _row(
+        _audio_file(tmp_path),
+        proposed="FX/Impacts and Hits/Generic Impact/One Shots",
+    )
+
+    apply_neural_runtime_authority(
+        [row],
+        _neural_batch(
+            _neural_prediction(
+                label,
+                known=True,
+                exact_training_match=True,
+                ownership_ready=True,
+                semantic_family="fx_impact",
+                semantic_top_score=0.24,
+                semantic_family_scores={"fx_impact": 0.24, "human_voice": 0.11},
+                panns_support_score=0.73,
+                panns_supporting_events=(NeuralEventSuggestion("Speech", 0.73),),
+            )
+        ),
+    )
+
+    assert row.proposed_folder == label
+    assert row.consensus_status == "neural_known_distribution_owner"
+
+
+def test_panns_contradiction_sends_gui_memory_to_review(tmp_path: Path) -> None:
+    row = _row(_audio_file(tmp_path), proposed="_TO_REVIEW/Measured Owner Conflict")
+
+    apply_neural_runtime_authority(
+        [row],
+        _neural_batch(
+            _neural_prediction(
+                "Instruments/Voice/Vocal Loops/Loops",
+                known=True,
+                exact_training_match=True,
+                ownership_ready=True,
+                panns_contradiction_score=0.88,
+                panns_contradicting_events=(NeuralEventSuggestion("Saxophone", 0.88),),
+            )
+        ),
+    )
+
+    assert row.proposed_folder == "_TO_REVIEW/Measured Role Conflict"
+    assert row.consensus_status == "neural_panns_family_conflict_review"
+
+
 def test_unknown_neural_nonvoice_vs_legacy_voice_forces_review(tmp_path: Path) -> None:
     row = _row(
         _audio_file(tmp_path, "also_not_evidence.wav"),
@@ -400,6 +494,71 @@ def test_unknown_neural_same_owner_keeps_legacy_proposal(tmp_path: Path) -> None
     assert row.neural_folder == "Instruments/Synths/Synth Lead/Loops"
 
 
+def test_unknown_neural_sax_vs_keys_forces_review(tmp_path: Path) -> None:
+    row = _row(
+        _audio_file(tmp_path),
+        proposed="Instruments/Woodwinds/Saxophone/Loops",
+    )
+
+    apply_neural_runtime_authority(
+        [row],
+        _neural_batch(
+            _neural_prediction(
+                "Instruments/Keys/Piano/Loops",
+                known=False,
+                ownership_ready=False,
+                ownership_reason="outside_learned_radius",
+            )
+        ),
+    )
+
+    assert row.proposed_folder == "_TO_REVIEW/Measured Role Conflict"
+    assert row.consensus_status == "neural_legacy_owner_conflict_review"
+
+
+def test_unknown_neural_runner_up_support_keeps_legacy_source(tmp_path: Path) -> None:
+    legacy = "Instruments/Woodwinds/Saxophone/Loops"
+    row = _row(_audio_file(tmp_path), proposed=legacy)
+
+    apply_neural_runtime_authority(
+        [row],
+        _neural_batch(
+            _neural_prediction(
+                "Instruments/Guitar/Electric Guitar/Loops",
+                second_label=legacy,
+                known=False,
+                ownership_ready=False,
+                ownership_reason="outside_learned_radius",
+            )
+        ),
+    )
+
+    assert row.proposed_folder == legacy
+    assert row.consensus_status == "unit_test"
+
+
+def test_unknown_neural_hat_vs_full_drum_loop_forces_review(tmp_path: Path) -> None:
+    row = _row(
+        _audio_file(tmp_path),
+        proposed="Drums/Drum Loops/Full Drum Loops/Loops",
+    )
+
+    apply_neural_runtime_authority(
+        [row],
+        _neural_batch(
+            _neural_prediction(
+                "Drums/Hi Hats/Generic Hat/Loops",
+                known=False,
+                ownership_ready=False,
+                ownership_reason="outside_learned_radius",
+            )
+        ),
+    )
+
+    assert row.proposed_folder == "_TO_REVIEW/Measured Role Conflict"
+    assert row.consensus_status == "neural_legacy_owner_conflict_review"
+
+
 def test_exporter_copies_approved_folder_tree(tmp_path: Path) -> None:
     source = _audio_file(tmp_path)
     row = _row(source, approved="Instruments/Synths/Synth Loops")
@@ -457,6 +616,28 @@ def test_correction_evidence_uses_manual_label_without_requiring_result(tmp_path
     assert evidence["proposed_folder"] == "FX/Hybrid Designed FX"
     assert evidence["approved_folder"] == "Instruments/Keys/Piano/Loops"
     assert "feature_values_by_name" not in evidence
+
+
+def test_gui_correction_becomes_foundation_calibration_feedback(tmp_path: Path) -> None:
+    row = _row(_audio_file(tmp_path), approved="Instruments/Voice/Vocal Loops/Loops")
+    row.neural_folder = "Instruments/Woodwinds/Saxophone/Loops"
+    row.neural_known_distribution = False
+    row.neural_similarity = 0.51
+    row.neural_margin = 0.01
+    row.neural_radius_ratio = 1.8
+    row.neural_label_example_count = 6
+    row.neural_semantic_family = "human_voice"
+    row.neural_prompt_suggestions = [{"positive_score": 0.42, "prompt_margin": 0.05}]
+    row.panns_contradiction_score = 0.88
+
+    feedback = calibration_feedback_from_preview_row(row, duplicate_conflict=True)
+
+    assert feedback is not None
+    assert not feedback.accepted
+    assert feedback.parent_family_accepted
+    assert feedback.out_of_distribution == 1.0
+    assert feedback.panns_contradiction_score == 0.88
+    assert feedback.duplicate_conflict == 1.0
 
 
 def test_single_file_correction_evidence_pack_allows_existing_folder(tmp_path: Path) -> None:
@@ -584,7 +765,7 @@ def test_load_available_labels_adds_review_options_and_sorts_brain_labels(tmp_pa
 
     assert labels[0] == "_TO_REVIEW/Needs Human Review"
     assert "Drums/Kick Drums/Generic Kick/One Shots" in labels
-    assert "Instruments/Synths/Synth Loops" in labels
+    assert "Instruments/Synths/Synth Loops/Loops" in labels
 
 
 def test_load_available_labels_canonicalizes_contradictory_structure_labels(tmp_path: Path) -> None:
@@ -628,9 +809,42 @@ def test_load_available_labels_merges_future_catalog_and_training_slots(tmp_path
     )
 
     assert labels[0] == "_TO_REVIEW/Needs Human Review"
-    assert "Instruments/Synths/Synth Loops" in labels
+    assert "Instruments/Synths/Synth Loops/Loops" in labels
     assert "Instruments/Plucked Strings/Koto/One Shots" in labels
     assert "Instruments/Plucked Strings/Koto/Loops" in labels
+
+
+def test_canonical_registry_owns_gui_taxonomy_when_present(tmp_path: Path) -> None:
+    brain = tmp_path / "brain.json"
+    brain.write_text(json.dumps({"labels": ["Instruments/Unregistered/Old Brain/One Shots"]}), encoding="utf-8")
+    config = tmp_path / "config"
+    config.mkdir()
+    canonical_label = "FX/Everyday Foley/Glass/One Shots"
+    (config / "canonical_taxonomy.json").write_text(
+        json.dumps(
+            {
+                "taxonomy_version": "test",
+                "categories": [
+                    {
+                        "path": canonical_label,
+                        "manual_selection_enabled": True,
+                        "automatic_classification_status": "tier_0_manual_only",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (config / "taxonomy_aliases.json").write_text(
+        json.dumps({"exact_aliases": {}, "prefix_aliases": {}}),
+        encoding="utf-8",
+    )
+
+    labels = load_available_labels(brain, project_root=tmp_path)
+
+    assert canonical_label in labels
+    assert "Instruments/Unregistered/Old Brain/One Shots" not in labels
+
 
 def test_load_available_labels_merges_all_configured_gui_brains(tmp_path: Path) -> None:
     config_path = tmp_path / "gui_brains.yaml"
@@ -689,13 +903,15 @@ def test_load_available_labels_includes_saxophone_subtypes(tmp_path: Path) -> No
     catalog = tmp_path / "config" / "gui_taxonomy_catalog.json"
     catalog.parent.mkdir(parents=True)
     catalog.write_text(
-        json.dumps({
-            "labels": [
-                "Instruments/Woodwinds/Saxophone/Alto/Loops",
-                "Instruments/Woodwinds/Saxophone/Tenor/One Shots",
-                "Instruments/Woodwinds/Saxophone/Bass/Loops",
-            ]
-        }),
+        json.dumps(
+            {
+                "labels": [
+                    "Instruments/Woodwinds/Saxophone/Alto/Loops",
+                    "Instruments/Woodwinds/Saxophone/Tenor/One Shots",
+                    "Instruments/Woodwinds/Saxophone/Bass/Loops",
+                ]
+            }
+        ),
         encoding="utf-8",
     )
     labels = load_available_labels(
@@ -708,8 +924,11 @@ def test_load_available_labels_includes_saxophone_subtypes(tmp_path: Path) -> No
     assert "Instruments/Woodwinds/Saxophone/Tenor/One Shots" in labels
     assert "Instruments/Woodwinds/Saxophone/Bass/Loops" in labels
 
+
 def test_load_training_taxonomy_labels_supports_long_running(tmp_path: Path) -> None:
-    training_slot = tmp_path / "training" / "locked_curated_v1" / "Instruments" / "Woodwinds" / "Saxophone" / "_LONG_RUNNING"
+    training_slot = (
+        tmp_path / "training" / "locked_curated_v1" / "Instruments" / "Woodwinds" / "Saxophone" / "_LONG_RUNNING"
+    )
     training_slot.mkdir(parents=True)
 
     labels = load_training_taxonomy_labels(tmp_path / "training" / "locked_curated_v1")

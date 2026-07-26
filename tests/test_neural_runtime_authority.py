@@ -12,7 +12,7 @@ from aaron_sound_sorter.domain.models import (
     VoterResult,
 )
 from aaron_sound_sorter.neural_audio.authority import apply_neural_prediction_to_result
-from aaron_sound_sorter.neural_audio.runtime import NeuralRuntimePrediction
+from aaron_sound_sorter.neural_audio.runtime import NeuralEventSuggestion, NeuralRuntimePrediction
 
 
 def _result(
@@ -20,6 +20,7 @@ def _result(
     *,
     loop_like: bool = True,
     consensus_status: str = "legacy_test",
+    authority_trace: dict[str, object] | None = None,
 ) -> SortFileResult:
     physics = AudioPhysics(
         source_path=Path("/audio/content.wav"),
@@ -41,6 +42,7 @@ def _result(
         folder_path=label,
         consensus_status=consensus_status,
         reason="legacy result",
+        authority_trace=authority_trace or {},
     )
     empty_votes = VoterResult(voter_name="test", guesses=[])
     return SortFileResult(
@@ -58,8 +60,16 @@ def _prediction(
     label: str,
     *,
     ready: bool,
+    known: bool = True,
     exact: bool = False,
     reason: str = "supported_separated_neighborhood",
+    semantic_family: str = "",
+    semantic_top_score: float = 0.0,
+    semantic_family_scores: dict[str, float] | None = None,
+    panns_support_score: float = 0.0,
+    panns_contradiction_score: float = 0.0,
+    panns_supporting_events: tuple[NeuralEventSuggestion, ...] = (),
+    panns_contradicting_events: tuple[NeuralEventSuggestion, ...] = (),
 ) -> NeuralRuntimePrediction:
     return NeuralRuntimePrediction(
         row_id="00001",
@@ -70,11 +80,18 @@ def _prediction(
         second_similarity=0.62,
         margin=0.20,
         radius_ratio=0.70,
-        known_distribution=True,
+        known_distribution=known,
         label_example_count=4,
         exact_training_match=exact,
         ownership_ready=ready,
         ownership_block_reason=reason,
+        semantic_family=semantic_family,
+        semantic_top_score=semantic_top_score,
+        semantic_family_scores=semantic_family_scores or {},
+        panns_support_score=panns_support_score,
+        panns_contradiction_score=panns_contradiction_score,
+        panns_supporting_events=panns_supporting_events,
+        panns_contradicting_events=panns_contradicting_events,
     )
 
 
@@ -88,6 +105,81 @@ def test_cli_neural_exact_training_match_takes_ownership() -> None:
     assert updated.decision.folder_path == label
     assert updated.decision.consensus_status == "neural_production_owner"
     assert updated.facts.evidence["neural_runtime"]["exact_training_match"] is True
+
+
+def test_cli_exact_voice_memory_with_decisive_nonvoice_audio_goes_to_review() -> None:
+    updated = apply_neural_prediction_to_result(
+        _result("FX/Impacts and Hits/Generic Impact/One Shots", loop_like=False),
+        _prediction(
+            "Instruments/Voice/Voice Phrase One Shots/One Shots",
+            ready=True,
+            exact=True,
+            reason="exact_human_training_match",
+            semantic_family="fx_impact",
+            semantic_top_score=0.24,
+            semantic_family_scores={"fx_impact": 0.24, "human_voice": 0.11},
+        ),
+    )
+
+    assert updated.decision.folder_path == "_TO_REVIEW/Measured Role Conflict"
+    assert updated.decision.consensus_status == "neural_semantic_family_conflict_review"
+    semantic = updated.facts.evidence["neural_runtime"]["semantic_compatibility"]
+    assert semantic["contradictory"] is True
+
+
+def test_cli_exact_voice_memory_with_voice_audio_keeps_ownership() -> None:
+    label = "Instruments/Voice/Vocal Loops/Loops"
+    updated = apply_neural_prediction_to_result(
+        _result("_TO_REVIEW/Measured Owner Conflict"),
+        _prediction(
+            label,
+            ready=True,
+            exact=True,
+            reason="exact_human_training_match",
+            semantic_family="human_voice",
+            semantic_top_score=0.18,
+            semantic_family_scores={"human_voice": 0.18, "bass": 0.10},
+        ),
+    )
+
+    assert updated.decision.folder_path == label
+    assert updated.decision.consensus_status == "neural_production_owner"
+
+
+def test_cli_panns_voice_support_prevents_weak_clap_veto() -> None:
+    label = "Instruments/Voice/Phrase/One Shots"
+    updated = apply_neural_prediction_to_result(
+        _result("FX/Impacts and Hits/Generic Impact/One Shots", loop_like=False),
+        _prediction(
+            label,
+            ready=True,
+            exact=True,
+            semantic_family="fx_impact",
+            semantic_top_score=0.24,
+            semantic_family_scores={"fx_impact": 0.24, "human_voice": 0.11},
+            panns_support_score=0.73,
+            panns_supporting_events=(NeuralEventSuggestion("Speech", 0.73),),
+        ),
+    )
+
+    assert updated.decision.folder_path == label
+    assert updated.decision.consensus_status == "neural_production_owner"
+
+
+def test_cli_panns_contradiction_blocks_exact_memory() -> None:
+    updated = apply_neural_prediction_to_result(
+        _result("_TO_REVIEW/Measured Owner Conflict"),
+        _prediction(
+            "Instruments/Voice/Vocal Loops/Loops",
+            ready=True,
+            exact=True,
+            panns_contradiction_score=0.88,
+            panns_contradicting_events=(NeuralEventSuggestion("Saxophone", 0.88),),
+        ),
+    )
+
+    assert updated.decision.folder_path == "_TO_REVIEW/Measured Role Conflict"
+    assert updated.decision.consensus_status == "neural_panns_family_conflict_review"
 
 
 def test_cli_neural_unready_cross_family_disagreement_forces_review() -> None:
@@ -122,6 +214,45 @@ def test_cli_neural_unready_same_family_keeps_measured_legacy_result() -> None:
 
     assert updated.decision == original.decision
     assert updated.facts.evidence["neural_runtime"]["ownership_ready"] is False
+
+
+def test_cli_neural_unknown_sax_vs_keys_disagreement_forces_review() -> None:
+    updated = apply_neural_prediction_to_result(
+        _result("Instruments/Woodwinds/Saxophone/Loops"),
+        _prediction(
+            "Instruments/Keys/Piano/Loops",
+            ready=False,
+            known=False,
+            reason="outside_learned_radius",
+        ),
+    )
+
+    assert updated.decision.folder_path == "_TO_REVIEW/Measured Role Conflict"
+    assert updated.decision.consensus_status == "neural_legacy_owner_conflict_review"
+
+
+def test_cli_neural_subfamily_conflict_defers_to_strong_measured_support() -> None:
+    legacy = "Drums/Percussion/Generic Percussion/One Shots"
+    original = _result(
+        legacy,
+        loop_like=False,
+        authority_trace={
+            "raw_claim": {
+                "path": "Drums/Snares/Acoustic Snare/One Shots",
+                "strength": 0.875,
+            }
+        },
+    )
+    updated = apply_neural_prediction_to_result(
+        original,
+        _prediction(
+            "Drums/Snares/Acoustic Snare/One Shots",
+            ready=False,
+            reason="ambiguous_nearest_labels",
+        ),
+    )
+
+    assert updated.decision == original.decision
 
 
 def test_cli_neural_unready_conflict_defers_to_exact_human_teacher() -> None:

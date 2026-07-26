@@ -11,6 +11,7 @@ from tkinter import filedialog, messagebox
 from typing import Any, Literal
 
 from aaron_sound_sorter.gui.models import PreviewRow, SortPreviewSession
+from aaron_sound_sorter.gui.neural_explanations import neural_evidence_lines
 from aaron_sound_sorter.gui.preview_service import SortPlanExporter, SortPreviewService, gui_worker_count
 
 APP_BG = "#f5f5f2"
@@ -428,6 +429,9 @@ class AaronSoundSorterApp:
             f"Decision:  {row.consensus_status}",
             f"Top:       {row.final_top}",
             f"Duration:  {row.duration_sec:.2f}s",
+            "",
+            "Neural Audio (plain English):",
+            *neural_evidence_lines(row),
             "",
             "Voter Summary:",
             row.diagnostic_summary or "(none)",

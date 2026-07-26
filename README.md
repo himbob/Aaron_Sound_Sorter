@@ -16,7 +16,9 @@ the heart of it.
 - Sorts Drums, Instruments, Voice, Textures, and FX.
 - Separates loops, one-shots, and long effects.
 - Uses decoded audio—not filenames or paths—as evidence.
-- Lets approved GUI corrections teach versioned CLAP prototypes.
+- Uses a downloaded, pretrained LAION CLAP encoder; it is not trained from scratch.
+- Uses pretrained PANNs as an independent broad sound-event witness.
+- Lets approved GUI corrections teach small, versioned Aaron prototypes on top.
 - Uses neural ownership for exact training or supported, separated neighborhoods.
 - Sends uncertain or conflicting evidence to Review.
 
@@ -73,6 +75,13 @@ Use `--no-neural` only for diagnostics.
 Approved corrections enter a source-blind training inbox. CLAP prototypes
 rebuild first; temporary legacy memories refresh second.
 
+The GUI explains, in plain English, what trained memory, broad CLAP, detailed
+CLAP, and PANNs heard—and which lane actually controlled the result. A
+one-click relabel that conflicts with a locked seed must be chosen twice.
+
+CLAP and PANNs weights are downloaded separately and remain frozen. Your
+corrections teach Aaron's local memory; they do not retrain the giant model.
+
 ## Categorization advice
 
 - Decide structure first: loop, one-shot, phrase, or long effect.
@@ -99,7 +108,8 @@ before AI-assisted changes.
 ## Status
 
 - CLI and GUI: working with local trained assets.
-- CLAP: conservative GUI and CLI ownership with human-memory priority.
+- CLAP: pretrained encoder plus conservative local prototype ownership.
+- PANNs: pretrained broad-event support/contradiction; never a detailed-folder owner.
 - Cross-family or structural conflict: Review.
 - Legacy classifier: temporary fallback while held-out coverage grows.
 
