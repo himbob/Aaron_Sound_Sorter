@@ -33,7 +33,7 @@ AI_BASE ?= HEAD
 
 .PHONY: help bootstrap init venv upgrade-pip install install-all install-runtime install-quality install-dev \
         ensure-quality \
-        doctor check-tools audit-source-names pycompile test test-one test-coverage test-coverage-html \
+        doctor check-tools audit-source-names audit-public-assets sanitize-public-assets pycompile test test-one test-coverage test-coverage-html \
         lint format format-check type-check docstyle quality qa ci quality-report quality-report-full \
         quality-report-coverage quality-gate-report quality-baseline quality-strict \
         ai-preflight ai-changed-files ai-fix ai-check ai-test ai-bundle-check \
@@ -140,6 +140,12 @@ doctor:
 audit-source-names:
 	"$(VENV_PYTHON)" tools/audit_no_source_name_sorting.py --project-root "$(PROJECT_ROOT)"
 
+audit-public-assets:
+	"$(VENV_PYTHON)" tools/audit_public_runtime_assets.py --project-root "$(PROJECT_ROOT)"
+
+sanitize-public-assets:
+	"$(VENV_PYTHON)" tools/audit_public_runtime_assets.py --project-root "$(PROJECT_ROOT)" --apply
+
 pycompile:
 	"$(VENV_PYTHON)" -m compileall -q src tests tools Aaron_Sound_Sorter.py
 
@@ -206,6 +212,7 @@ ai-fix: clean-generated ensure-quality
 
 ai-check: clean-generated ensure-quality
 	"$(VENV_PYTHON)" tools/ai_quality_gate.py --project-root "$(PROJECT_ROOT)" --base "$(AI_BASE)" check
+	"$(VENV_PYTHON)" tools/audit_public_runtime_assets.py --project-root "$(PROJECT_ROOT)"
 
 ai-test: test-one
 
@@ -257,12 +264,14 @@ clean-generated:
 
 clean: clean-generated
 	@if test -f tools/cleanup_project.py; then "$(VENV_PYTHON)" tools/cleanup_project.py --project-root "$(PROJECT_ROOT)" --mode standard --apply; fi
+	rm -rf "$(PYTHON_BYTECODE_CACHE)"
 
 clean-dry-run:
 	@if test -f tools/cleanup_project.py; then "$(VENV_PYTHON)" tools/cleanup_project.py --project-root "$(PROJECT_ROOT)" --mode standard; else echo "tools/cleanup_project.py not present"; fi
 
 clean-for-bundle: clean-generated
 	@if test -f tools/cleanup_project.py; then "$(VENV_PYTHON)" tools/cleanup_project.py --project-root "$(PROJECT_ROOT)" --mode bundle --apply; fi
+	rm -rf "$(PYTHON_BYTECODE_CACHE)"
 
 show-junk:
 	find . \( -name '._*' -o -name '.DS_Store' -o -name '__pycache__' -o -name '.pytest_cache' -o -name '.mypy_cache' -o -name '.ruff_cache' -o -name '*.pyc' -o -name '.coverage' \) -print

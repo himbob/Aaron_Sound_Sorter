@@ -28,6 +28,7 @@ CALIBRATION_FEATURES = (
     "out_of_distribution",
     "duplicate_conflict",
 )
+VALID_CALIBRATION_OUTCOMES = frozenset({"prediction_correct", "parent_family_correct"})
 
 
 @dataclass(frozen=True)
@@ -137,11 +138,33 @@ class ConfidenceCalibrator:
         self.numpy_scale: np.ndarray | None = None
         self.numpy_weights: np.ndarray | None = None
         self.method = "unfitted"
+        self.outcome = "prediction_correct"
 
-    def fit(self, feedback: Sequence[ReviewFeedback]) -> None:
+    def fit(
+        self,
+        feedback: Sequence[ReviewFeedback],
+        *,
+        outcome: str = "prediction_correct",
+    ) -> None:
+        """Fit one interpretable outcome from reviewed evidence.
+
+        Args:
+            feedback: Non-leaking, hash-deduplicated reviewed events.
+            outcome: ``prediction_correct`` or ``parent_family_correct``.
+
+        Raises:
+            ValueError: If the outcome is unsupported or lacks enough positive
+                and negative reviewed examples.
+
+        Side Effects:
+            Imports scikit-learn when available; otherwise uses NumPy.
+        """
+        if outcome not in VALID_CALIBRATION_OUTCOMES:
+            raise ValueError(f"unsupported calibration outcome: {outcome}")
         if len(feedback) < 20:
             raise ValueError("at least 20 reviewed decisions are required for calibration")
-        y = np.asarray([1 if row.accepted else 0 for row in feedback], dtype=np.int32)
+        self.outcome = outcome
+        y = np.asarray([1 if _feedback_outcome(row, outcome) else 0 for row in feedback], dtype=np.int32)
         if len(set(y.tolist())) < 2:
             raise ValueError("calibration requires both accepted and rejected outcomes")
         x = np.vstack([feedback_features(row) for row in feedback])
@@ -184,6 +207,7 @@ class ConfidenceCalibrator:
         payload = {
             "schema_version": 1,
             "method": self.method,
+            "outcome": self.outcome,
             "feature_names": list(CALIBRATION_FEATURES),
             "feature_mean": self.numpy_mean.tolist(),
             "feature_scale": self.numpy_scale.tolist(),
@@ -211,6 +235,9 @@ class ConfidenceCalibrator:
         if calibrator.numpy_weights.shape != (len(CALIBRATION_FEATURES) + 1,):
             raise ValueError("invalid calibration weight shape")
         calibrator.method = f"loaded_{payload.get('method', 'unknown')}"
+        calibrator.outcome = str(payload.get("outcome", "prediction_correct"))
+        if calibrator.outcome not in VALID_CALIBRATION_OUTCOMES:
+            raise ValueError(f"unsupported saved calibration outcome: {calibrator.outcome}")
         return calibrator
 
     def _fit_numpy_logistic(self, features: np.ndarray, outcomes: np.ndarray) -> None:
@@ -235,3 +262,52 @@ class ConfidenceCalibrator:
         self.numpy_scale = scale
         self.numpy_weights = weights
         self.method = "numpy_logistic"
+
+
+@dataclass(frozen=True)
+class CalibrationProbabilities:
+    """Human-readable confidence outputs from separated calibration targets."""
+
+    prediction_correct: float | None
+    parent_family_correct: float | None
+    review_required: float | None
+
+
+class ConfidenceCalibrationBundle:
+    """Optional prediction and parent-family calibrators for production use."""
+
+    def __init__(
+        self,
+        prediction_calibrator: ConfidenceCalibrator,
+        parent_family_calibrator: ConfidenceCalibrator | None = None,
+    ) -> None:
+        self.prediction_calibrator = prediction_calibrator
+        self.parent_family_calibrator = parent_family_calibrator
+
+    @classmethod
+    def load(cls, directory: Path) -> ConfidenceCalibrationBundle:
+        """Load available dependency-free calibration artifacts."""
+        root = Path(directory)
+        prediction = ConfidenceCalibrator.load(root / "confidence_calibrator.json")
+        parent_path = root / "parent_family_calibrator.json"
+        parent = ConfidenceCalibrator.load(parent_path) if parent_path.is_file() else None
+        return cls(prediction, parent)
+
+    def predict(self, feedback: ReviewFeedback) -> CalibrationProbabilities:
+        """Return correct-label, correct-parent, and Review probabilities."""
+        prediction_correct = self.prediction_calibrator.predict_probability(feedback)
+        parent_correct = (
+            self.parent_family_calibrator.predict_probability(feedback)
+            if self.parent_family_calibrator is not None
+            else None
+        )
+        review_required = None if prediction_correct is None else 1.0 - prediction_correct
+        return CalibrationProbabilities(prediction_correct, parent_correct, review_required)
+
+
+def _feedback_outcome(row: ReviewFeedback, outcome: str) -> bool:
+    if outcome == "prediction_correct":
+        return bool(row.accepted)
+    if outcome == "parent_family_correct":
+        return bool(row.parent_family_accepted)
+    raise ValueError(f"unsupported calibration outcome: {outcome}")

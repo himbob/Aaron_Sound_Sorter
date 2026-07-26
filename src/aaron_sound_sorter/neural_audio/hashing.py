@@ -92,9 +92,12 @@ def normalized_audio_sha256(path: Path) -> str:
         active = np.flatnonzero(np.abs(mono) >= 1e-4)
         if active.size:
             mono = mono[int(active[0]) : int(active[-1]) + 1]
-    quantized = np.rint(np.clip(mono, -1.0, 1.0) * 32767.0).astype("<i2")
+    # Twelve-bit quantization absorbs harmless float/codec rounding after gain
+    # normalization while remaining far too precise to merge different notes
+    # or performances as identical derived copies.
+    quantized = np.rint(np.clip(mono, -1.0, 1.0) * 2047.0).astype("<i2")
     digest = hashlib.sha256()
-    digest.update(b"aaron-normalized-audio-v1\0")
+    digest.update(b"aaron-normalized-audio-v2\0")
     digest.update(int(sample_rate).to_bytes(8, byteorder="little", signed=False))
     digest.update(int(quantized.shape[0]).to_bytes(8, byteorder="little", signed=False))
     digest.update(quantized.tobytes(order="C"))

@@ -16,6 +16,9 @@ from aaron_sound_sorter.taxonomy_contracts import (
     taxonomy_label_contract,
 )
 
+from .authority_promotion import category_authority_group, enabled_authority_groups
+from .calibration import CalibrationProbabilities, ConfidenceCalibrationBundle
+from .calibration_features import review_feedback_from_runtime
 from .runtime import (
     NeuralRuntimeBatch,
     NeuralRuntimePrediction,
@@ -27,6 +30,7 @@ from .semantic_panel import (
 )
 
 MEASURED_CONFLICT_REVIEW = "_TO_REVIEW/Measured Role Conflict"
+MINIMUM_CALIBRATED_OWNERSHIP_PROBABILITY = 0.82
 
 
 def apply_configured_neural_authority(
@@ -62,8 +66,16 @@ def apply_configured_neural_authority(
         report_dir,
     )
     predictions = {prediction.row_id: prediction for prediction in batch.predictions}
+    calibration = load_optional_confidence_calibration(project_root)
+    authority_groups = enabled_authority_groups(project_root)
     updated = [
-        apply_neural_prediction_to_result(result, predictions.get(row_id)) for row_id, result in zip(row_ids, results)
+        apply_neural_prediction_to_result(
+            result,
+            predictions.get(row_id),
+            calibration=calibration,
+            enabled_groups=authority_groups,
+        )
+        for row_id, result in zip(row_ids, results)
     ]
     return updated, batch
 
@@ -71,6 +83,9 @@ def apply_configured_neural_authority(
 def apply_neural_prediction_to_result(
     result: SortFileResult,
     prediction: NeuralRuntimePrediction | None,
+    *,
+    calibration: ConfidenceCalibrationBundle | None = None,
+    enabled_groups: frozenset[str] | None = None,
 ) -> SortFileResult:
     """Apply one neural prediction to an unplaced domain result.
 
@@ -94,6 +109,24 @@ def apply_neural_prediction_to_result(
         return result
 
     legacy_label = canonicalize_taxonomy_label(result.decision.folder_path or result.decision.final_label)
+    if prediction.ownership_ready and not prediction.exact_training_match and enabled_groups is not None:
+        authority_group = category_authority_group(neural_label)
+        evidence["limited_authority"] = {
+            "category_group": authority_group,
+            "enabled_groups": sorted(enabled_groups),
+            "calibration_available": calibration is not None,
+        }
+        if calibration is None or authority_group not in enabled_groups:
+            block_reason = (
+                "confidence_calibration_not_promoted" if calibration is None else "category_group_not_promoted"
+            )
+            prediction = replace(
+                prediction,
+                ownership_ready=False,
+                ownership_block_reason=block_reason,
+            )
+            evidence["ownership_ready"] = False
+            evidence["ownership_block_reason"] = block_reason
     if prediction.ownership_ready:
         if neural_panns_contradicts(prediction):
             event_names = ", ".join(event.label for event in prediction.panns_contradicting_events[:3])
@@ -143,6 +176,42 @@ def apply_neural_prediction_to_result(
                 reason=reason,
                 neural_evidence=evidence,
             )
+        calibration_probabilities = calibrated_neural_probabilities(
+            prediction,
+            calibration=calibration,
+        )
+        evidence["confidence_calibration"] = {
+            "status": "available" if calibration_probabilities is not None else "not_fitted",
+            "prediction_correct_probability": (
+                calibration_probabilities.prediction_correct if calibration_probabilities else None
+            ),
+            "parent_family_correct_probability": (
+                calibration_probabilities.parent_family_correct if calibration_probabilities else None
+            ),
+            "review_required_probability": (
+                calibration_probabilities.review_required if calibration_probabilities else None
+            ),
+            "minimum_ownership_probability": MINIMUM_CALIBRATED_OWNERSHIP_PROBABILITY,
+        }
+        if (
+            not prediction.exact_training_match
+            and calibration_probabilities is not None
+            and calibration_probabilities.prediction_correct is not None
+            and calibration_probabilities.prediction_correct < MINIMUM_CALIBRATED_OWNERSHIP_PROBABILITY
+        ):
+            probability = calibration_probabilities.prediction_correct
+            reason = (
+                "Learned memory matched, but reviewed confidence calibration "
+                f"estimated only {probability:.0%} correctness; forcing human review."
+            )
+            return _replace_decision(
+                result,
+                folder_path=MEASURED_CONFLICT_REVIEW,
+                final_top="_TO_REVIEW",
+                consensus_status="neural_calibration_below_threshold_review",
+                reason=reason,
+                neural_evidence=evidence,
+            )
         reason = (
             "Source-name-blind neural audio had production-ready learned evidence "
             f"and took ownership from the legacy proposal ({legacy_label})."
@@ -181,6 +250,41 @@ def apply_neural_prediction_to_result(
             neural_evidence=evidence,
         )
     return result
+
+
+def load_optional_confidence_calibration(project_root: Path) -> ConfidenceCalibrationBundle | None:
+    """Load the local reviewed calibrator, degrading safely when unavailable."""
+    calibration_dir = Path(project_root) / "neural_artifacts" / "calibration" / "current"
+    status_path = calibration_dir / "calibration_status.json"
+    artifact_path = calibration_dir / "confidence_calibrator.json"
+    if not status_path.is_file() or not artifact_path.is_file():
+        return None
+    try:
+        import json
+
+        status = json.loads(status_path.read_text(encoding="utf-8"))
+        if status.get("status") != "built" or not bool(status.get("production_authority_enabled", False)):
+            return None
+        return ConfidenceCalibrationBundle.load(calibration_dir)
+    except (OSError, TypeError, ValueError):
+        return None
+
+
+def calibrated_neural_probabilities(
+    prediction: NeuralRuntimePrediction,
+    *,
+    calibration: ConfidenceCalibrationBundle | None,
+) -> CalibrationProbabilities | None:
+    """Return reviewed confidence outputs without changing raw lane scores."""
+    if calibration is None:
+        return None
+    feedback = review_feedback_from_runtime(
+        prediction,
+        final_approved_label=prediction.predicted_label,
+        structure_agreement=1.0,
+        brain_version="",
+    )
+    return calibration.predict(feedback)
 
 
 def neural_defers_to_exact_human_teacher(

@@ -26,6 +26,7 @@ from aaron_sound_sorter.gui.preview_service import (
     load_available_labels,
     load_simple_yaml_mapping,
     load_training_taxonomy_labels,
+    preview_row_from_result,
     training_slot_path,
     write_corrections_csv,
 )
@@ -234,6 +235,25 @@ def test_known_neural_neighborhood_takes_gui_ownership_for_any_category(tmp_path
     assert row.consensus_status == "neural_known_distribution_owner"
     assert row.neural_known_distribution is True
     assert row.neural_folder == "Drums/Drum Loops/Loops"
+
+
+def test_production_gui_uses_shared_unpromoted_authority_gate(tmp_path: Path) -> None:
+    row = preview_row_from_result(1, _candidate_result(is_loop_like=True))
+    prediction = _neural_prediction(
+        "Instruments/Synths/Synth Pad/Loops",
+        known=True,
+        ownership_ready=True,
+    )
+
+    apply_neural_runtime_authority(
+        [row],
+        _neural_batch(prediction),
+        project_root=tmp_path,
+    )
+
+    assert row.proposed_folder == "_TO_REVIEW/Measured Role Conflict"
+    assert row.neural_ownership_ready is False
+    assert row.neural_ownership_reason == "confidence_calibration_not_promoted"
 
 
 def test_known_but_ambiguous_voice_sax_prediction_cannot_steal_ownership(tmp_path: Path) -> None:

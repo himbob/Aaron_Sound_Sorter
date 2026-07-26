@@ -91,6 +91,26 @@ def test_normalized_audio_hash_groups_gain_and_boundary_silence_copies(tmp_path:
     assert normalized_audio_sha256(original) == normalized_audio_sha256(derived)
 
 
+def test_explicit_split_rejects_gain_and_boundary_silence_copy(tmp_path: Path) -> None:
+    sample_rate = 16_000
+    time_axis = np.arange(sample_rate // 4, dtype=np.float32) / sample_rate
+    tone = np.sin(2.0 * np.pi * 330.0 * time_axis).astype(np.float32)
+    preview_path = tmp_path / "preview_gain.wav"
+    heldout_path = tmp_path / "heldout_gain.wav"
+    sf.write(preview_path, tone, sample_rate, subtype="FLOAT")
+    sf.write(
+        heldout_path,
+        np.concatenate([np.zeros(40, dtype=np.float32), tone * 0.4, np.zeros(50, dtype=np.float32)]),
+        sample_rate,
+        subtype="FLOAT",
+    )
+    preview = discover_curated_examples(_single_label_root(tmp_path, "preview_gain_root", preview_path))
+    heldout = discover_curated_examples(_single_label_root(tmp_path, "heldout_gain_root", heldout_path))
+
+    with pytest.raises(ValueError, match="normalized-audio leakage"):
+        build_explicit_evaluation_split(preview, heldout)
+
+
 def _single_label_root(tmp_path: Path, root_name: str, source: Path) -> Path:
     root = tmp_path / root_name
     label_dir = root / "Voice"

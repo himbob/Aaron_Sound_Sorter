@@ -19,7 +19,8 @@ the heart of it.
 - Uses a downloaded, pretrained LAION CLAP encoder; it is not trained from scratch.
 - Uses pretrained PANNs as an independent broad sound-event witness.
 - Lets approved GUI corrections teach small, versioned Aaron prototypes on top.
-- Uses neural ownership for exact training or supported, separated neighborhoods.
+- Remembers exact human-approved audio immediately.
+- Promotes broader neural ownership one tested category group at a time.
 - Sends uncertain or conflicting evidence to Review.
 
 ## Install
@@ -29,6 +30,8 @@ Requirements: Python 3.9+, macOS or Linux, and `libsndfile`.
 ```bash
 git clone https://github.com/himbob/Aaron_Sound_Sorter.git
 cd Aaron_Sound_Sorter
+git lfs install
+git lfs pull
 make bootstrap
 .venv_phase4/bin/python Aaron_Sound_Sorter.py self-test
 ```
@@ -40,8 +43,9 @@ Optional local CLAP support:
 ./commands/neural/PREFETCH_CLAP_MODEL.command
 ```
 
-Model weights, trained brains, training audio, and private evidence are not
-included.
+Git LFS carries the pinned model snapshots and compact neural indexes. Active
+brain JSONs are included. Sample audio, training trees, and private review
+reports are not.
 
 ## Sort audio
 
@@ -57,7 +61,7 @@ python3 Aaron_Sound_Sorter.py sort \
   --brain "/path/to/stage4_folder_brain.json"
 ```
 
-With local CLAP assets installed, CLI sorting also uses neural authority.
+With local CLAP assets installed, CLI sorting also uses neural evidence.
 Use `--no-neural` only for diagnostics.
 
 ## Train with the GUI
@@ -72,12 +76,29 @@ Use `--no-neural` only for diagnostics.
 4. Apply training.
 5. Re-run Preview.
 
+Large folders stay usable: the queue shows 200 sounds at a time and receives
+only new results. **Stop & Keep Results** ends new work but keeps completed
+sounds reviewable; **Cancel** abandons the run.
+
 Approved corrections enter a source-blind training inbox. CLAP prototypes
 rebuild first; temporary legacy memories refresh second.
 
-The GUI explains, in plain English, what trained memory, broad CLAP, detailed
-CLAP, and PANNs heard—and which lane actually controlled the result. A
-one-click relabel that conflicts with a locked seed must be chosen twice.
+The selected-file panel gives one plain-English decision. CLAP, PANNs, voter
+traces, and alternatives stay collapsed unless you want them. A relabel that
+conflicts with a locked seed must be chosen twice.
+
+Open **Learning Center** for batch training:
+
+1. Load a generated cluster review pack.
+2. Listen to its center, typical, boundary, and outlier examples.
+3. Approve the safe core.
+4. Add that approval to the training inbox.
+5. Press **Build Updated Neural Brain** once after the review session.
+
+The coverage table keeps all 395 categories selectable while showing which
+ones need more varied examples. Confidence learning uses accepted and corrected
+reviews, but it cannot enable automatic ownership until independent held-out
+gates pass.
 
 CLAP and PANNs weights are downloaded separately and remain frozen. Your
 corrections teach Aaron's local memory; they do not retrain the giant model.
@@ -108,7 +129,7 @@ before AI-assisted changes.
 ## Status
 
 - CLI and GUI: working with local trained assets.
-- CLAP: pretrained encoder plus conservative local prototype ownership.
+- CLAP: pretrained encoder plus local prototypes; generalized authority is data-gated.
 - PANNs: pretrained broad-event support/contradiction; never a detailed-folder owner.
 - Cross-family or structural conflict: Review.
 - Legacy classifier: temporary fallback while held-out coverage grows.

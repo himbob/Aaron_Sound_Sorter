@@ -1,19 +1,25 @@
 # Current status
 
-Updated: 2026-07-25
+Updated: 2026-07-26
 
 ## Working
 
 - CLI sorting with local trained brains.
 - Local GUI review and supervised corrections.
+- Human-sized selected-file summaries, stable disclosures, 200-row queue
+  windows, incremental polling, and Stop & Keep Results for large runs.
 - Durable, source-blind GUI corrections feeding versioned CLAP prototypes.
-- Limited CLAP ownership across all categories inside known neighborhoods.
+- Exact content-hash ownership for human-approved audio.
 - Cross-family neural/legacy conflicts routed to Review.
 - Exact human-approved memory ownership across Drums, Instruments, and FX.
 - Pretrained PANNs broad-event evidence, visible in both GUIs.
 - Canonical 395-category registry; availability is separate from readiness.
 - Read-only detailed CLAP prompt suggestions for every canonical category.
 - Cluster-first review packs that retain every member under hash-only names.
+- Learning Center with representative playback, safe-core approval, separate
+  import, explicit background prototype rebuilding, and all-category coverage.
+- Accepted and corrected GUI outcomes feeding source-blind confidence learning.
+- Gain/silence-normalized duplicate protection across training and evaluation.
 - Locked-seed relabels require the same explicit GUI choice twice.
 - Source-name blindness audit.
 - CLAP and MERT embedding, cache, prototype, and evaluation tooling.
@@ -22,8 +28,10 @@ Updated: 2026-07-25
 ## Production authority
 
 - Measured evidence and trained memory: active.
-- CLAP ownership: active only for known learned neighborhoods with compatible
-  measured structure.
+- CLAP generalized ownership: gated off until a small category group passes
+  calibration and independent held-out requirements.
+- Exact approved hashes: active unless neural witnesses or measured structure
+  expose a hard contradiction.
 - PANNs: broad support/contradiction guardrail only; no detailed ownership.
 - Detailed CLAP prompts: visible advice only.
 - Unknown or conflicting neural evidence: Review or legacy fallback.
@@ -34,29 +42,44 @@ Updated: 2026-07-25
 - Trusted hash-only runtime replay: 45/45 exact; 0 Review (2026-07-25).
 - Detailed CLAP prompt benchmark: 8/45 exact top-1 and 19/45 exact top-3;
   therefore advisory only.
-- Active local prototype memory: 159 examples across 69 labels.
-- Real confidence calibration: not fitted; reviewed outcomes are insufficient.
+- Active local prototype memory: 179 examples across 72 labels.
+- Category coverage: 395 selectable; 7 Tier B, 30 Tier C, 358 Tier D.
+- Independent 67-sound CLAP panel: 65.7% top-1, 82.1% top-3, 82.1%
+  Review/OOD, and 4 incorrect known-distribution placements.
+- Voice promotion gate: failed and remained disabled.
+- Seven-file real synth-loop provenance audit: 1 exact neural owner, 2 neural
+  conflict reviews, 4 transitional/legacy decisions, and 0 automatic Voice
+  placements. Passing final folders are not being counted as neural wins.
+- Real confidence calibration: 19 nonleaking reviewed outcomes (2 accepted,
+  17 corrected); one more distinct outcome is required to fit, and substantially
+  more balanced evidence is required to promote authority.
 - MERT is research-only because its checkpoint is non-commercial.
 
 ## Public repository
 
+Included for a runnable checkout:
+
+- active brain JSONs;
+- pinned CLAP and research-only MERT snapshots through Git LFS;
+- active compact prototype and prompt indexes.
+
 Not distributed:
 
 - sample audio;
-- trained brains;
 - training trees;
-- model weights;
-- private neural evidence;
+- private review and calibration evidence;
 - local machine paths.
 
-The public checkout supports development and self-test. Production sorting
-requires a compatible local brain.
+Run `git lfs pull` after cloning. New personal training still requires the
+user's own lawfully licensed audio.
 
-## Next
+## Next AI step
 
-- Review the audio-evidence-only cluster packs and approve safe cores.
-- Collect nonleaking calibration outcomes.
-- Expand sparse category boundaries with diverse approved audio.
-- Retire legacy lanes only after independent ablation and rollback testing.
+- Collect at least 21 more balanced, nonleaking accepted/corrected reviews.
+- Add independent held-out audio per authority group; do not lower the gate.
+- Run group promotion again, starting with voice, then drums and FX.
+- Audit decision-owner provenance before removing any legacy lane.
+- Refactor `preview_service.py` next; split the legacy arbiter only behind
+  ablation tests and rollback coverage.
 
 See `docs/NEURAL_AUDIO_ARCHITECTURE_V1.md`.

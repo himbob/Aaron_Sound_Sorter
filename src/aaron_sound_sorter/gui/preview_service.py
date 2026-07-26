@@ -10,7 +10,7 @@ import shutil
 import traceback
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
@@ -24,6 +24,10 @@ from aaron_sound_sorter.engine.consensus import ConsensusRunner
 from aaron_sound_sorter.engine.family_claim_arbiter import FamilyClaimArbiter
 from aaron_sound_sorter.engine.placement_resolver import PlacementResolver
 from aaron_sound_sorter.engine.sorter import SortSamplesUseCase, voter_result_digest
+from aaron_sound_sorter.gui.calibration_feedback import (
+    calibration_feedback_from_preview_row,
+    record_approved_session_feedback,
+)
 from aaron_sound_sorter.gui.models import (
     ExportMode,
     ExportSummary,
@@ -40,7 +44,9 @@ from aaron_sound_sorter.infrastructure.report_writer import (
     unique_path,
 )
 from aaron_sound_sorter.neural_audio.authority import (
+    apply_neural_prediction_to_result,
     has_decisive_loop_structure,
+    load_optional_confidence_calibration,
     neural_conflict_families,
     neural_defers_to_exact_human_teacher,
     neural_disagreement_requires_review,
@@ -48,15 +54,14 @@ from aaron_sound_sorter.neural_audio.authority import (
     neural_semantic_compatibility,
     neural_structure_conflicts,
 )
-from aaron_sound_sorter.neural_audio.calibration import ReviewFeedback, ReviewFeedbackStore
+from aaron_sound_sorter.neural_audio.authority_promotion import enabled_authority_groups
+from aaron_sound_sorter.neural_audio.calibration import ConfidenceCalibrationBundle, ReviewFeedbackStore
 from aaron_sound_sorter.neural_audio.gui_training import NeuralTrainingInbox
-from aaron_sound_sorter.neural_audio.hashing import sha256_file
 from aaron_sound_sorter.neural_audio.runtime import (
     NeuralRuntimeBatch,
     NeuralRuntimePrediction,
     run_configured_neural_predictions,
 )
-from aaron_sound_sorter.neural_audio.semantic_panel import compatible_semantic_families
 from aaron_sound_sorter.taxonomy_contracts import (
     STRUCTURE_TERMINALS,
     TOP_LEVEL_TAXONOMY_FAMILIES,
@@ -309,7 +314,7 @@ class SortPreviewService:
                 [(row.row_id, row.source_path) for row in rows],
                 run_dir,
             )
-            apply_neural_runtime_authority(rows, neural_batch)
+            apply_neural_runtime_authority(rows, neural_batch, project_root=self.project_root)
             if row_callback is not None and neural_batch.predictions:
                 for row in rows:
                     row_callback(row)
@@ -598,6 +603,7 @@ class SortPlanExporter:
         """
         if mode not in {"copy", "move", "symlink"}:
             raise ValueError(f"Unsupported export mode: {mode}")
+        record_approved_session_feedback(self.project_root, session)
         disable_macos_metadata_sidecars()
         destination = Path(destination_root).expanduser().resolve()
         sorted_root = destination / SORTED_ROOT_NAME
@@ -1153,6 +1159,8 @@ def preview_row_from_result(index: int, result: SortFileResult) -> PreviewRow:
 def apply_neural_runtime_authority(
     rows: list[PreviewRow],
     batch: NeuralRuntimeBatch,
+    *,
+    project_root: Path | None = None,
 ) -> None:
     """Apply conservative category-wide neural ownership to GUI proposals.
 
@@ -1162,16 +1170,29 @@ def apply_neural_runtime_authority(
     FX.
     """
     predictions = {prediction.row_id: prediction for prediction in batch.predictions}
+    calibration = load_optional_confidence_calibration(project_root) if project_root is not None else None
+    authority_groups = enabled_authority_groups(project_root) if project_root is not None else None
     for row in rows:
         prediction = predictions.get(row.row_id)
         if prediction is None:
             if batch.status in {"error", "unavailable"}:
                 row.diagnostic_summary = f"{row.diagnostic_summary}; neural={batch.status} ({batch.message})"
             continue
-        _apply_neural_prediction(row, prediction)
+        _apply_neural_prediction(
+            row,
+            prediction,
+            calibration=calibration,
+            authority_groups=authority_groups,
+        )
 
 
-def _apply_neural_prediction(row: PreviewRow, prediction: NeuralRuntimePrediction) -> None:
+def _apply_neural_prediction(
+    row: PreviewRow,
+    prediction: NeuralRuntimePrediction,
+    *,
+    calibration: ConfidenceCalibrationBundle | None = None,
+    authority_groups: frozenset[str] | None = None,
+) -> None:
     """Apply one neural result without consulting source-name text."""
     neural_label = normalize_taxonomy_label(prediction.predicted_label)
     row.neural_folder = neural_label
@@ -1230,6 +1251,28 @@ def _apply_neural_prediction(row: PreviewRow, prediction: NeuralRuntimePredictio
     )
     row.diagnostic_summary = f"{row.diagnostic_summary}; {neural_summary}"
     if not is_valid_taxonomy_label(neural_label):
+        return
+
+    if row.result is not None and authority_groups is not None:
+        updated_result = apply_neural_prediction_to_result(
+            row.result,
+            prediction,
+            calibration=calibration,
+            enabled_groups=authority_groups,
+        )
+        row.result = updated_result
+        decision = updated_result.decision
+        decided_folder = normalize_taxonomy_label(decision.folder_path or decision.final_label)
+        row.proposed_folder = decided_folder
+        row.approved_folder = decided_folder
+        row.final_top = str(decision.final_top or "")
+        row.consensus_status = str(decision.consensus_status or "")
+        row.confidence = decision_confidence(updated_result)
+        row.decision_reason = str(decision.reason or "")
+        runtime_evidence = updated_result.facts.evidence.get("neural_runtime", {})
+        if isinstance(runtime_evidence, dict):
+            row.neural_ownership_ready = bool(runtime_evidence.get("ownership_ready", False))
+            row.neural_ownership_reason = str(runtime_evidence.get("ownership_block_reason", ""))
         return
 
     legacy_label = row.proposed_folder
@@ -1874,53 +1917,6 @@ def correction_evidence(row: PreviewRow) -> dict[str, Any]:
         }
     )
     return payload
-
-
-def calibration_feedback_from_preview_row(
-    row: PreviewRow,
-    *,
-    duplicate_conflict: bool = False,
-    brain_version: str = "",
-    taxonomy_version: str = "2026-07-25",
-) -> ReviewFeedback | None:
-    """Convert one explicit GUI correction into separated calibration evidence."""
-    predicted_label = normalize_taxonomy_label(row.neural_folder)
-    approved_label = normalize_taxonomy_label(row.approved_folder)
-    if row.neural_known_distribution is None or not predicted_label or not approved_label:
-        return None
-    prompt = row.neural_prompt_suggestions[0] if row.neural_prompt_suggestions else {}
-    compatible_families = compatible_semantic_families(predicted_label)
-    if not row.neural_semantic_family or not compatible_families:
-        broad_family_agreement = 0.5
-    else:
-        broad_family_agreement = 1.0 if row.neural_semantic_family in compatible_families else 0.0
-    structure_agreement = 1.0
-    if row.result is not None and neural_structure_conflicts(row.result, predicted_label):
-        structure_agreement = 0.0
-    return ReviewFeedback(
-        file_sha256=sha256_file(row.source_path),
-        provider_id="foundation_panel",
-        predicted_label=predicted_label,
-        accepted=predicted_label == approved_label,
-        top_similarity=float(row.neural_similarity),
-        margin=float(row.neural_margin),
-        radius_ratio=float(row.neural_radius_ratio),
-        label_example_count=max(0, int(row.neural_label_example_count)),
-        label_prototype_count=0,
-        structure_agreement=structure_agreement,
-        created_utc=datetime.now(timezone.utc).isoformat(),
-        final_approved_label=approved_label,
-        parent_family_accepted=predicted_label.split("/", 1)[0] == approved_label.split("/", 1)[0],
-        prompt_top_similarity=float(prompt.get("positive_score", 0.0)),
-        prompt_margin=float(prompt.get("prompt_margin", 0.0)),
-        panns_support_score=float(row.panns_support_score),
-        panns_contradiction_score=float(row.panns_contradiction_score),
-        broad_family_agreement=broad_family_agreement,
-        out_of_distribution=0.0 if row.neural_known_distribution else 1.0,
-        duplicate_conflict=1.0 if duplicate_conflict else 0.0,
-        brain_version=str(brain_version),
-        taxonomy_version=str(taxonomy_version),
-    )
 
 
 def timestamp() -> str:

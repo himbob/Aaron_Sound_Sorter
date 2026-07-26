@@ -11,3 +11,7 @@ neural_artifacts/prototype_indexes/**/*.pt filter=lfs diff=lfs merge=lfs -text
 neural_artifacts/prototype_indexes/**/*.pth filter=lfs diff=lfs merge=lfs -text
 neural_artifacts/prototype_indexes/**/*.bin filter=lfs diff=lfs merge=lfs -text
 neural_artifacts/prototype_indexes/**/*.safetensors filter=lfs diff=lfs merge=lfs -text
+neural_artifacts/prompt_indexes/**/*.npz filter=lfs diff=lfs merge=lfs -text
+
+# Active trained brains are runtime assets, not useful line-by-line Git diffs.
+stage4_*brain*.json filter=lfs diff=lfs merge=lfs -text

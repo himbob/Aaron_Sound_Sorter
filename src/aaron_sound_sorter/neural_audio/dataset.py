@@ -16,17 +16,17 @@ from .contracts import (
     EvaluationSplit,
     LabeledAudioExample,
 )
-from .hashing import decoded_audio_sha256, sha256_file
+from .hashing import decoded_audio_sha256, normalized_audio_sha256, sha256_file
 
 AUDIO_SUFFIXES = frozenset({".wav", ".aif", ".aiff", ".flac", ".ogg", ".au", ".mp3", ".m4a"})
-CuratedRow = Union[tuple[Path, str], tuple[Path, str, str]]
+CuratedRow = Union[tuple[Path, str], tuple[Path, str, str], tuple[Path, str, str, str]]
 
 
 def discover_curated_examples(
     root: Path,
     *,
     allow_label_conflicts: bool = False,
-) -> dict[str, list[tuple[Path, str, str]]]:
+) -> dict[str, list[tuple[Path, str, str, str]]]:
     """Read labels from deliberately curated relative folder paths.
 
     File names are never inspected for label evidence.  Duplicate bytes assigned
@@ -37,9 +37,10 @@ def discover_curated_examples(
     if not root.is_dir():
         raise ValueError(f"curated training root is not a directory: {root}")
 
-    by_label: dict[str, list[tuple[Path, str, str]]] = defaultdict(list)
+    by_label: dict[str, list[tuple[Path, str, str, str]]] = defaultdict(list)
     hash_labels: dict[str, set[str]] = defaultdict(set)
     decoded_hash_labels: dict[str, set[str]] = defaultdict(set)
+    normalized_hash_labels: dict[str, set[str]] = defaultdict(set)
     for path in sorted(root.rglob("*")):
         if not path.is_file() or path.suffix.lower() not in AUDIO_SUFFIXES:
             continue
@@ -52,21 +53,31 @@ def discover_curated_examples(
         digest = sha256_file(path)
         try:
             decoded_digest = decoded_audio_sha256(path)
+            normalized_digest = normalized_audio_sha256(path)
         except (OSError, RuntimeError):
             decoded_digest = ""
-        by_label[label].append((path, digest, decoded_digest))
+            normalized_digest = ""
+        by_label[label].append((path, digest, decoded_digest, normalized_digest))
         hash_labels[digest].add(label)
         if decoded_digest:
             decoded_hash_labels[decoded_digest].add(label)
+        if normalized_digest:
+            normalized_hash_labels[normalized_digest].add(label)
 
     conflicts = {digest: labels for digest, labels in hash_labels.items() if len(labels) > 1}
     decoded_conflicts = {digest: labels for digest, labels in decoded_hash_labels.items() if len(labels) > 1}
+    normalized_conflicts = {digest: labels for digest, labels in normalized_hash_labels.items() if len(labels) > 1}
     if conflicts and not allow_label_conflicts:
         preview = ", ".join(f"{digest[:10]}:{sorted(labels)}" for digest, labels in list(conflicts.items())[:5])
         raise ValueError(f"same audio bytes assigned to multiple labels: {preview}")
     if decoded_conflicts and not allow_label_conflicts:
         preview = ", ".join(f"{digest[:10]}:{sorted(labels)}" for digest, labels in list(decoded_conflicts.items())[:5])
         raise ValueError(f"same decoded audio assigned to multiple labels: {preview}")
+    if normalized_conflicts and not allow_label_conflicts:
+        preview = ", ".join(
+            f"{digest[:10]}:{sorted(labels)}" for digest, labels in list(normalized_conflicts.items())[:5]
+        )
+        raise ValueError(f"same normalized derived audio assigned to multiple labels: {preview}")
     return dict(by_label)
 
 
@@ -92,19 +103,23 @@ def build_evaluation_split(
     warnings: list[str] = []
     global_seen: set[str] = set()
     global_decoded_seen: set[str] = set()
+    global_normalized_seen: set[str] = set()
 
     for label, rows in sorted(by_label.items()):
-        unique: dict[str, tuple[Path, str]] = {}
+        unique: dict[str, tuple[Path, str, str, str]] = {}
         for row in rows:
-            path, digest, decoded_digest = _curated_row_parts(row)
-            content_key = decoded_digest or digest
-            unique.setdefault(content_key, (Path(path), digest))
+            path, digest, decoded_digest, normalized_digest = _curated_row_parts(row)
+            content_key = normalized_digest or decoded_digest or digest
+            unique.setdefault(content_key, (Path(path), digest, decoded_digest, normalized_digest))
         duplicates_removed = len(rows) - len(unique)
         if duplicates_removed:
             warnings.append(f"{label}: removed {duplicates_removed} duplicate-audio example(s)")
 
         ranked = sorted(
-            ((digest, path, content_key) for content_key, (path, digest) in unique.items()),
+            (
+                (digest, path, decoded_digest, normalized_digest, content_key)
+                for content_key, (path, digest, decoded_digest, normalized_digest) in unique.items()
+            ),
             key=lambda item: _stable_rank(seed, label, item[0]),
         )
         n = len(ranked)
@@ -115,19 +130,27 @@ def build_evaluation_split(
             holdout_count = max(1, int(round(n * holdout_fraction)))
             holdout_count = min(holdout_count, n - minimum_train_examples)
 
-        heldout_hashes = {digest for digest, _, _ in ranked[:holdout_count]}
-        for digest, path, content_key in ranked:
-            if digest in global_seen or content_key in global_decoded_seen:
+        heldout_hashes = {digest for digest, *_rest in ranked[:holdout_count]}
+        for digest, path, decoded_digest, normalized_digest, content_key in ranked:
+            if (
+                digest in global_seen
+                or (decoded_digest and decoded_digest in global_decoded_seen)
+                or (normalized_digest and normalized_digest in global_normalized_seen)
+            ):
                 continue
             global_seen.add(digest)
-            global_decoded_seen.add(content_key)
+            if decoded_digest:
+                global_decoded_seen.add(decoded_digest)
+            if normalized_digest:
+                global_normalized_seen.add(normalized_digest)
             split = HELDOUT_EVAL_SPLIT if digest in heldout_hashes else REVIEW_PREVIEW_SPLIT
             example = LabeledAudioExample(
                 label=label,
                 path=path,
                 file_sha256=digest,
                 split=split,
-                decoded_audio_sha256=content_key,
+                decoded_audio_sha256=decoded_digest or content_key,
+                normalized_audio_sha256=normalized_digest,
             )
             (heldout if split == HELDOUT_EVAL_SPLIT else preview).append(example)
 
@@ -171,7 +194,7 @@ def build_explicit_evaluation_split(
     )
 
 
-def _curated_row_parts(row: CuratedRow) -> tuple[Path, str, str]:
+def _curated_row_parts(row: CuratedRow) -> tuple[Path, str, str, str]:
     if len(row) == 2:
         path, digest = row
         path = Path(path)
@@ -179,9 +202,21 @@ def _curated_row_parts(row: CuratedRow) -> tuple[Path, str, str]:
             decoded_digest = decoded_audio_sha256(path) if path.is_file() else ""
         except (OSError, RuntimeError):
             decoded_digest = ""
-        return path, str(digest), decoded_digest
-    path, digest, decoded_digest = row
-    return Path(path), str(digest), str(decoded_digest)
+        try:
+            normalized_digest = normalized_audio_sha256(path) if path.is_file() else ""
+        except (OSError, RuntimeError, ValueError):
+            normalized_digest = ""
+        return path, str(digest), decoded_digest, normalized_digest
+    if len(row) == 3:
+        path, digest, decoded_digest = row
+        path = Path(path)
+        try:
+            normalized_digest = normalized_audio_sha256(path) if path.is_file() else ""
+        except (OSError, RuntimeError, ValueError):
+            normalized_digest = ""
+        return path, str(digest), str(decoded_digest), normalized_digest
+    path, digest, decoded_digest, normalized_digest = row
+    return Path(path), str(digest), str(decoded_digest), str(normalized_digest)
 
 
 def _examples_for_explicit_split(
@@ -193,22 +228,30 @@ def _examples_for_explicit_split(
     warnings: list[str] = []
     global_seen: set[str] = set()
     global_decoded_seen: set[str] = set()
+    global_normalized_seen: set[str] = set()
     for label, rows in sorted(by_label.items()):
         kept = 0
         for row in sorted(rows, key=lambda value: (_curated_row_parts(value)[1], str(_curated_row_parts(value)[0]))):
-            path, digest, decoded_digest = _curated_row_parts(row)
-            content_key = decoded_digest or digest
-            if digest in global_seen or content_key in global_decoded_seen:
+            path, digest, decoded_digest, normalized_digest = _curated_row_parts(row)
+            if (
+                digest in global_seen
+                or (decoded_digest and decoded_digest in global_decoded_seen)
+                or (normalized_digest and normalized_digest in global_normalized_seen)
+            ):
                 continue
             global_seen.add(digest)
-            global_decoded_seen.add(content_key)
+            if decoded_digest:
+                global_decoded_seen.add(decoded_digest)
+            if normalized_digest:
+                global_normalized_seen.add(normalized_digest)
             examples.append(
                 LabeledAudioExample(
                     label=label,
                     path=path,
                     file_sha256=digest,
                     split=split,
-                    decoded_audio_sha256=content_key,
+                    decoded_audio_sha256=decoded_digest,
+                    normalized_audio_sha256=normalized_digest,
                 )
             )
             kept += 1
@@ -227,7 +270,16 @@ def write_split_manifest(split: EvaluationSplit, output_dir: Path) -> None:
         path = output_dir / name
         with path.open("w", encoding="utf-8", newline="") as handle:
             writer = csv.writer(handle)
-            writer.writerow(["label", "path", "file_sha256", "decoded_audio_sha256", "split"])
+            writer.writerow(
+                [
+                    "label",
+                    "path",
+                    "file_sha256",
+                    "decoded_audio_sha256",
+                    "normalized_audio_sha256",
+                    "split",
+                ]
+            )
             for row in rows:
                 writer.writerow(
                     [
@@ -235,6 +287,7 @@ def write_split_manifest(split: EvaluationSplit, output_dir: Path) -> None:
                         str(row.path),
                         row.file_sha256,
                         row.decoded_audio_sha256,
+                        row.normalized_audio_sha256,
                         row.split,
                     ]
                 )

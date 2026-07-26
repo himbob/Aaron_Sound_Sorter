@@ -275,7 +275,7 @@ def command_audit_trainers(args: argparse.Namespace) -> int:
     total = sum(len(rows) for rows in discovered.values())
     position = 0
     for label, rows in sorted(discovered.items()):
-        for path, digest, _ in sorted(rows, key=lambda item: item[1]):
+        for path, digest, _decoded_digest, _normalized_digest in sorted(rows, key=lambda item: item[1]):
             position += 1
             print(f"[{position}/{total}] auditing trainer {path.name}", flush=True)
             embedded[label].append(cache.get_or_compute(path, provider))

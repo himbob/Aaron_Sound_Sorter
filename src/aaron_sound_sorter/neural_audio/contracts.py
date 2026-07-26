@@ -64,6 +64,7 @@ class LabeledAudioExample:
     file_sha256: str
     split: str
     decoded_audio_sha256: str = ""
+    normalized_audio_sha256: str = ""
 
     def __post_init__(self) -> None:
         if not self.label.strip():
@@ -74,6 +75,8 @@ class LabeledAudioExample:
             raise ValueError("file_sha256 must be a SHA-256 digest")
         if self.decoded_audio_sha256 and len(self.decoded_audio_sha256) != 64:
             raise ValueError("decoded_audio_sha256 must be empty or a SHA-256 digest")
+        if self.normalized_audio_sha256 and len(self.normalized_audio_sha256) != 64:
+            raise ValueError("normalized_audio_sha256 must be empty or a SHA-256 digest")
 
 
 @dataclass(frozen=True)
@@ -100,6 +103,18 @@ class EvaluationSplit:
         if decoded_overlap:
             raise ValueError(
                 f"training/evaluation decoded-audio leakage detected for {len(decoded_overlap)} content fingerprint(s)"
+            )
+        train_normalized_hashes = {
+            example.normalized_audio_sha256 for example in self.review_preview if example.normalized_audio_sha256
+        }
+        heldout_normalized_hashes = {
+            example.normalized_audio_sha256 for example in self.heldout_eval if example.normalized_audio_sha256
+        }
+        normalized_overlap = train_normalized_hashes & heldout_normalized_hashes
+        if normalized_overlap:
+            raise ValueError(
+                "training/evaluation normalized-audio leakage detected for "
+                f"{len(normalized_overlap)} derived-copy fingerprint(s)"
             )
 
 

@@ -41,6 +41,7 @@ def neural_evidence_lines(row: PreviewRow) -> list[str]:
         broad_clap_summary(row),
         *detailed_clap_lines(row),
         panns_summary(row),
+        calibration_summary(row),
         neural_result_summary(row),
     ]
 
@@ -54,6 +55,14 @@ def neural_memory_summary(row: PreviewRow) -> str:
         count = row.neural_label_example_count
         example_text = f" from {count} approved examples" if count else ""
         return f"Your trained memory: ready to classify{example_text} → {label}."
+    if row.neural_ownership_reason in {
+        "confidence_calibration_not_promoted",
+        "category_group_not_promoted",
+    }:
+        return (
+            "Your trained memory: found a familiar match, but this category group "
+            f"has not passed the automatic-placement safety gate → {label}."
+        )
     if row.neural_known_distribution:
         return f"Your trained memory: recognizes nearby audio, but is not ready to own the folder → {label}."
     return f"Your trained memory: this audio is outside its familiar neighborhood; nearest guess → {label}."
@@ -104,6 +113,20 @@ def panns_summary(row: PreviewRow) -> str:
     return f"PANNs broad events (raw scores; {role}): {event_text}."
 
 
+def calibration_summary(row: PreviewRow) -> str:
+    """Explain reviewed confidence learning without exposing feature jargon."""
+    if row.result is None or not isinstance(row.result.facts.evidence, dict):
+        return "Confidence learning: not fitted yet; conservative safety rules remain active."
+    neural = row.result.facts.evidence.get("neural_runtime", {})
+    calibration = neural.get("confidence_calibration", {}) if isinstance(neural, dict) else {}
+    if not isinstance(calibration, dict) or calibration.get("status") != "available":
+        return "Confidence learning: not fitted yet; conservative safety rules remain active."
+    probability = calibration.get("prediction_correct_probability")
+    if probability is None:
+        return "Confidence learning: fitted model did not produce a usable score; Review safety remains active."
+    return f"Confidence learning: reviewed outcomes estimate {float(probability):.0%} correctness for this decision."
+
+
 def neural_result_summary(row: PreviewRow) -> str:
     """Explain whether neural evidence controlled or merely advised."""
     status = row.consensus_status
@@ -115,6 +138,10 @@ def neural_result_summary(row: PreviewRow) -> str:
         return "Neural result: sent to Review because the trained label contradicted the measured audio shape."
     if status == "neural_legacy_owner_conflict_review":
         return "Neural result: sent to Review because the available systems disagreed and memory was not ready."
-    if status == "neural_known_distribution_owner":
+    if status == "neural_calibration_below_threshold_review":
+        return (
+            "Neural result: sent to Review because confidence learned from past reviews was below the ownership gate."
+        )
+    if status in {"neural_known_distribution_owner", "neural_production_owner"}:
         return "Neural result: trained memory controlled the proposed folder; detailed CLAP suggestions did not."
     return "Neural result: evidence was advisory; the normal sorter controlled the proposed folder."

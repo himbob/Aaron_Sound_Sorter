@@ -2,6 +2,7 @@ import builtins
 from pathlib import Path
 
 from aaron_sound_sorter.neural_audio.calibration import (
+    ConfidenceCalibrationBundle,
     ConfidenceCalibrator,
     ReviewFeedback,
     ReviewFeedbackStore,
@@ -73,3 +74,23 @@ def test_calibrator_round_trip_is_dependency_free(tmp_path: Path) -> None:
     assert expected is not None
     assert actual is not None
     assert abs(expected - actual) < 1e-9
+
+
+def test_calibration_bundle_exposes_correct_parent_and_review_outputs(tmp_path: Path) -> None:
+    rows = [feedback(index, accepted=index % 2 == 0) for index in range(30)]
+    prediction = ConfidenceCalibrator()
+    prediction.fit(rows)
+    prediction.save(tmp_path / "confidence_calibrator.json")
+    parent = ConfidenceCalibrator()
+    parent_rows = [
+        ReviewFeedback(**{**row.__dict__, "parent_family_accepted": index % 3 != 0}) for index, row in enumerate(rows)
+    ]
+    parent.fit(parent_rows, outcome="parent_family_correct")
+    parent.save(tmp_path / "parent_family_calibrator.json")
+
+    probabilities = ConfidenceCalibrationBundle.load(tmp_path).predict(feedback(100, True))
+
+    assert probabilities.prediction_correct is not None
+    assert probabilities.parent_family_correct is not None
+    assert probabilities.review_required is not None
+    assert abs(probabilities.review_required - (1.0 - probabilities.prediction_correct)) < 1e-12

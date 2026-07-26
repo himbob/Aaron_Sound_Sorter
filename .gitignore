@@ -56,14 +56,19 @@ _models/**/logs/
 _models/**/*backup*
 _models/**/*archive*
 
-# Keep only compact runtime neural prototype indexes.
+# Keep only compact runtime neural prototype and prompt indexes.
 # Embedding caches, curation runs, GUI imports/inboxes, and reports stay local.
 neural_artifacts/*
 !neural_artifacts/prototype_indexes/
 !neural_artifacts/prototype_indexes/**
+!neural_artifacts/prompt_indexes/
+!neural_artifacts/prompt_indexes/**
 neural_artifacts/prototype_indexes/**/.cache/
 neural_artifacts/prototype_indexes/**/*backup*
 neural_artifacts/prototype_indexes/**/*archive*
+neural_artifacts/prompt_indexes/**/.cache/
+neural_artifacts/prompt_indexes/**/*backup*
+neural_artifacts/prompt_indexes/**/*archive*
 _neural_cache/
 _neural_runs/
 

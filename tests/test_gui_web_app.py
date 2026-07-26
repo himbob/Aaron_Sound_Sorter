@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 from aaron_audio_intelligence.physics_memory_brain import PHYSICS_MEMORY_BRAIN_NAME
 from aaron_audio_intelligence.shape_memory_brain import SHAPE_MEMORY_BRAIN_NAME, SHAPE_STARTER_MEMORY_BRAIN_NAME
@@ -11,6 +12,7 @@ from aaron_sound_sorter.gui.web_app import (
     BrainTrainingJob,
     ExportJob,
     PreviewJob,
+    SorterRequestHandler,
     add_preview_job_row,
     apply_overrides,
     audio_content_type,
@@ -23,6 +25,7 @@ from aaron_sound_sorter.gui.web_app import (
     parse_range_header,
     preview_job_to_payload,
     render_index_html,
+    request_stop_preview_job,
     run_brain_training_job,
     session_to_payload,
     training_job_to_payload,
@@ -50,6 +53,8 @@ def test_web_gui_shell_contains_core_controls() -> None:
     )
 
     assert "Aaron Sound Sorter" in html
+    assert 'href="/learning"' in html
+    assert "Open Learning Center" in html
     assert "Preview Sort" in html
     assert "cancelPreviewButton" in html
     assert "/api/preview-cancel" in html
@@ -70,7 +75,9 @@ def test_web_gui_shell_contains_core_controls() -> None:
     assert "waitForAudioReady" in html
     assert "categoryHints" in html
     assert "Detected category options" in html
-    assert "Neural Audio (plain English)" in html
+    assert "Why did it do this?" in html
+    assert "Technical details" in html
+    assert "Choose the Correct Folder" in html
     assert "neural_explanation_lines" in html
     assert "categoryModal" in html
     assert "Choose Approved Folder" in html
@@ -89,6 +96,12 @@ def test_web_gui_shell_contains_core_controls() -> None:
     assert "syncQueueScrollbars" in html
     assert "queueScrollSlider" not in html
     assert "Use the local slider" not in html
+    assert "Previous 200" in html
+    assert "Next 200" in html
+    assert "QUEUE_WINDOW_SIZE = 200" in html
+    assert "Stop &amp; Keep Results" in html
+    assert "/api/preview-stop" in html
+    assert "after_revision" in html
     assert "detailsResizeHandle" in html
     assert "detailsRevealButton" in html
     assert "pane-resizer" in html
@@ -346,6 +359,63 @@ def test_preview_job_payload_streams_completed_rows_in_final_order() -> None:
     assert [row["display_name"] for row in payload["partial_rows"]] == ["kick.wav", "snare.wav"]
     assert [row["index"] for row in payload["partial_rows"]] == [0, 1]
     assert payload["updated_at"] >= payload["started_at"]
+
+    incremental = preview_job_to_payload(job, after_revision=1)
+    assert incremental["row_revision"] == 2
+    assert [row["display_name"] for row in incremental["partial_rows"]] == ["kick.wav"]
+
+
+def test_stop_preview_job_keeps_completed_rows_for_session_finalization() -> None:
+    job = PreviewJob(job_id="job-1", status="running")
+
+    request_stop_preview_job(job)
+
+    assert job.cancel_event.is_set()
+    assert job.keep_completed_on_stop is True
+    assert job.status == "stopping"
+    assert "completed sounds" in job.message
+
+
+def test_stopped_preview_becomes_a_normal_review_session(tmp_path: Path, monkeypatch) -> None:
+    brain_path = tmp_path / "brain.json"
+    brain_path.write_text("{}", encoding="utf-8")
+    preview_service = SimpleNamespace(load_brain_family_config=lambda: SimpleNamespace(full_brain_path=brain_path))
+    handler = object.__new__(SorterRequestHandler)
+    handler.gui_state = SimpleNamespace(
+        project_root=tmp_path,
+        preview_service=preview_service,
+        sessions={},
+    )
+    monkeypatch.setattr(
+        "aaron_sound_sorter.gui.web_app.load_available_labels",
+        lambda *_args, **_kwargs: ["Drums/Kick Drums/Generic Kick/One Shots"],
+    )
+    job = PreviewJob(job_id="job-keep", status="stopping", keep_completed_on_stop=True)
+    add_preview_job_row(
+        job,
+        PreviewRow(
+            row_id="00001",
+            source_path=tmp_path / "sound.wav",
+            display_name="sound.wav",
+            proposed_folder="Drums/Kick Drums/Generic Kick/One Shots",
+            approved_folder="Drums/Kick Drums/Generic Kick/One Shots",
+            final_top="Drums",
+            consensus_status="strong_consensus",
+            confidence=0.9,
+            duration_sec=0.2,
+            read_status="ok",
+            decision_reason="measured evidence",
+            diagnostic_summary="shape=drum_hit",
+        ),
+    )
+
+    handler.finalize_stopped_preview(job, tmp_path / "input")
+
+    assert job.status == "stopped"
+    assert job.session_id in handler.gui_state.sessions
+    session = handler.gui_state.sessions[job.session_id]
+    assert [row.display_name for row in session.rows] == ["sound.wav"]
+    assert (session.run_dir / "Aaron_GUI_Preview.csv").is_file()
 
 
 def test_cancel_preview_job_marks_live_job_cancelled() -> None:

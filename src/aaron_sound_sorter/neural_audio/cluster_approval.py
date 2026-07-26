@@ -74,7 +74,14 @@ def import_cluster_approval(
     cluster_manifest = _load_object(cluster_manifest_path)
     cluster = _find_cluster(cluster_manifest, cluster_id)
     safe_core_hashes = set(_string_tuple(cluster.get("safe_core_hashes", [])))
-    if not set(approved_hashes).issubset(safe_core_hashes):
+    approved_set = set(approved_hashes)
+    approval_scope = str(approval.get("approval_scope", "safe_core"))
+    explicit_all_members = bool(approval.get("allow_non_core", False)) and approval_scope == "all_members"
+    if explicit_all_members:
+        member_hashes = set(_string_tuple(cluster.get("member_hashes", [])))
+        if not member_hashes or approved_set != member_hashes:
+            raise ValueError("explicit all-member approval must include every cluster member exactly once")
+    elif not approved_set.issubset(safe_core_hashes):
         raise ValueError("approval includes hashes outside the cluster safe core")
     member_paths = cluster.get("member_paths_by_hash", {})
     if not isinstance(member_paths, dict):
@@ -134,6 +141,7 @@ def import_cluster_approval(
         "schema_version": 1,
         "cluster_id": cluster_id,
         "approved_category": approved_category,
+        "approval_scope": approval_scope,
         "approval_manifest": str(approval_path),
         "inbox_root": str(inbox.inbox_root),
         "current_manifest_path": str(inbox.current_manifest_path),

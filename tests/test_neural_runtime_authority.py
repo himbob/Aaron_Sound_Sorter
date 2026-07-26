@@ -12,6 +12,7 @@ from aaron_sound_sorter.domain.models import (
     VoterResult,
 )
 from aaron_sound_sorter.neural_audio.authority import apply_neural_prediction_to_result
+from aaron_sound_sorter.neural_audio.calibration import ConfidenceCalibrationBundle
 from aaron_sound_sorter.neural_audio.runtime import NeuralEventSuggestion, NeuralRuntimePrediction
 
 
@@ -95,6 +96,14 @@ def _prediction(
     )
 
 
+class _ConstantCalibrator:
+    def __init__(self, probability: float) -> None:
+        self.probability = probability
+
+    def predict_probability(self, _feedback) -> float:
+        return self.probability
+
+
 def test_cli_neural_exact_training_match_takes_ownership() -> None:
     label = "Instruments/Synths/Synth Pad/Loops"
     updated = apply_neural_prediction_to_result(
@@ -105,6 +114,65 @@ def test_cli_neural_exact_training_match_takes_ownership() -> None:
     assert updated.decision.folder_path == label
     assert updated.decision.consensus_status == "neural_production_owner"
     assert updated.facts.evidence["neural_runtime"]["exact_training_match"] is True
+
+
+def test_unpromoted_generalization_keeps_compatible_legacy_owner() -> None:
+    legacy = "Instruments/Synths/Synth Pad/Loops"
+    original = _result(legacy)
+
+    updated = apply_neural_prediction_to_result(
+        original,
+        _prediction("Instruments/Keys/Electric Piano/Loops", ready=True),
+        enabled_groups=frozenset(),
+    )
+
+    assert updated.decision == original.decision
+    assert updated.facts.evidence["neural_runtime"]["ownership_block_reason"] == ("confidence_calibration_not_promoted")
+
+
+def test_promoted_group_with_calibration_can_generalize() -> None:
+    label = "Instruments/Voice/Vocal One Shots/One Shots"
+    calibration = ConfidenceCalibrationBundle(_ConstantCalibrator(0.93))  # type: ignore[arg-type]
+
+    updated = apply_neural_prediction_to_result(
+        _result("Instruments/Voice/Voice Phrase One Shots/One Shots", loop_like=False),
+        _prediction(label, ready=True),
+        calibration=calibration,
+        enabled_groups=frozenset({"voice"}),
+    )
+
+    assert updated.decision.folder_path == label
+    assert updated.decision.consensus_status == "neural_production_owner"
+
+
+def test_reviewed_calibration_blocks_low_probability_generalization() -> None:
+    label = "Instruments/Synths/Synth Pad/Loops"
+    calibration = ConfidenceCalibrationBundle(_ConstantCalibrator(0.61))  # type: ignore[arg-type]
+
+    updated = apply_neural_prediction_to_result(
+        _result("Instruments/Mixed Musical Loops/Multi Instrument/Loops"),
+        _prediction(label, ready=True, exact=False),
+        calibration=calibration,
+    )
+
+    assert updated.decision.folder_path == "_TO_REVIEW/Measured Role Conflict"
+    assert updated.decision.consensus_status == "neural_calibration_below_threshold_review"
+    calibration_evidence = updated.facts.evidence["neural_runtime"]["confidence_calibration"]
+    assert calibration_evidence["prediction_correct_probability"] == 0.61
+
+
+def test_exact_human_match_is_not_blocked_by_generalization_calibration() -> None:
+    label = "Instruments/Synths/Synth Pad/Loops"
+    calibration = ConfidenceCalibrationBundle(_ConstantCalibrator(0.20))  # type: ignore[arg-type]
+
+    updated = apply_neural_prediction_to_result(
+        _result("_TO_REVIEW/Measured Owner Conflict"),
+        _prediction(label, ready=True, exact=True, reason="exact_human_training_match"),
+        calibration=calibration,
+    )
+
+    assert updated.decision.folder_path == label
+    assert updated.decision.consensus_status == "neural_production_owner"
 
 
 def test_cli_exact_voice_memory_with_decisive_nonvoice_audio_goes_to_review() -> None:

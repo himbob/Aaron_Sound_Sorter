@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Learning Center — Aaron Sound Sorter</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f2ed;
+      --panel: #fff;
+      --text: #1d1d1f;
+      --muted: #62666d;
+      --line: #d7d2c8;
+      --accent: #2357a5;
+      --soft: #eef3fb;
+      --good: #1f6f43;
+      --warn: #8b560d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: center;
+      padding: 18px 22px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfaf7;
+    }
+    h1, h2, h3 { margin: 0; }
+    h1 { font-size: 23px; }
+    h2 { font-size: 18px; }
+    h3 { font-size: 16px; }
+    p { margin: 5px 0; }
+    a, button { font: inherit; }
+    a.button, button {
+      display: inline-flex;
+      min-height: 36px;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 7px 12px;
+      background: #f2f2f0;
+      color: var(--text);
+      font-weight: 700;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    button.primary { border-color: var(--accent); background: var(--accent); color: white; }
+    button:disabled { cursor: not-allowed; opacity: .5; }
+    main { width: min(1180px, 100%); margin: 0 auto; padding: 18px; }
+    .panel {
+      margin-bottom: 16px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 16px;
+      background: var(--panel);
+    }
+    .panel-head, .toolbar, .actions, .summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 9px;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .small { color: var(--muted); font-size: 12px; }
+    .status { min-height: 22px; margin-top: 9px; color: var(--muted); }
+    .status.good { color: var(--good); }
+    .status.warn { color: var(--warn); }
+    input[type="text"], select {
+      width: 100%;
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 7px 9px;
+      background: white;
+      font-size: 14px;
+    }
+    label { display: block; margin-bottom: 4px; color: var(--muted); font-size: 12px; font-weight: 750; }
+    .path-row { display: grid; grid-template-columns: minmax(280px, 1fr) auto auto; gap: 8px; align-items: end; }
+    .review-card { margin-top: 14px; border: 1px solid var(--line); border-radius: 9px; padding: 14px; }
+    .cluster-facts { display: flex; flex-wrap: wrap; gap: 7px; margin: 10px 0; }
+    .pill { border-radius: 999px; padding: 4px 8px; background: var(--soft); font-size: 12px; font-weight: 700; }
+    .listen-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 9px; margin: 12px 0; }
+    .listen-card { border: 1px solid var(--line); border-radius: 7px; padding: 9px; background: #fbfbfa; }
+    audio { width: 100%; height: 34px; margin-top: 6px; }
+    .choice-grid { display: grid; grid-template-columns: minmax(260px, 1fr) auto; gap: 9px; align-items: end; }
+    details { margin-top: 11px; border-top: 1px solid #ece8df; padding-top: 9px; }
+    summary { cursor: pointer; color: var(--accent); font-weight: 750; }
+    .danger-zone { margin-top: 10px; padding-top: 10px; border-top: 1px solid #ece8df; }
+    .table-wrap { max-height: 520px; overflow: auto; margin-top: 12px; border: 1px solid var(--line); border-radius: 7px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 8px; border-bottom: 1px solid #ece8df; text-align: left; vertical-align: top; }
+    th { position: sticky; top: 0; background: #fbfaf7; }
+    .tier { width: 26px; text-align: center; border-radius: 999px; padding: 3px; background: var(--soft); font-weight: 850; }
+    .coverage-controls { display: grid; grid-template-columns: 1fr auto; gap: 9px; margin-top: 11px; }
+    @media (max-width: 720px) {
+      header { align-items: flex-start; padding: 14px; }
+      main { padding: 12px; }
+      .path-row, .choice-grid, .coverage-controls { grid-template-columns: 1fr; }
+      .path-row button, .choice-grid button { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Learning Center</h1>
+      <p class="small">Listen, choose, approve. Technical evidence stays optional.</p>
+    </div>
+    <a class="button" href="/">Back to Sorter</a>
+  </header>
+  <main>
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Review Similar Sounds</h2>
+          <p class="small">Listen to a few representatives before approving a safe group.</p>
+        </div>
+        <span id="clusterPosition" class="small">No pack loaded</span>
+      </div>
+      <div class="path-row">
+        <div>
+          <label for="packPath">Aaron review-pack folder</label>
+          <input id="packPath" type="text" placeholder="/path/to/cluster_review_pack" />
+        </div>
+        <button id="choosePack">Choose Folder</button>
+        <button id="loadPack" class="primary">Load Review Pack</button>
+      </div>
+      <div id="clusterCard" class="review-card" hidden>
+        <div class="panel-head">
+          <div>
+            <h3 id="clusterTitle">Cluster</h3>
+            <div id="clusterSubtitle" class="small"></div>
+          </div>
+          <div class="actions">
+            <button id="previousCluster">Previous</button>
+            <button id="nextCluster">Next</button>
+          </div>
+        </div>
+        <div id="clusterFacts" class="cluster-facts"></div>
+        <div id="representatives" class="listen-grid"></div>
+        <div class="choice-grid">
+          <div>
+            <label for="approvedCategory">Correct category</label>
+            <input id="approvedCategory" type="text" list="categoryOptions" placeholder="Choose the narrowest category you trust" />
+          </div>
+          <button id="approveSafeCore" class="primary">Approve Safe Core</button>
+        </div>
+        <datalist id="categoryOptions"></datalist>
+        <div id="suggestions" class="small" style="margin-top:7px;"></div>
+        <div id="decisionStatus" class="status"></div>
+        <div class="actions" style="justify-content:flex-start;">
+          <button id="importApproval" disabled>Add Approved Audio to Training Inbox</button>
+          <span class="small">Approval and training import are deliberately separate. Prototype rebuilding happens later.</span>
+        </div>
+        <details>
+          <summary>More review choices and technical evidence</summary>
+          <div id="technicalEvidence" class="small" style="margin-top:9px;"></div>
+          <div class="danger-zone actions" style="justify-content:flex-start;">
+            <button data-cluster-action="approve_all">Approve All Members</button>
+            <button data-cluster-action="choose_parent">Choose Parent Only</button>
+            <button data-cluster-action="split">Needs Splitting</button>
+            <button data-cluster-action="mixed">Mixed / Unusable</button>
+            <button data-cluster-action="reject">Reject Cluster</button>
+          </div>
+        </details>
+      </div>
+      <div id="packStatus" class="status">Choose a review pack to begin.</div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Update the Neural Brain</h2>
+          <p class="small">After importing approved audio, build one new version. The current version stays safe if building fails.</p>
+        </div>
+        <button id="rebuildPrototypes" class="primary">Build Updated Neural Brain</button>
+      </div>
+      <div id="prototypeStatus" class="status">Nothing changes until you press the button.</div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Training Coverage</h2>
+          <p class="small">Every category remains selectable. This view only shows where more examples would help.</p>
+        </div>
+        <button id="refreshCoverage">Refresh</button>
+      </div>
+      <div id="coverageSummary" class="summary small"></div>
+      <div class="coverage-controls">
+        <input id="coverageSearch" type="text" placeholder="Search categories…" />
+        <label style="margin:0;"><input id="needsWorkOnly" type="checkbox" /> Show categories needing work</label>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Tier</th><th>Category</th><th>Examples</th><th>Held-out</th><th>What it needs</th></tr></thead>
+          <tbody id="coverageRows"></tbody>
+        </table>
+      </div>
+      <div id="coverageStatus" class="status">Loading coverage…</div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Confidence Learning</h2>
+          <p class="small">Accepted and corrected reviews teach when the sorter should trust itself.</p>
+        </div>
+        <button id="rebuildCalibration">Recheck Calibration</button>
+      </div>
+      <div id="calibrationStatus" class="status">Loading calibration status…</div>
+    </section>
+  </main>
+  <script>
+    const state = { packId: "", clusters: [], clusterIndex: 0, decisionPath: "", coverage: [] };
+    const byId = id => document.getElementById(id);
+
+    async function jsonFetch(url, options={}) {
+      const response = await fetch(url, { headers: { "Content-Type": "application/json" }, ...options });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || response.statusText);
+      return payload;
+    }
+
+    function setMessage(element, text, kind="") {
+      element.textContent = text;
+      element.className = `status ${kind}`.trim();
+    }
+
+    async function choosePackFolder() {
+      const current = byId("packPath").value.trim();
+      const payload = await jsonFetch(`/api/dialog?kind=folder&current=${encodeURIComponent(current)}`);
+      if (payload.path) byId("packPath").value = payload.path;
+    }
+
+    async function loadPack() {
+      const path = byId("packPath").value.trim();
+      if (!path) return setMessage(byId("packStatus"), "Choose a review-pack folder first.", "warn");
+      setMessage(byId("packStatus"), "Loading review pack…");
+      try {
+        const payload = await jsonFetch("/api/learning/open-pack", {
+          method: "POST", body: JSON.stringify({ path })
+        });
+        state.packId = payload.pack_id;
+        state.clusters = payload.clusters || [];
+        state.clusterIndex = 0;
+        state.decisionPath = "";
+        byId("clusterCard").hidden = !state.clusters.length;
+        setMessage(byId("packStatus"), `Loaded ${payload.cluster_count} clusters and ${payload.member_count} sounds.`, "good");
+        renderCluster();
+      } catch (error) {
+        setMessage(byId("packStatus"), error.message, "warn");
+      }
+    }
+
+    function currentCluster() { return state.clusters[state.clusterIndex] || null; }
+
+    function renderCluster() {
+      const cluster = currentCluster();
+      if (!cluster) return;
+      state.decisionPath = "";
+      byId("importApproval").disabled = true;
+      setMessage(byId("decisionStatus"), "Listen first, then choose the category you trust.");
+      byId("clusterPosition").textContent = `${state.clusterIndex + 1} of ${state.clusters.length}`;
+      byId("clusterTitle").textContent = cluster.cluster_id;
+      byId("clusterSubtitle").textContent = `${cluster.structure_bucket} · ${cluster.broad_measured_family}`;
+      byId("clusterFacts").innerHTML = [
+        `${cluster.member_count} total`, `${cluster.safe_core_count} safe`,
+        `${cluster.boundary_count} boundary`, `${cluster.outlier_count} outlier`
+      ].map(text => `<span class="pill">${escapeHtml(text)}</span>`).join("");
+      byId("representatives").innerHTML = (cluster.representatives || []).map(row => `
+        <div class="listen-card"><strong>${escapeHtml(row.role)}</strong>
+          <audio controls preload="metadata" src="${encodeURI(row.audio_url)}"></audio></div>
+      `).join("");
+      const suggestions = cluster.suggested_detailed_categories || [];
+      byId("suggestions").innerHTML = suggestions.length
+        ? `Suggestions only: ${suggestions.map(label => `<button class="suggestion" data-label="${escapeAttr(label)}">${escapeHtml(label)}</button>`).join(" ")}`
+        : "No detailed suggestion. Choose by listening.";
+      byId("approvedCategory").value = suggestions[0] || cluster.suggested_parent_category || "";
+      byId("technicalEvidence").textContent = [
+        `Mean similarity: ${Number(cluster.mean_similarity || 0).toFixed(3)}`,
+        `Cluster radius: ${Number(cluster.radius_p95 || 0).toFixed(3)}`,
+        `Novelty: ${Number(cluster.novelty_score || 0).toFixed(3)}`,
+        `Model disagreement: ${Number(cluster.conflict_score || 0).toFixed(3)}`
+      ].join(" · ");
+      byId("previousCluster").disabled = state.clusterIndex <= 0;
+      byId("nextCluster").disabled = state.clusterIndex >= state.clusters.length - 1;
+    }
+
+    async function saveDecision(action) {
+      const cluster = currentCluster();
+      if (!cluster) return;
+      const approvedCategory = byId("approvedCategory").value.trim();
+      setMessage(byId("decisionStatus"), "Saving explicit decision…");
+      try {
+        const payload = await jsonFetch("/api/learning/decision", {
+          method: "POST",
+          body: JSON.stringify({
+            pack_id: state.packId, cluster_id: cluster.cluster_id, action,
+            approved_category: approvedCategory, reviewed_by: "Aaron"
+          })
+        });
+        state.decisionPath = payload.decision_path || "";
+        byId("importApproval").disabled = !payload.training_ready;
+        setMessage(byId("decisionStatus"), payload.message, "good");
+      } catch (error) {
+        setMessage(byId("decisionStatus"), error.message, "warn");
+      }
+    }
+
+    async function importApproval() {
+      if (!state.decisionPath) return;
+      byId("importApproval").disabled = true;
+      setMessage(byId("decisionStatus"), "Adding approved audio to the training inbox…");
+      try {
+        const payload = await jsonFetch("/api/learning/import", {
+          method: "POST", body: JSON.stringify({ decision_path: state.decisionPath })
+        });
+        setMessage(byId("decisionStatus"), payload.message, "good");
+        loadCoverage();
+      } catch (error) {
+        byId("importApproval").disabled = false;
+        setMessage(byId("decisionStatus"), error.message, "warn");
+      }
+    }
+
+    async function loadCoverage() {
+      setMessage(byId("coverageStatus"), "Loading coverage…");
+      try {
+        const payload = await jsonFetch("/api/learning/coverage");
+        state.coverage = payload.categories || [];
+        const calibration = payload.calibration || {};
+        byId("coverageSummary").textContent = `${payload.category_count} selectable categories · Tiers ${JSON.stringify(payload.tier_counts)} · Calibration ${calibration.status || "not built"}`;
+        byId("categoryOptions").innerHTML = state.coverage.map(row => `<option value="${escapeAttr(row.path)}"></option>`).join("");
+        renderCoverage();
+        renderCalibration(calibration);
+        setMessage(byId("coverageStatus"), "Coverage is based on approved examples, prototypes, and held-out evidence—not folder popularity.", "good");
+      } catch (error) {
+        setMessage(byId("coverageStatus"), error.message, "warn");
+      }
+    }
+
+    function renderCoverage() {
+      const query = byId("coverageSearch").value.trim().toLowerCase();
+      const needsWork = byId("needsWorkOnly").checked;
+      const rows = state.coverage.filter(row => {
+        if (needsWork && row.readiness_tier === "A") return false;
+        return !query || row.path.toLowerCase().includes(query);
+      });
+      byId("coverageRows").innerHTML = rows.map(row => `
+        <tr><td><div class="tier">${escapeHtml(row.readiness_tier)}</div></td>
+        <td><strong>${escapeHtml(row.path)}</strong><div class="small">${escapeHtml((row.common_confusions || []).join(", "))}</div></td>
+        <td>${Number(row.training_example_count || 0)} / ${Number(row.prototype_count || 0)} prototypes</td>
+        <td>${Number(row.heldout_example_count || 0)}${row.heldout_top1_accuracy === null ? "" : ` · ${Math.round(100 * row.heldout_top1_accuracy)}%`}</td>
+        <td>${escapeHtml(row.readiness_reason)}</td></tr>
+      `).join("");
+    }
+
+    function renderCalibration(status) {
+      const reviewed = Number(status.reviewed_unique_hash_count || 0);
+      const accepted = Number(status.accepted_count || 0);
+      const rejected = Number(status.rejected_count || 0);
+      const message = status.status === "built"
+        ? `Calibration ready: ${reviewed} reviewed sounds (${accepted} accepted, ${rejected} corrected).`
+        : `${reviewed} reviewed sounds (${accepted} accepted, ${rejected} corrected). ${status.message || "More mixed outcomes are needed."}`;
+      setMessage(byId("calibrationStatus"), message, status.status === "built" ? "good" : "warn");
+    }
+
+    async function rebuildCalibration() {
+      setMessage(byId("calibrationStatus"), "Checking reviewed outcomes…");
+      try {
+        const payload = await jsonFetch("/api/learning/rebuild-calibration", { method: "POST", body: "{}" });
+        renderCalibration(payload);
+        loadCoverage();
+      } catch (error) {
+        setMessage(byId("calibrationStatus"), error.message, "warn");
+      }
+    }
+
+    async function rebuildPrototypes() {
+      byId("rebuildPrototypes").disabled = true;
+      setMessage(byId("prototypeStatus"), "Starting the neural rebuild…");
+      try {
+        const job = await jsonFetch("/api/learning/rebuild-prototypes", { method: "POST", body: "{}" });
+        await pollPrototypeRebuild(job.job_id);
+      } catch (error) {
+        byId("rebuildPrototypes").disabled = false;
+        setMessage(byId("prototypeStatus"), error.message, "warn");
+      }
+    }
+
+    async function pollPrototypeRebuild(jobId) {
+      try {
+        const job = await jsonFetch(`/api/learning/rebuild-job/${encodeURIComponent(jobId)}`);
+        const suffix = job.error ? ` ${job.error}` : "";
+        setMessage(byId("prototypeStatus"), `${job.message}${suffix}`, job.status === "done" ? "good" : job.status === "error" ? "warn" : "");
+        if (["queued", "running"].includes(job.status)) {
+          window.setTimeout(() => pollPrototypeRebuild(jobId), 900);
+          return;
+        }
+        byId("rebuildPrototypes").disabled = false;
+        if (job.status === "done") loadCoverage();
+      } catch (error) {
+        byId("rebuildPrototypes").disabled = false;
+        setMessage(byId("prototypeStatus"), error.message, "warn");
+      }
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "").replace(/[&<>"']/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[char]);
+    }
+    function escapeAttr(value) { return escapeHtml(value); }
+
+    byId("choosePack").addEventListener("click", choosePackFolder);
+    byId("loadPack").addEventListener("click", loadPack);
+    byId("previousCluster").addEventListener("click", () => { state.clusterIndex--; renderCluster(); });
+    byId("nextCluster").addEventListener("click", () => { state.clusterIndex++; renderCluster(); });
+    byId("approveSafeCore").addEventListener("click", () => saveDecision("approve_safe_core"));
+    byId("importApproval").addEventListener("click", importApproval);
+    document.querySelectorAll("[data-cluster-action]").forEach(button => button.addEventListener("click", () => saveDecision(button.dataset.clusterAction)));
+    byId("suggestions").addEventListener("click", event => {
+      const button = event.target.closest("button[data-label]");
+      if (button) byId("approvedCategory").value = button.dataset.label;
+    });
+    byId("coverageSearch").addEventListener("input", renderCoverage);
+    byId("needsWorkOnly").addEventListener("change", renderCoverage);
+    byId("refreshCoverage").addEventListener("click", loadCoverage);
+    byId("rebuildCalibration").addEventListener("click", rebuildCalibration);
+    byId("rebuildPrototypes").addEventListener("click", rebuildPrototypes);
+    loadCoverage();
+  </script>
+</body>
+</html>
