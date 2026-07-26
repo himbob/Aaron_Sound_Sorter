@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import os
+import sys
+import types
 from pathlib import Path
 
 import numpy as np
 import soundfile as sf
 
-from aaron_sound_sorter.neural_audio.panns_provider import PannsProvider
+from aaron_sound_sorter.neural_audio.panns_provider import OfficialPannsBackend, PannsProvider
 
 
 class FakePannsBackend:
@@ -52,3 +55,63 @@ def test_panns_provider_requires_positive_segment_configuration(tmp_path: Path) 
         assert "segment configuration" in str(exc)
     else:
         raise AssertionError("invalid segment configuration should fail")
+
+
+def test_official_panns_backend_allows_pinned_legacy_checkpoint_on_modern_torch(
+    monkeypatch, tmp_path: Path
+) -> None:
+    seen = {}
+
+    class FakeAudioTagging:
+        def __init__(self, *, checkpoint_path: str, device: str) -> None:
+            seen["checkpoint_path"] = checkpoint_path
+            seen["device"] = device
+            seen["legacy_load"] = os.environ.get("TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD")
+
+        def inference(self, waveform_batch: np.ndarray):
+            return np.zeros((len(waveform_batch), 2), dtype=np.float32), None
+
+    fake_module = types.ModuleType("panns_inference")
+    fake_module.AudioTagging = FakeAudioTagging
+    monkeypatch.setitem(sys.modules, "panns_inference", fake_module)
+    monkeypatch.delenv("TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD", raising=False)
+
+    checkpoint = tmp_path / "panns.pth"
+    checkpoint.write_bytes(b"pinned-test-checkpoint")
+    backend = OfficialPannsBackend(
+        checkpoint_path=checkpoint,
+        labels=("Speech", "Music"),
+        device="cpu",
+    )
+
+    assert backend.labels == ("Speech", "Music")
+    assert seen == {
+        "checkpoint_path": str(checkpoint),
+        "device": "cpu",
+        "legacy_load": "1",
+    }
+    assert "TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD" not in os.environ
+
+
+def test_official_panns_backend_restores_existing_torch_load_setting(
+    monkeypatch, tmp_path: Path
+) -> None:
+    seen = []
+
+    class FakeAudioTagging:
+        def __init__(self, *, checkpoint_path: str, device: str) -> None:
+            seen.append(os.environ.get("TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"))
+
+    fake_module = types.ModuleType("panns_inference")
+    fake_module.AudioTagging = FakeAudioTagging
+    monkeypatch.setitem(sys.modules, "panns_inference", fake_module)
+    monkeypatch.setenv("TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD", "existing-value")
+
+    OfficialPannsBackend(
+        checkpoint_path=tmp_path / "panns.pth",
+        labels=("Speech",),
+        device="cpu",
+    )
+
+    assert seen == ["1"]
+    assert os.environ["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] == "existing-value"

@@ -467,7 +467,7 @@ def write_product_manifest(
                 "",
                 "This archive contains active runtime brains, selected neural model snapshots, and compact prototype indexes only.",
                 "It intentionally excludes application source, reports, virtual environments, training audio, test audio, caches, backups, and archives.",
-                "CLAP and MERT remain shadow-only and do not own production placement.",
+                "CLAP, MERT, and PANNs remain shadow-only and do not own production placement.",
             ]
         )
     else:
@@ -484,7 +484,7 @@ def write_product_manifest(
                 "./commands/gui/RUN_SORTER_GUI.command",
                 "```",
                 "",
-                "The trained runtime brains are included. CLAP and MERT remain shadow-only and do not own production placement.",
+                "The trained runtime brains are included. CLAP, MERT, and PANNs remain shadow-only and do not own production placement.",
                 "Training audio, reports, virtual environments, test audio, caches, backups, and archived artifacts are excluded. Python test code is included.",
             ]
         )

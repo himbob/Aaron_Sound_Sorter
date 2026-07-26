@@ -192,8 +192,23 @@ class OfficialPannsBackend:
             from panns_inference import AudioTagging
         except ImportError as exc:
             raise RuntimeError("PANNs requires panns-inference==0.1.1") from exc
-        with redirect_stdout(io.StringIO()):
-            self._model = AudioTagging(checkpoint_path=str(checkpoint_path), device=device)
+        # ``panns-inference==0.1.1`` predates PyTorch 2.6, where ``torch.load``
+        # changed its default to ``weights_only=True``. The official PANNs wheel
+        # does not pass that argument, so modern PyTorch can reject the pinned
+        # legacy checkpoint before inference starts. The provider verifies the
+        # exact checkpoint SHA-256 before constructing this backend, so permit
+        # the legacy full checkpoint load only for this narrow construction
+        # window, then restore the caller's environment unchanged.
+        previous_legacy_load = os.environ.get("TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD")
+        os.environ["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
+        try:
+            with redirect_stdout(io.StringIO()):
+                self._model = AudioTagging(checkpoint_path=str(checkpoint_path), device=device)
+        finally:
+            if previous_legacy_load is None:
+                os.environ.pop("TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD", None)
+            else:
+                os.environ["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = previous_legacy_load
 
     def infer(self, waveform_batch: np.ndarray) -> np.ndarray:
         """Run deterministic clip-level AudioSet tagging."""

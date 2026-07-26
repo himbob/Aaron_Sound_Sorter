@@ -45,15 +45,48 @@ def test_neural_explanation_distinguishes_memory_clap_and_authority() -> None:
     lines = neural_evidence_lines(_row())
 
     assert lines[0].startswith("Your trained memory: exact human-approved audio match")
-    assert lines[1] == "CLAP broad hearing: brass instrument (clear signal; this is not a probability)."
+    assert lines[1] == (
+        "CLAP broad hearing: brass instrument (raw score 0.310; clear signal; this is not a probability)."
+    )
     assert "experimental; advice only" in lines[2]
     assert "alto saxophone one shot" in lines[3]
     assert lines[4] == "PANNs broad events (raw scores; advice only): Saxophone 0.88; Music 0.74."
     assert lines[-1].startswith("Neural result: sent to Review")
 
 
-def test_neural_explanation_reports_unavailable_runtime() -> None:
+def test_neural_explanation_reports_each_lane_independently() -> None:
     row = _row()
     row.neural_known_distribution = None
+    row.neural_semantic_family = ""
+    row.neural_prompt_status = "unavailable"
+    row.neural_prompt_suggestions = []
+    row.panns_status = "unavailable"
+    row.panns_events = []
 
-    assert neural_evidence_lines(row) == ["Neural audio: unavailable for this preview."]
+    lines = neural_evidence_lines(row)
+
+    assert lines[0] == "Your trained memory: No Result."
+    assert lines[1] == "CLAP broad hearing: No Result."
+    assert lines[2] == "CLAP detailed suggestions: No Result; they did not affect sorting."
+    assert lines[3] == "PANNs broad events: No Result."
+
+
+def test_neural_explanation_keeps_extremely_weak_raw_guesses_visible() -> None:
+    row = _row()
+    row.neural_semantic_family = "fx_texture"
+    row.neural_semantic_score = 0.004
+    row.neural_semantic_margin = 0.001
+    row.panns_events = [
+        {"label": "Music", "score": 0.006},
+        {"label": "Sound effect", "score": 0.002},
+    ]
+    row.panns_support_score = 0.0
+    row.panns_contradiction_score = 0.0
+
+    lines = neural_evidence_lines(row)
+
+    assert lines[1] == (
+        "CLAP broad hearing: texture, drone, or ambience FX "
+        "(raw score 0.004; weak signal; this is not a probability)."
+    )
+    assert lines[4] == "PANNs broad events (raw scores; advice only): Music 0.01; Sound effect 0.00."

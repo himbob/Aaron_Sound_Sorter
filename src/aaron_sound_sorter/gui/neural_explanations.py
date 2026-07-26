@@ -33,9 +33,7 @@ SEMANTIC_FAMILY_NAMES = {
 
 
 def neural_evidence_lines(row: PreviewRow) -> list[str]:
-    """Return concise explanations of memory, CLAP, and final authority."""
-    if row.neural_known_distribution is None:
-        return ["Neural audio: unavailable for this preview."]
+    """Return one independent status line for every neural evidence lane."""
     return [
         neural_memory_summary(row),
         broad_clap_summary(row),
@@ -48,7 +46,9 @@ def neural_evidence_lines(row: PreviewRow) -> list[str]:
 
 def neural_memory_summary(row: PreviewRow) -> str:
     """Explain the trained prototype-memory result without model jargon."""
-    label = row.neural_folder or "no category"
+    if row.neural_known_distribution is None:
+        return "Your trained memory: No Result."
+    label = row.neural_folder or "No Result"
     if row.neural_exact_training_match:
         return f"Your trained memory: exact human-approved audio match → {label}."
     if row.neural_ownership_ready:
@@ -69,8 +69,10 @@ def neural_memory_summary(row: PreviewRow) -> str:
 
 
 def broad_clap_summary(row: PreviewRow) -> str:
-    """Explain independent broad CLAP evidence as a signal, not confidence."""
-    family = SEMANTIC_FAMILY_NAMES.get(row.neural_semantic_family, row.neural_semantic_family or "no opinion")
+    """Show CLAP's nearest broad guess whenever inference returned one."""
+    if not row.neural_semantic_family:
+        return "CLAP broad hearing: No Result."
+    family = SEMANTIC_FAMILY_NAMES.get(row.neural_semantic_family, row.neural_semantic_family)
     if row.neural_semantic_score < 0.10:
         signal = "weak"
     elif row.neural_semantic_margin >= 0.06:
@@ -79,28 +81,29 @@ def broad_clap_summary(row: PreviewRow) -> str:
         signal = "mixed"
     else:
         signal = "close call"
-    return f"CLAP broad hearing: {family} ({signal} signal; this is not a probability)."
+    return (
+        f"CLAP broad hearing: {family} (raw score {row.neural_semantic_score:.3f}; "
+        f"{signal} signal; this is not a probability)."
+    )
 
 
 def detailed_clap_lines(row: PreviewRow) -> list[str]:
     """Format experimental detailed prompt suggestions for human review."""
-    if row.neural_prompt_status != "advisory_only":
-        return ["CLAP detailed suggestions: unavailable; they did not affect sorting."]
+    if row.neural_prompt_status != "advisory_only" or not row.neural_prompt_suggestions:
+        return ["CLAP detailed suggestions: No Result; they did not affect sorting."]
     lines = ["CLAP detailed suggestions (experimental; advice only):"]
     for suggestion in row.neural_prompt_suggestions[:3]:
         path = str(suggestion.get("path", ""))
         audible_prompt = str(suggestion.get("top_positive_prompt", ""))
         explanation = f' — matched "{audible_prompt}"' if audible_prompt else ""
         lines.append(f"  - {path}{explanation}")
-    if len(lines) == 1:
-        lines.append("  - no detailed suggestion")
     return lines
 
 
 def panns_summary(row: PreviewRow) -> str:
-    """Format independent broad AudioSet events without implying probability."""
-    if row.panns_status != "advisory_only" or not row.panns_events:
-        return "PANNs broad events: unavailable; they did not affect sorting."
+    """Show PANNs' nearest raw events whenever inference returned any."""
+    if not row.panns_events:
+        return "PANNs broad events: No Result."
     event_text = "; ".join(
         f"{event.get('label', '')} {float(event.get('score', 0.0)):.2f}" for event in row.panns_events[:5]
     )

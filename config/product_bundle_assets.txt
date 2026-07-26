@@ -32,6 +32,7 @@ optional-file stage4_folder_brain_harmonic_outlier_baby.json
 # committed with Git LFS. Neural category ownership remains shadow-only.
 model-dir _models/laion_larger_clap_music_and_speech
 model-dir _models/mert_v1_95m_7d1bb4c
+model-dir _models/panns_cnn14
 
 # Compact runtime neural indexes. Development embedding caches, curation runs,
 # GUI inboxes, quarantine data, and reports are intentionally not distributed.

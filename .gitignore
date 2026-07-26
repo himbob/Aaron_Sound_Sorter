@@ -50,6 +50,8 @@ _models/*
 !_models/laion_larger_clap_music_and_speech/**
 !_models/mert_v1_95m_7d1bb4c/
 !_models/mert_v1_95m_7d1bb4c/**
+!_models/panns_cnn14/
+!_models/panns_cnn14/**
 _models/**/.cache/
 _models/**/cache/
 _models/**/logs/

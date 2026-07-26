@@ -79,6 +79,9 @@ def test_web_gui_shell_contains_core_controls() -> None:
     assert "Technical details" in html
     assert "Choose the Correct Folder" in html
     assert "neural_explanation_lines" in html
+    assert "CLAP: No Result." in html
+    assert "PANNs: No Result." in html
+    assert "raw score" in html
     assert "categoryModal" in html
     assert "Choose Approved Folder" in html
     assert "Apply Approved Folder" in html
@@ -191,7 +194,12 @@ def test_session_payload_preserves_preview_rows() -> None:
         "Drums/Kick Drums/Generic Kick/One Shots",
         "FX/Impacts and Hits/Boom/One Shots",
     ]
-    assert payload["rows"][0]["neural_explanation_lines"] == ["Neural audio: unavailable for this preview."]
+    assert payload["rows"][0]["neural_explanation_lines"][:4] == [
+        "Your trained memory: No Result.",
+        "CLAP broad hearing: No Result.",
+        "CLAP detailed suggestions: No Result; they did not affect sorting.",
+        "PANNs broad events: No Result.",
+    ]
 
 
 def test_apply_overrides_updates_approved_folder_only() -> None:

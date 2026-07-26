@@ -21,7 +21,7 @@ The default build produces:
 
 2. `Aaron_Sound_Sorter_End_User_Pack_<timestamp>_Part_XX_of_YY.zip`
    - a balanced multipart end-user pack;
-   - all parts together contain the code archive, active trained brains, selected CLAP/MERT snapshots, and prototype indexes;
+   - all parts together contain the code archive, active trained brains, selected CLAP/MERT/PANNs snapshots, and prototype indexes;
    - every finished part stays below `BUNDLE_UPLOAD_PART_MAX_MIB`, which defaults to 490 MiB.
 
 The multipart pack names make it obvious that every file belongs to one set.
@@ -34,7 +34,7 @@ folder.
 
 The code and AI-runtime archives both use ZIP DEFLATE level 9. GZIP uses the
 same DEFLATE compression family, so changing from ZIP to `.tar.gz` does not
-meaningfully shrink dense CLAP/MERT model weights. The reliable fix is balanced
+meaningfully shrink dense CLAP/MERT/PANNs model weights. The reliable fix is balanced
 multipart packaging.
 
 Default maximum part size:

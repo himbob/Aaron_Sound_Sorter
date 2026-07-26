@@ -1885,14 +1885,18 @@ function refreshSelectedRowDetails({ preserveDisclosureState = false } = {}) {
     } else {
       memory = `Memory: unfamiliar audio; nearest guess is ${row.neural_folder || "unclear"}.`;
     }
-    const clapFamily = String(row.neural_semantic_family || "no clear family").replaceAll("_", " ");
-    const clap = `CLAP: broad hearing says ${clapFamily}${Number(row.neural_semantic_margin || 0) < 0.025 ? " (close call)" : ""}.`;
+    const clapFamilyRaw = String(row.neural_semantic_family || "").trim();
+    const clap = clapFamilyRaw
+      ? `CLAP: nearest guess is ${clapFamilyRaw.replaceAll("_", " ")} `
+        + `(raw score ${Number(row.neural_semantic_score || 0).toFixed(3)}`
+        + `${Number(row.neural_semantic_margin || 0) < 0.025 ? "; weak close call" : ""}).`
+      : "CLAP: No Result.";
     const pannsEvents = Array.isArray(row.panns_events)
-      ? row.panns_events.slice(0, 3).map(event => event.label).filter(Boolean)
+      ? row.panns_events.slice(0, 5).filter(event => event && event.label)
       : [];
     const panns = pannsEvents.length
-      ? `PANNs: heard ${pannsEvents.join(", ")}.`
-      : "PANNs: no useful independent event result.";
+      ? `PANNs: nearest events are ${pannsEvents.map(event => `${event.label} ${Number(event.score || 0).toFixed(3)}`).join(", ")}.`
+      : "PANNs: No Result.";
     return [memory, clap, panns];
   }
 

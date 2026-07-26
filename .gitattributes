@@ -3,7 +3,7 @@
 # Git objects.
 _models/laion_larger_clap_music_and_speech/** filter=lfs diff=lfs merge=lfs -text
 _models/mert_v1_95m_7d1bb4c/** filter=lfs diff=lfs merge=lfs -text
-
+_models/panns_cnn14/** filter=lfs diff=lfs merge=lfs -text
 # Compact indexes are normally small, but large binary forms should also use LFS.
 neural_artifacts/prototype_indexes/**/*.npy filter=lfs diff=lfs merge=lfs -text
 neural_artifacts/prototype_indexes/**/*.npz filter=lfs diff=lfs merge=lfs -text
@@ -12,6 +12,5 @@ neural_artifacts/prototype_indexes/**/*.pth filter=lfs diff=lfs merge=lfs -text
 neural_artifacts/prototype_indexes/**/*.bin filter=lfs diff=lfs merge=lfs -text
 neural_artifacts/prototype_indexes/**/*.safetensors filter=lfs diff=lfs merge=lfs -text
 neural_artifacts/prompt_indexes/**/*.npz filter=lfs diff=lfs merge=lfs -text
-
 # Active trained brains are runtime assets, not useful line-by-line Git diffs.
 stage4_*brain*.json filter=lfs diff=lfs merge=lfs -text

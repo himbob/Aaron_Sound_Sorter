@@ -8,7 +8,7 @@ set -euo pipefail
 #      Small source/review archive without trained runtime assets.
 #   2. Aaron_Sound_Sorter_End_User_Pack_<timestamp>_Part_XX_of_YY.zip
 #      Balanced upload-safe parts. Together they contain the code archive,
-#      active brains, selected CLAP/MERT snapshots, and prototype indexes.
+#      active brains, selected CLAP/MERT/PANNs snapshots, and prototype indexes.
 #
 # Extract every End_User_Pack part into one folder and run the included
 # ASSEMBLE_AND_INSTALL.command. The pack parts are balanced below the configured

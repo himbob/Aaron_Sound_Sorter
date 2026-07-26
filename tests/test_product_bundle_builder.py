@@ -33,6 +33,7 @@ def make_project(tmp_path: Path) -> Path:
             "optional-file stage4_folder_brain_core_baby.json",
             "model-dir _models/laion_larger_clap_music_and_speech",
             "model-dir _models/mert_v1_95m_7d1bb4c",
+            "model-dir _models/panns_cnn14",
             "artifact-dir neural_artifacts/prototype_indexes",
         )
     )
@@ -48,12 +49,15 @@ def make_project(tmp_path: Path) -> Path:
 
     clap_dir = project_root / "_models" / "laion_larger_clap_music_and_speech"
     mert_dir = project_root / "_models" / "mert_v1_95m_7d1bb4c"
+    panns_dir = project_root / "_models" / "panns_cnn14"
     prototype_dir = project_root / "neural_artifacts" / "prototype_indexes"
     embedding_cache = project_root / "neural_artifacts" / "embedding_cache"
-    for directory in (clap_dir, mert_dir, prototype_dir, embedding_cache):
+    for directory in (clap_dir, mert_dir, panns_dir, prototype_dir, embedding_cache):
         directory.mkdir(parents=True, exist_ok=True)
     (clap_dir / "model.safetensors").write_bytes(b"clap")
     (mert_dir / "pytorch_model.bin").write_bytes(b"mert")
+    (panns_dir / "Cnn14_mAP=0.431.pth").write_bytes(b"panns")
+    (panns_dir / "class_labels_indices.csv").write_text("index,mid,display_name\n", encoding="utf-8")
     (prototype_dir / "runtime_index.npz").write_bytes(b"index")
     (embedding_cache / "development_cache.npy").write_bytes(b"cache")
     return project_root
@@ -83,6 +87,8 @@ def test_product_selection_includes_live_runtime_assets_and_test_code(tmp_path: 
     assert "stage4_folder_brain_backup_2026.json" not in selected_paths
     assert "_models/laion_larger_clap_music_and_speech/model.safetensors" in selected_paths
     assert "_models/mert_v1_95m_7d1bb4c/pytorch_model.bin" in selected_paths
+    assert "_models/panns_cnn14/Cnn14_mAP=0.431.pth" in selected_paths
+    assert "_models/panns_cnn14/class_labels_indices.csv" in selected_paths
     assert "neural_artifacts/prototype_indexes/runtime_index.npz" in selected_paths
     assert "neural_artifacts/embedding_cache/development_cache.npy" not in selected_paths
     assert "_reports/gui_preview/report.txt" not in selected_paths
@@ -117,6 +123,8 @@ def test_written_zip_contains_no_generated_or_backup_payload(tmp_path: Path) -> 
     assert "Aaron_Product_Test/stage4_folder_brain.json" in names
     assert "Aaron_Product_Test/tests/test_app.py" in names
     assert "Aaron_Product_Test/_models/laion_larger_clap_music_and_speech/model.safetensors" in names
+    assert "Aaron_Product_Test/_models/panns_cnn14/Cnn14_mAP=0.431.pth" in names
+    assert "Aaron_Product_Test/_models/panns_cnn14/class_labels_indices.csv" in names
     assert not any("_reports/gui_preview" in name for name in names)
     assert not any("embedding_cache" in name for name in names)
     assert not any(name.endswith("large_fixture.wav") for name in names)
