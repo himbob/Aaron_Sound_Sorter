@@ -9,6 +9,9 @@ from typing import Any
 
 from aaron_sound_sorter.taxonomy_registry import TaxonomyRegistry
 
+CORROBORATING_EVENT_FLOOR = 0.05
+CORROBORATING_EVENT_THRESHOLD = 0.25
+
 
 @dataclass(frozen=True)
 class PannsEventScore:
@@ -90,6 +93,8 @@ class PannsMappingRegistry:
         """Map raw broad events to support or contradiction for a candidate."""
         supporting: list[PannsEventScore] = []
         contradicting: list[PannsEventScore] = []
+        weak_supporting: list[PannsEventScore] = []
+        weak_contradicting: list[PannsEventScore] = []
         neutral: list[PannsEventScore] = []
         for event in events:
             mapping = self.mappings.get(event.label)
@@ -97,18 +102,32 @@ class PannsMappingRegistry:
                 continue
             if mapping.neutral or mapping.ambiguous:
                 neutral.append(event)
-            elif event.score < mapping.minimum_support_score:
-                continue
             elif _matches_any_prefix(candidate_label, mapping.supports):
-                supporting.append(event)
+                if event.score >= mapping.minimum_support_score:
+                    supporting.append(event)
+                elif event.score >= CORROBORATING_EVENT_FLOOR:
+                    weak_supporting.append(event)
             elif _matches_any_prefix(candidate_label, mapping.contradicts):
-                contradicting.append(event)
+                if event.score >= mapping.minimum_support_score:
+                    contradicting.append(event)
+                elif event.score >= CORROBORATING_EVENT_FLOOR:
+                    weak_contradicting.append(event)
             else:
                 neutral.append(event)
+        support_score = max((event.score for event in supporting), default=0.0)
+        contradiction_score = max((event.score for event in contradicting), default=0.0)
+        corroborating_support = _corroborating_score(weak_supporting)
+        corroborating_contradiction = _corroborating_score(weak_contradicting)
+        if len(weak_supporting) >= 2 and corroborating_support >= CORROBORATING_EVENT_THRESHOLD:
+            supporting.extend(weak_supporting)
+            support_score = max(support_score, corroborating_support)
+        if len(weak_contradicting) >= 2 and corroborating_contradiction >= CORROBORATING_EVENT_THRESHOLD:
+            contradicting.extend(weak_contradicting)
+            contradiction_score = max(contradiction_score, corroborating_contradiction)
         return PannsMappedEvidence(
             candidate_label=candidate_label,
-            support_score=max((event.score for event in supporting), default=0.0),
-            contradiction_score=max((event.score for event in contradicting), default=0.0),
+            support_score=support_score,
+            contradiction_score=contradiction_score,
             supporting_events=tuple(sorted(supporting, key=lambda row: (-row.score, row.label))),
             contradicting_events=tuple(sorted(contradicting, key=lambda row: (-row.score, row.label))),
             neutral_events=tuple(sorted(neutral, key=lambda row: (-row.score, row.label))),
@@ -127,6 +146,14 @@ def _validate_mapping_prefixes(mapping: PannsEventMapping, taxonomy: TaxonomyReg
 
 def _matches_any_prefix(candidate_label: str, prefixes: tuple[str, ...]) -> bool:
     return any(candidate_label == prefix or candidate_label.startswith(f"{prefix}/") for prefix in prefixes)
+
+
+def _corroborating_score(events: list[PannsEventScore]) -> float:
+    """Combine several weak, related event scores without treating them as labels."""
+    remaining_probability = 1.0
+    for event in events:
+        remaining_probability *= 1.0 - max(0.0, min(1.0, event.score))
+    return 1.0 - remaining_probability
 
 
 def _string_tuple(payload: Any) -> tuple[str, ...]:

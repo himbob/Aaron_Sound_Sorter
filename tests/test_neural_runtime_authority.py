@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from aaron_sound_sorter.domain.models import (
     AudioPhysics,
@@ -175,24 +176,37 @@ def test_exact_human_match_is_not_blocked_by_generalization_calibration() -> Non
     assert updated.decision.consensus_status == "neural_production_owner"
 
 
-def test_cli_exact_voice_memory_with_decisive_nonvoice_audio_goes_to_review() -> None:
+@pytest.mark.parametrize(
+    "approved_label",
+    [
+        "Drums/Snares/Generic Snare/One Shots",
+        "Instruments/Synths/Synth Pad/Loops",
+        "Instruments/Voice/Vocal Loops/Loops",
+        "FX/Human and Voice FX/Altered Voice/Long FX",
+    ],
+)
+def test_cli_exact_user_training_overrides_advisory_disagreement_for_every_family(
+    approved_label: str,
+) -> None:
     updated = apply_neural_prediction_to_result(
         _result("FX/Impacts and Hits/Generic Impact/One Shots", loop_like=False),
         _prediction(
-            "Instruments/Voice/Voice Phrase One Shots/One Shots",
+            approved_label,
             ready=True,
             exact=True,
             reason="exact_human_training_match",
             semantic_family="fx_impact",
             semantic_top_score=0.24,
             semantic_family_scores={"fx_impact": 0.24, "human_voice": 0.11},
+            panns_contradiction_score=0.88,
+            panns_contradicting_events=(NeuralEventSuggestion("Saxophone", 0.88),),
         ),
     )
 
-    assert updated.decision.folder_path == "_TO_REVIEW/Measured Role Conflict"
-    assert updated.decision.consensus_status == "neural_semantic_family_conflict_review"
-    semantic = updated.facts.evidence["neural_runtime"]["semantic_compatibility"]
-    assert semantic["contradictory"] is True
+    assert updated.decision.folder_path == approved_label
+    assert updated.decision.consensus_status == "neural_production_owner"
+    assert updated.facts.evidence["neural_runtime"]["authority_action"] == ("exact_human_training_override")
+    assert updated.facts.evidence["neural_runtime"]["ownership_block_reason"] == ("exact_human_training_match")
 
 
 def test_cli_exact_voice_memory_with_voice_audio_keeps_ownership() -> None:
@@ -202,7 +216,7 @@ def test_cli_exact_voice_memory_with_voice_audio_keeps_ownership() -> None:
         _prediction(
             label,
             ready=True,
-            exact=True,
+            exact=False,
             reason="exact_human_training_match",
             semantic_family="human_voice",
             semantic_top_score=0.18,
@@ -234,7 +248,7 @@ def test_cli_panns_voice_support_prevents_weak_clap_veto() -> None:
     assert updated.decision.consensus_status == "neural_production_owner"
 
 
-def test_cli_panns_contradiction_blocks_exact_memory() -> None:
+def test_cli_panns_contradiction_cannot_veto_exact_user_training() -> None:
     updated = apply_neural_prediction_to_result(
         _result("_TO_REVIEW/Measured Owner Conflict"),
         _prediction(
@@ -246,8 +260,8 @@ def test_cli_panns_contradiction_blocks_exact_memory() -> None:
         ),
     )
 
-    assert updated.decision.folder_path == "_TO_REVIEW/Measured Role Conflict"
-    assert updated.decision.consensus_status == "neural_panns_family_conflict_review"
+    assert updated.decision.folder_path == "Instruments/Voice/Vocal Loops/Loops"
+    assert updated.decision.consensus_status == "neural_production_owner"
 
 
 def test_cli_neural_unready_cross_family_disagreement_forces_review() -> None:

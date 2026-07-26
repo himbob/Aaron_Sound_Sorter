@@ -57,3 +57,26 @@ def test_panns_speech_supports_voice_and_rejects_nonvoice_fx() -> None:
     assert voice.contradiction_score == 0.0
     assert glitch.support_score == 0.0
     assert glitch.contradiction_score == 0.73
+
+
+def test_panns_combines_several_quiet_voice_events() -> None:
+    root, taxonomy = _registry()
+    mappings = PannsMappingRegistry.load(root / "config" / "panns_audioset_mapping.json", taxonomy)
+    events = (
+        PannsEventScore("Singing", 0.13),
+        PannsEventScore("Yodeling", 0.11),
+        PannsEventScore("Speech", 0.09),
+        PannsEventScore("A capella", 0.09),
+    )
+
+    voice = mappings.evaluate(events, "FX/Human and Voice FX/Altered Voice/Long FX")
+    sax = mappings.evaluate(events, "Instruments/Woodwinds/Saxophone/Loops")
+
+    assert voice.support_score > 0.30
+    assert {event.label for event in voice.supporting_events} == {
+        "A capella",
+        "Singing",
+        "Speech",
+        "Yodeling",
+    }
+    assert sax.contradiction_score == voice.support_score

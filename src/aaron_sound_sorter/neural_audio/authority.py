@@ -109,6 +109,24 @@ def apply_neural_prediction_to_result(
         return result
 
     legacy_label = canonicalize_taxonomy_label(result.decision.folder_path or result.decision.final_label)
+    if prediction.ownership_ready and prediction.exact_training_match:
+        evidence["authority_action"] = "exact_human_training_override"
+        evidence["witness_policy"] = (
+            "CLAP semantics, PANNs events, and measured structure remain visible "
+            "diagnostics but cannot veto this exact explicit user correction."
+        )
+        reason = (
+            "This exact audio was explicitly taught by the user, so its source-name-blind "
+            f"content identity owns {neural_label}. Independent models remain advisory."
+        )
+        return _replace_decision(
+            result,
+            folder_path=neural_label,
+            final_top=neural_label.split("/", 1)[0],
+            consensus_status="neural_production_owner",
+            reason=reason,
+            neural_evidence=evidence,
+        )
     if prediction.ownership_ready and not prediction.exact_training_match and enabled_groups is not None:
         authority_group = category_authority_group(neural_label)
         evidence["limited_authority"] = {
@@ -605,6 +623,7 @@ def _prediction_evidence(prediction: NeuralRuntimePrediction) -> dict[str, Any]:
         "exact_training_match": prediction.exact_training_match,
         "ownership_ready": prediction.ownership_ready,
         "ownership_reason": prediction.ownership_block_reason,
+        "ownership_block_reason": prediction.ownership_block_reason,
         "semantic_family": prediction.semantic_family,
         "semantic_second_family": prediction.semantic_second_family,
         "semantic_top_score": prediction.semantic_top_score,

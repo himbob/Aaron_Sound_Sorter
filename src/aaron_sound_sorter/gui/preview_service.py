@@ -1164,10 +1164,10 @@ def apply_neural_runtime_authority(
 ) -> None:
     """Apply conservative category-wide neural ownership to GUI proposals.
 
-    Exact human-trained content or a supported, separated learned neighborhood
-    owns the proposal unless measured structure contradicts it. Weak or sparse
-    neural disagreements become Review across voice, instruments, drums, and
-    FX.
+    Exact human-trained content owns the proposal immediately. A supported,
+    separated learned neighborhood owns only after the independent safety
+    gates accept it. Weak or sparse neural disagreements become Review across
+    voice, instruments, drums, and FX.
     """
     predictions = {prediction.row_id: prediction for prediction in batch.predictions}
     calibration = load_optional_confidence_calibration(project_root) if project_root is not None else None
@@ -1277,6 +1277,17 @@ def _apply_neural_prediction(
 
     legacy_label = row.proposed_folder
     if prediction.ownership_ready:
+        if prediction.exact_training_match:
+            row.proposed_folder = neural_label
+            row.approved_folder = neural_label
+            row.final_top = neural_label.split("/", 1)[0]
+            row.consensus_status = "neural_known_distribution_owner"
+            row.confidence = 1.0
+            row.decision_reason = (
+                "This exact audio was explicitly taught by the user. Independent neural "
+                "witnesses remain visible diagnostics but cannot veto the correction."
+            )
+            return
         if neural_panns_contradicts(prediction):
             event_names = ", ".join(event.label for event in prediction.panns_contradicting_events[:3])
             row.neural_ownership_ready = False

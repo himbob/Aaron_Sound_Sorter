@@ -46,8 +46,8 @@ INBOX_FIELDS = (
 TRAINABLE_IMPORT_STATUSES = frozenset({"staged", "duplicate_existing"})
 DEFAULT_INBOX_ROOT = Path("neural_artifacts") / "gui_training_inbox"
 DEFAULT_TRAINING_CONFIG = Path("config") / "neural_training.json"
-EXACT_TRAINING_POLICY = "content_hash_approved_label_v1"
-LOCKED_SEED_OVERRIDE_CONFIRMATIONS = 2
+EXACT_TRAINING_POLICY = "latest_explicit_user_label_by_content_hash_v2"
+LOCKED_SEED_OVERRIDE_CONFIRMATIONS = 1
 
 
 @dataclass(frozen=True)
@@ -104,10 +104,11 @@ class CorrectionPrediction:
 
 @dataclass(frozen=True)
 class PendingTrainingConflict:
-    """One GUI relabel awaiting deliberate confirmation.
+    """Compatibility record for an unresolved legacy training conflict.
 
-    A single GUI click must not silently replace a locked human seed for the
-    same decoded audio. Repeating the same explicit relabel confirms intent.
+    Explicit GUI corrections currently require one approval and therefore
+    supersede an older locked seed immediately. The record remains part of the
+    build contract so older reports can still be loaded.
     """
 
     file_sha256: str
@@ -784,11 +785,11 @@ def _partition_confirmed_inbox_rows(
     base_rows: Sequence[Mapping[str, str]],
     inbox_rows: Sequence[Mapping[str, str]],
 ) -> tuple[list[Mapping[str, str]], tuple[PendingTrainingConflict, ...]]:
-    """Hold a one-click relabel when it conflicts with a locked training seed.
+    """Apply the latest explicit GUI label over an older locked training seed.
 
-    The comparison uses content identity plus explicit supervised labels. A
-    second identical GUI approval confirms that the user intends to replace
-    the older locked label. Source names and paths never participate.
+    The comparison uses content identity plus explicit supervised labels. One
+    approval is sufficient because the GUI action is the user's authoritative
+    correction. Source names and paths never participate.
     """
     locked_labels_by_identity: dict[str, str] = {}
     for row in base_rows:

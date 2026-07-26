@@ -376,7 +376,7 @@ def test_exact_human_training_match_owns_even_for_sparse_label(tmp_path: Path) -
     assert row.neural_exact_training_match is True
 
 
-def test_exact_voice_training_cannot_override_decisive_nonvoice_semantics(tmp_path: Path) -> None:
+def test_exact_user_training_overrides_advisory_semantic_disagreement(tmp_path: Path) -> None:
     row = _row(
         _audio_file(tmp_path, "display_only.wav"),
         proposed="FX/Impacts and Hits/Generic Impact/One Shots",
@@ -398,10 +398,9 @@ def test_exact_voice_training_cannot_override_decisive_nonvoice_semantics(tmp_pa
         ),
     )
 
-    assert row.proposed_folder == "_TO_REVIEW/Measured Role Conflict"
-    assert row.consensus_status == "neural_semantic_family_conflict_review"
-    assert row.neural_ownership_ready is False
-    assert row.neural_ownership_reason == "semantic_family_contradiction"
+    assert row.proposed_folder == "Instruments/Voice/Voice Phrase One Shots/One Shots"
+    assert row.consensus_status == "neural_known_distribution_owner"
+    assert row.neural_ownership_ready is True
 
 
 def test_panns_voice_support_prevents_weak_clap_veto_in_gui(tmp_path: Path) -> None:
@@ -417,7 +416,7 @@ def test_panns_voice_support_prevents_weak_clap_veto_in_gui(tmp_path: Path) -> N
             _neural_prediction(
                 label,
                 known=True,
-                exact_training_match=True,
+                exact_training_match=False,
                 ownership_ready=True,
                 semantic_family="fx_impact",
                 semantic_top_score=0.24,
@@ -432,7 +431,7 @@ def test_panns_voice_support_prevents_weak_clap_veto_in_gui(tmp_path: Path) -> N
     assert row.consensus_status == "neural_known_distribution_owner"
 
 
-def test_panns_contradiction_sends_gui_memory_to_review(tmp_path: Path) -> None:
+def test_panns_contradiction_cannot_veto_exact_user_training(tmp_path: Path) -> None:
     row = _row(_audio_file(tmp_path), proposed="_TO_REVIEW/Measured Owner Conflict")
 
     apply_neural_runtime_authority(
@@ -449,8 +448,8 @@ def test_panns_contradiction_sends_gui_memory_to_review(tmp_path: Path) -> None:
         ),
     )
 
-    assert row.proposed_folder == "_TO_REVIEW/Measured Role Conflict"
-    assert row.consensus_status == "neural_panns_family_conflict_review"
+    assert row.proposed_folder == "Instruments/Voice/Vocal Loops/Loops"
+    assert row.consensus_status == "neural_known_distribution_owner"
 
 
 def test_unknown_neural_nonvoice_vs_legacy_voice_forces_review(tmp_path: Path) -> None:

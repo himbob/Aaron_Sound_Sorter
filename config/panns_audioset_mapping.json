@@ -1,10 +1,12 @@
 {
   "schema_version": 1,
-  "mapping_version": "2026-07-25-v1",
+  "mapping_version": "2026-07-26-v2",
   "description": "Read-only broad AudioSet event mapping. PANNs may support or contradict broad Aaron families but may not own detailed folders.",
   "production_ownership_enabled": false,
   "events": {
     "Singing": {"supports": ["Instruments/Voice", "FX/Human and Voice FX"], "contradicts": ["Drums", "Instruments", "FX"], "minimum_support_score": 0.30},
+    "Yodeling": {"supports": ["Instruments/Voice", "FX/Human and Voice FX"], "contradicts": ["Drums", "Instruments", "FX"], "minimum_support_score": 0.30},
+    "A capella": {"supports": ["Instruments/Voice", "FX/Human and Voice FX"], "contradicts": ["Drums", "Instruments", "FX"], "minimum_support_score": 0.30},
     "Speech": {"supports": ["Instruments/Voice", "FX/Human and Voice FX"], "contradicts": ["Drums", "Instruments", "FX"], "minimum_support_score": 0.30},
     "Rapping": {"supports": ["Instruments/Voice", "FX/Human and Voice FX"], "contradicts": ["Drums", "Instruments", "FX"], "minimum_support_score": 0.30},
     "Sigh": {"supports": ["Instruments/Voice", "FX/Human and Voice FX"], "contradicts": ["Drums", "Instruments", "FX"], "minimum_support_score": 0.30},

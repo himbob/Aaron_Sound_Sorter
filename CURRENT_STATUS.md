@@ -20,7 +20,7 @@ Updated: 2026-07-26
   import, explicit background prototype rebuilding, and all-category coverage.
 - Accepted and corrected GUI outcomes feeding source-blind confidence learning.
 - Gain/silence-normalized duplicate protection across training and evaluation.
-- Locked-seed relabels require the same explicit GUI choice twice.
+- The latest explicit GUI relabel supersedes an older seed immediately.
 - Source-name blindness audit.
 - CLAP and MERT embedding, cache, prototype, and evaluation tooling.
 - Provenance, contamination, readiness, active-learning, and ablation reports.
@@ -30,8 +30,8 @@ Updated: 2026-07-26
 - Measured evidence and trained memory: active.
 - CLAP generalized ownership: gated off until a small category group passes
   calibration and independent held-out requirements.
-- Exact approved hashes: active unless neural witnesses or measured structure
-  expose a hard contradiction.
+- Exact approved hashes: authoritative; CLAP, PANNs, and measured witnesses
+  remain visible but cannot veto the user's explicit choice.
 - PANNs: broad support/contradiction guardrail only; no detailed ownership.
 - Detailed CLAP prompts: visible advice only.
 - Unknown or conflicting neural evidence: Review or legacy fallback.
@@ -42,7 +42,9 @@ Updated: 2026-07-26
 - Trusted hash-only runtime replay: 45/45 exact; 0 Review (2026-07-25).
 - Detailed CLAP prompt benchmark: 8/45 exact top-1 and 19/45 exact top-3;
   therefore advisory only.
-- Active local prototype memory: 179 examples across 72 labels.
+- Active local prototype memory: 180 examples across 72 labels.
+- Real altered-vocal replay: exact user label owned the final folder; combined
+  PANNs Singing/Yodeling/Speech/A-cappella support was 0.359 (2026-07-26).
 - Category coverage: 395 selectable; 7 Tier B, 30 Tier C, 358 Tier D.
 - Independent 67-sound CLAP panel: 65.7% top-1, 82.1% top-3, 82.1%
   Review/OOD, and 4 incorrect known-distribution placements.

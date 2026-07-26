@@ -240,7 +240,7 @@ def test_versioned_prototype_rebuild_teaches_correction_and_is_filename_invarian
     assert index.predict(renamed_record).predicted_label == SYNTH_LABEL
 
 
-def test_locked_seed_relabel_requires_two_identical_gui_approvals(tmp_path: Path) -> None:
+def test_explicit_gui_relabel_immediately_supersedes_locked_seed(tmp_path: Path) -> None:
     training_root = tmp_path / "training"
     trusted_audio = write_audio(training_root / "audio.wav", 440.0)
     base_split = tmp_path / "neural_artifacts/base/dataset_splits.csv"
@@ -266,10 +266,9 @@ def test_locked_seed_relabel_requires_two_identical_gui_approvals(tmp_path: Path
 
     first_build = trainer.rebuild()
 
-    assert len(first_build.pending_training_conflicts) == 1
-    assert first_build.pending_training_conflicts[0].locked_label == VOICE_LABEL
+    assert first_build.pending_training_conflicts == ()
     first_manifest = list(csv.DictReader((first_build.index_path.parent / "training_manifest.csv").open()))
-    assert {row["label"] for row in first_manifest} == {VOICE_LABEL}
+    assert {row["label"] for row in first_manifest} == {SYNTH_LABEL}
 
     inbox.queue_import_manifest(import_manifest)
     confirmed_build = trainer.rebuild()

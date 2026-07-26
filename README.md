@@ -80,12 +80,14 @@ Large folders stay usable: the queue shows 200 sounds at a time and receives
 only new results. **Stop & Keep Results** ends new work but keeps completed
 sounds reviewable; **Cancel** abandons the run.
 
-Approved corrections enter a source-blind training inbox. CLAP prototypes
-rebuild first; temporary legacy memories refresh second.
+Approved corrections enter a source-blind training inbox. The latest explicit
+choice owns that exact audio immediately. CLAP prototypes rebuild first;
+temporary legacy memories refresh second, so similar audio also contributes to
+the category neighborhood.
 
 The selected-file panel gives one plain-English decision. CLAP, PANNs, voter
-traces, and alternatives stay collapsed unless you want them. A relabel that
-conflicts with a locked seed must be chosen twice.
+traces, and alternatives stay collapsed unless you want them. For an exact
+trained sound those models are diagnostics, not vetoes.
 
 Open **Learning Center** for batch training:
 
