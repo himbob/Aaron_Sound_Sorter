@@ -327,7 +327,7 @@ def test_preview_job_progress_tracks_completed_and_total_files() -> None:
     assert job.completed_files == 3
     assert job.total_files == 10
     assert job.latest_file == "snare.wav"
-    assert job.message == "Classified 3 of 10: snare.wav"
+    assert job.message == "Finalized 3 of 10: snare.wav"
     assert job.updated_at >= job.started_at
 
 

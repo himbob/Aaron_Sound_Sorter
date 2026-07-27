@@ -7,6 +7,7 @@ import filecmp
 import json
 import os
 import shutil
+import time
 import traceback
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import dataclass
@@ -58,9 +59,10 @@ from aaron_sound_sorter.neural_audio.authority_promotion import enabled_authorit
 from aaron_sound_sorter.neural_audio.calibration import ConfidenceCalibrationBundle, ReviewFeedbackStore
 from aaron_sound_sorter.neural_audio.gui_training import NeuralTrainingInbox
 from aaron_sound_sorter.neural_audio.runtime import (
+    ConfiguredNeuralPredictionProcess,
     NeuralRuntimeBatch,
     NeuralRuntimePrediction,
-    run_configured_neural_predictions,
+    start_configured_neural_prediction_process,
 )
 from aaron_sound_sorter.taxonomy_contracts import (
     STRUCTURE_TERMINALS,
@@ -294,7 +296,7 @@ class SortPreviewService:
             if progress_callback is not None:
                 progress_callback(0, total_files, "Prepared audio input")
             _raise_if_preview_cancelled(cancel_requested)
-            results = classify_audio_files_with_progress(
+            results, rows = classify_audio_files_with_streaming_neural_finalization(
                 sorter,
                 prepared_input.audio_files,
                 brain,
@@ -303,25 +305,14 @@ class SortPreviewService:
                 use_baby_brains_in_sort=request.use_baby_brains_in_sort,
                 use_harmonic_brains_in_sort=request.use_harmonic_brains_in_sort,
                 max_workers=request.sort_workers,
+                project_root=self.project_root,
+                run_dir=run_dir,
                 progress_callback=progress_callback,
-                # Do not publish the base-sorter candidate. A GUI row is only
-                # complete after memory, CLAP, PANNs, and neural authority have
-                # finished the final category decision.
-                row_callback=None,
+                row_callback=row_callback,
                 cancel_requested=cancel_requested,
             )
             _raise_if_preview_cancelled(cancel_requested)
             labels = load_available_labels(brain_config.full_brain_path, project_root=self.project_root)
-            rows = [preview_row_from_result(index, result) for index, result in enumerate(results, start=1)]
-            neural_batch = run_configured_neural_predictions(
-                self.project_root,
-                [(row.row_id, row.source_path) for row in rows],
-                run_dir,
-            )
-            apply_neural_runtime_authority(rows, neural_batch, project_root=self.project_root)
-            if row_callback is not None:
-                for row in rows:
-                    row_callback(row)
             session = SortPreviewSession(
                 run_dir=run_dir,
                 input_path=Path(input_path).expanduser(),
@@ -1010,6 +1001,148 @@ def declare_voters(candidate_count: int = 100) -> list[Voter]:
         PhysicsVoter(PhysicsVoterPolicy(top_n=candidate_count)),
         ShapeVoter(ShapeVoterPolicy()),
     ]
+
+
+
+
+def classify_audio_files_with_streaming_neural_finalization(
+    sorter: SortSamplesUseCase,
+    audio_files: list[Path],
+    brain: dict[str, Any],
+    baby_brains: dict[str, dict[str, Any] | None] | None,
+    harmonic_baby_brains: dict[str, dict[str, Any] | None] | None,
+    *,
+    use_baby_brains_in_sort: bool,
+    use_harmonic_brains_in_sort: bool,
+    max_workers: int,
+    project_root: Path,
+    run_dir: Path,
+    progress_callback: PreviewProgressCallback | None,
+    row_callback: PreviewRowCallback | None = None,
+    cancel_requested: CancelRequestedCallback | None = None,
+) -> tuple[list[SortFileResult], list[PreviewRow]]:
+    """Run base and neural analysis concurrently and publish only final rows.
+
+    One neural subprocess is started for the whole input so CLAP and PANNs load
+    once. Its per-file atomic checkpoints are combined with completed base sorter
+    results as soon as both sides are ready. The GUI therefore receives a row only
+    after neural authority has finished that row's category decision.
+    """
+    total_files = len(audio_files)
+    neural_process: ConfiguredNeuralPredictionProcess = start_configured_neural_prediction_process(
+        project_root,
+        [(f"{index:05d}", audio_file) for index, audio_file in enumerate(audio_files, start=1)],
+        run_dir,
+    )
+    ordered_results: list[SortFileResult | None] = [None] * total_files
+    finalized_rows: list[PreviewRow | None] = [None] * total_files
+    pending_rows: dict[str, tuple[int, PreviewRow]] = {}
+    finalized_count = 0
+
+    def publish_ready_rows(*, force: bool = False) -> None:
+        nonlocal finalized_count
+        batch = neural_process.poll()
+        predicted_ids = {prediction.row_id for prediction in batch.predictions}
+        error_ids = set(batch.row_errors)
+        process_done = neural_process.done
+        ready_entries: list[tuple[str, int, PreviewRow]] = []
+        for row_id, (index, row) in sorted(pending_rows.items(), key=lambda item: item[1][0]):
+            if not force and row_id not in predicted_ids and row_id not in error_ids and not process_done:
+                continue
+            ready_entries.append((row_id, index, row))
+        if not ready_entries:
+            return
+        ready_rows = [entry[2] for entry in ready_entries]
+        apply_neural_runtime_authority(ready_rows, batch, project_root=project_root)
+        for row_id, index, row in ready_entries:
+            pending_rows.pop(row_id, None)
+            finalized_rows[index] = row
+            finalized_count += 1
+            if row_callback is not None:
+                row_callback(row)
+            if progress_callback is not None:
+                progress_callback(finalized_count, total_files, row.display_name)
+
+    def accept_base_result(index: int, result: SortFileResult) -> None:
+        ordered_results[index] = result
+        row = preview_row_from_result(index + 1, result)
+        pending_rows[row.row_id] = (index, row)
+        publish_ready_rows()
+
+    try:
+        worker_count = max(1, min(int(max_workers), max(1, total_files)))
+        if worker_count <= 1 or total_files <= 1:
+            for index, audio_file in enumerate(audio_files):
+                _raise_if_preview_cancelled(cancel_requested)
+                result = sorter.classify_one_file(
+                    audio_file,
+                    brain,
+                    baby_brains,
+                    harmonic_baby_brains,
+                    use_baby_brains_in_sort=use_baby_brains_in_sort,
+                    use_harmonic_brains_in_sort=use_harmonic_brains_in_sort,
+                )
+                accept_base_result(index, result)
+                row_id = f"{index + 1:05d}"
+                while row_id in pending_rows:
+                    _raise_if_preview_cancelled(cancel_requested)
+                    publish_ready_rows()
+                    if row_id not in pending_rows:
+                        break
+                    time.sleep(0.05)
+        else:
+            next_index = 0
+            with ThreadPoolExecutor(max_workers=worker_count, thread_name_prefix="aaron-gui-preview") as executor:
+                futures: dict[Any, tuple[int, Path]] = {}
+
+                def submit_next_file() -> bool:
+                    nonlocal next_index
+                    _raise_if_preview_cancelled(cancel_requested)
+                    if next_index >= total_files:
+                        return False
+                    index = next_index
+                    audio_file = audio_files[index]
+                    future = executor.submit(
+                        sorter.classify_one_file,
+                        audio_file,
+                        brain,
+                        baby_brains,
+                        harmonic_baby_brains,
+                        use_baby_brains_in_sort=use_baby_brains_in_sort,
+                        use_harmonic_brains_in_sort=use_harmonic_brains_in_sort,
+                    )
+                    futures[future] = (index, audio_file)
+                    next_index += 1
+                    return True
+
+                for _ in range(worker_count):
+                    if not submit_next_file():
+                        break
+                while futures:
+                    _raise_if_preview_cancelled(cancel_requested)
+                    done_futures, _pending = wait(futures, timeout=0.10, return_when=FIRST_COMPLETED)
+                    for future in done_futures:
+                        index, _audio_file = futures.pop(future)
+                        result = future.result()
+                        submit_next_file()
+                        accept_base_result(index, result)
+                    publish_ready_rows()
+
+        while pending_rows:
+            _raise_if_preview_cancelled(cancel_requested)
+            publish_ready_rows()
+            if not pending_rows:
+                break
+            if neural_process.done:
+                publish_ready_rows(force=True)
+                break
+            time.sleep(0.10)
+    finally:
+        neural_process.close()
+
+    results = [result for result in ordered_results if result is not None]
+    rows = [row for row in finalized_rows if row is not None]
+    return results, rows
 
 
 def classify_audio_files_with_progress(

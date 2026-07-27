@@ -105,9 +105,9 @@ def update_preview_job_progress(job: PreviewJob, completed_files: int, total_fil
         job.message = "Preparing audio files..."
         return
     if completed_files <= 0:
-        job.message = f"Prepared {total_files} files. Starting classification..."
+        job.message = f"Prepared {total_files} files. Starting final audio analysis..."
         return
-    job.message = f"Classified {completed_files} of {total_files}: {latest_file}"
+    job.message = f"Finalized {completed_files} of {total_files}: {latest_file}"
 
 
 def cancel_preview_job(job: PreviewJob) -> None:

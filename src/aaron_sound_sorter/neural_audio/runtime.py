@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import time
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -102,6 +103,214 @@ def configured_neural_python(project_root: Path) -> Path:
     if not python_path.is_file():
         raise FileNotFoundError(f"configured neural Python is missing: {python_path}")
     return python_path
+
+
+
+
+class ConfiguredNeuralPredictionProcess:
+    """One long-lived neural worker whose atomic checkpoints can be polled.
+
+    The worker receives the whole list of audio paths once, loads CLAP and PANNs
+    once, and checkpoints each completed row. The GUI can therefore combine a
+    base sorter result with its neural result immediately instead of waiting for
+    the entire folder to finish.
+    """
+
+    def __init__(
+        self,
+        project_root: Path,
+        audio_by_row_id: list[tuple[str, Path]],
+        report_dir: Path,
+        *,
+        timeout_seconds: float = 1800.0,
+    ) -> None:
+        self.root = Path(project_root).expanduser().resolve()
+        self.output_dir = Path(report_dir).expanduser().resolve()
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.request_path = self.output_dir / "neural_runtime_request.json"
+        self.response_path = self.output_dir / "neural_runtime_predictions.json"
+        self.log_path = self.output_dir / "neural_runtime.log"
+        self._process: subprocess.Popen[str] | None = None
+        self._log_handle: Any | None = None
+        self._static_batch: NeuralRuntimeBatch | None = None
+        self._timed_out = False
+        self._started_at = time.monotonic()
+        self._effective_timeout = float(timeout_seconds)
+
+        config = load_neural_training_config(self.root)
+        if not bool(config.get("enabled", False)):
+            self._static_batch = NeuralRuntimeBatch("disabled", "Neural runtime is disabled.", ())
+            return
+        if not bool(config.get("production_ownership_enabled", False)):
+            self._static_batch = NeuralRuntimeBatch(
+                "shadow_only",
+                "Neural runtime ownership is disabled.",
+                (),
+            )
+            return
+        if not audio_by_row_id:
+            self._static_batch = NeuralRuntimeBatch("skipped", "No audio files were supplied.", ())
+            return
+
+        request_payload = {
+            "schema_version": 1,
+            "source_name_policy": "paths are I/O metadata only; audio waveforms are the only model input",
+            "items": [
+                {
+                    "row_id": str(row_id),
+                    "audio_path": str(Path(audio_path).expanduser().resolve()),
+                }
+                for row_id, audio_path in audio_by_row_id
+            ],
+        }
+        self.request_path.write_text(
+            json.dumps(request_payload, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        base_timeout = max(60.0, float(config.get("runtime_batch_base_timeout_seconds", 300.0)))
+        per_file_timeout = max(1.0, float(config.get("runtime_timeout_seconds_per_file", 45.0)))
+        self._effective_timeout = max(
+            float(timeout_seconds),
+            base_timeout + per_file_timeout * len(audio_by_row_id),
+        )
+        command = [
+            str(configured_neural_python(self.root)),
+            str(self.root / "tools" / "predict_neural_audio.py"),
+            "--project-root",
+            str(self.root),
+            "--request-json",
+            str(self.request_path),
+            "--output-json",
+            str(self.response_path),
+        ]
+        try:
+            self._log_handle = self.log_path.open("w", encoding="utf-8")
+            self._log_handle.write(
+                f"effective_timeout={self._effective_timeout:.1f}\n"
+                f"command={' '.join(command)}\n\n"
+            )
+            self._log_handle.flush()
+            self._process = subprocess.Popen(
+                command,
+                cwd=self.root,
+                stdin=subprocess.DEVNULL,
+                stdout=self._log_handle,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            self._close_log_handle()
+            self._static_batch = NeuralRuntimeBatch(
+                "unavailable",
+                str(exc),
+                (),
+                log_path=self.log_path,
+            )
+
+    @property
+    def done(self) -> bool:
+        """Return whether this worker can produce no additional checkpoints."""
+        if self._static_batch is not None or self._timed_out:
+            return True
+        return self._process is None or self._process.poll() is not None
+
+    def poll(self) -> NeuralRuntimeBatch:
+        """Return the newest complete checkpoint without blocking."""
+        if self._static_batch is not None:
+            return self._static_batch
+        if self._process is None:
+            return NeuralRuntimeBatch(
+                "unavailable",
+                "Neural worker was not started.",
+                (),
+                report_path=self.response_path,
+                log_path=self.log_path,
+            )
+
+        return_code = self._process.poll()
+        elapsed = time.monotonic() - self._started_at
+        if return_code is None and elapsed > self._effective_timeout:
+            self._timed_out = True
+            self._terminate_process()
+            return _batch_from_checkpoint(
+                self.response_path,
+                self.log_path,
+                status="partial_timeout",
+                fallback_message=(
+                    f"Neural runtime timed out after {self._effective_timeout:.0f} seconds; "
+                    "completed rows were preserved."
+                ),
+            )
+        if return_code is None:
+            return _batch_from_checkpoint(
+                self.response_path,
+                self.log_path,
+                status="processing",
+                fallback_message="Neural runtime is loading models or processing its first audio file.",
+            )
+
+        self._close_log_handle()
+        if return_code == 0:
+            return _batch_from_checkpoint(
+                self.response_path,
+                self.log_path,
+                status="predicted",
+                fallback_message="Neural prediction process produced no response file.",
+            )
+        return _batch_from_checkpoint(
+            self.response_path,
+            self.log_path,
+            status="error",
+            fallback_message=f"Neural prediction process failed with exit code {return_code}.",
+        )
+
+    def wait(self, *, poll_seconds: float = 0.10) -> NeuralRuntimeBatch:
+        """Wait for the worker while preserving checkpoint visibility."""
+        batch = self.poll()
+        while not self.done:
+            time.sleep(max(0.01, float(poll_seconds)))
+            batch = self.poll()
+        return self.poll() if batch.status == "processing" else batch
+
+    def close(self) -> None:
+        """Stop a live worker and release its log file."""
+        self._terminate_process()
+        self._close_log_handle()
+
+    def _terminate_process(self) -> None:
+        if self._process is None or self._process.poll() is not None:
+            return
+        self._process.terminate()
+        try:
+            self._process.wait(timeout=3.0)
+        except subprocess.TimeoutExpired:
+            self._process.kill()
+            self._process.wait(timeout=3.0)
+
+    def _close_log_handle(self) -> None:
+        if self._log_handle is None:
+            return
+        try:
+            self._log_handle.flush()
+            self._log_handle.close()
+        finally:
+            self._log_handle = None
+
+
+def start_configured_neural_prediction_process(
+    project_root: Path,
+    audio_by_row_id: list[tuple[str, Path]],
+    report_dir: Path,
+    *,
+    timeout_seconds: float = 1800.0,
+) -> ConfiguredNeuralPredictionProcess:
+    """Start one persistent neural worker for incremental GUI finalization."""
+    return ConfiguredNeuralPredictionProcess(
+        project_root,
+        audio_by_row_id,
+        report_dir,
+        timeout_seconds=timeout_seconds,
+    )
 
 
 def run_configured_neural_predictions(
