@@ -3,6 +3,7 @@
 # Normal human workflow:
 #   make bootstrap
 #   make test
+#   make gui
 #
 # AI coding workflow:
 #   make ai-preflight
@@ -31,7 +32,7 @@ BUNDLE_NAME ?= Aaron_Sound_Sorter_AI_patch
 BUNDLE_OUTPUT_DIR ?= _reports/bundles
 AI_BASE ?= HEAD
 
-.PHONY: help bootstrap init venv upgrade-pip install install-all install-runtime install-quality install-dev \
+.PHONY: help bootstrap init gui venv upgrade-pip install install-all install-runtime install-quality install-dev \
         ensure-quality \
         doctor check-tools audit-source-names audit-public-assets sanitize-public-assets pycompile test test-one test-coverage test-coverage-html \
         lint format format-check type-check docstyle quality qa ci quality-report quality-report-full \
@@ -53,6 +54,7 @@ help:
 	@echo "  make install-dev               Install full dev stack from requirements-dev.txt."
 	@echo "  make ensure-quality            Fast import-only check that the quality deps are already installed."
 	@echo "  make doctor                    Verify required developer tools from the venv."
+	@echo "  make gui                       Launch the sorter GUI."
 	@echo ""
 	@echo "AI changed-files quality gate:"
 	@echo "  make ai-preflight              Verify tools, show changed files, and fail on generated junk."
@@ -113,6 +115,9 @@ init: bootstrap
 install: install-dev
 
 install-all: install-dev
+
+gui:
+	./commands/gui/RUN_SORTER_GUI.command
 
 venv:
 	@test -x "$(VENV_PYTHON)" || "$(PYTHON)" -m venv "$(VENV_DIR)"
@@ -219,7 +224,6 @@ ai-test: test-one
 ai-bundle-check:
 	@test -n "$(BUNDLE_DIR)" || (echo "Usage: make ai-bundle-check BUNDLE_DIR=/path/to/bundle_root" && exit 2)
 	"$(VENV_PYTHON)" tools/ai_quality_gate.py --project-root "$(PROJECT_ROOT)" bundle-check --bundle-dir "$(BUNDLE_DIR)"
-
 
 bundle:
 	PROJECT_ROOT="$(PROJECT_ROOT)" \
