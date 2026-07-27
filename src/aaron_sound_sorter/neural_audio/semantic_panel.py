@@ -11,124 +11,143 @@ from .contracts import EmbeddingRecord
 
 SEMANTIC_FAMILY_PROMPTS: Mapping[str, tuple[str, ...]] = {
     "human_voice": (
-        "an isolated human voice",
-        "a person speaking",
-        "a person singing",
-        "a human vocal shout or chant",
-        "rap vocals",
+        "an isolated natural human voice",
+        "a person speaking or narrating",
+        "a person singing or humming",
+        "rap vocals, chanting, or beatboxing",
+        "a shouted, whispered, crying, or laughing human voice",
+        "a heavily processed, pitch-shifted, formant-shifted, vocoded, robotic, or altered human voice",
+        "a chopped vocal sample or vocal sound effect",
     ),
     "drums": (
-        "an acoustic drum hit",
-        "a kick or snare drum",
-        "a cymbal or hi-hat",
-        "a percussion rhythm",
-        "a full drum beat",
+        "an acoustic or electronic drum hit",
+        "a kick, snare, clap, rimshot, tom, or cymbal",
+        "a percussion rhythm or drum fill",
+        "a full drum beat or drum loop",
+        "a layered drum kit performance",
     ),
     "drum_kick": (
-        "an isolated kick drum or bass drum hit",
-        "a deep electronic kick drum",
+        "an isolated acoustic kick drum or bass drum hit",
+        "a deep electronic kick, sub kick, or 808 kick",
+        "a short low-frequency drum thump",
     ),
     "drum_backbeat": (
-        "an isolated snare drum, clap, snap, or rimshot",
+        "an isolated snare drum, clap, snap, slap, or rimshot",
         "a sharp backbeat drum hit",
+        "a layered snare and clap transient",
     ),
     "drum_cymbal": (
-        "an isolated hi-hat, ride, or crash cymbal",
-        "a metallic cymbal rhythm",
+        "an isolated closed or open hi-hat",
+        "a ride, crash, splash, or china cymbal",
+        "a metallic cymbal rhythm or cymbal swell",
     ),
     "drum_percussion": (
-        "hand percussion, shaker, conga, bongo, or tambourine",
-        "a tom, wood block, cowbell, or world percussion sound",
+        "hand percussion, shaker, conga, bongo, tambourine, or maraca",
+        "a tom, wood block, cowbell, clave, gong, or world percussion sound",
+        "an electronic percussion hit that is not a kick or snare",
     ),
     "drum_full": (
-        "a full drum kit beat or drum loop",
-        "a layered kick snare and hi-hat rhythm",
+        "a full acoustic drum kit beat or drum loop",
+        "a programmed electronic drum groove",
+        "a layered kick snare hi-hat rhythm or drum fill",
     ),
     "bass": (
-        "an electric bass instrument",
-        "a synthesized bass line",
-        "a low bass note",
+        "an electric or acoustic bass guitar",
+        "a synthesized bass line or sub bass",
+        "a low bass note, bass stab, or bass loop",
+        "a distorted, processed, or resampled bass sound",
     ),
     "keys": (
         "an acoustic piano",
-        "an electric piano or keyboard",
-        "a keyboard melody",
+        "an electric piano, organ, or keyboard",
+        "a keyboard chord, melody, stab, or loop",
+        "a processed piano or sampled keyboard sound",
     ),
     "guitar_plucked": (
         "an acoustic or electric guitar",
-        "a plucked string instrument",
-        "a guitar chord or melody",
+        "a plucked string instrument such as guitar, banjo, harp, or ukulele",
+        "a guitar chord, riff, melody, stab, or loop",
+        "a distorted or heavily processed guitar sound",
     ),
     "strings_bowed": (
         "a bowed string instrument",
-        "a violin or cello",
-        "an orchestral string section",
+        "a violin, viola, cello, or double bass",
+        "an orchestral string section, string stab, or string loop",
+        "a processed or synthesized bowed-string sound",
     ),
     "woodwind_reed": (
-        "a saxophone",
-        "a flute or woodwind instrument",
-        "a reed instrument melody",
+        "a saxophone, clarinet, oboe, or bassoon",
+        "a flute, recorder, or other woodwind instrument",
+        "a reed instrument melody, stab, phrase, or loop",
+        "a processed or synthetic woodwind-like sound",
     ),
     "brass": (
-        "a trumpet or trombone",
-        "a brass horn section",
-        "an isolated brass instrument",
+        "a trumpet, trombone, horn, or tuba",
+        "a brass horn section, brass stab, or brass loop",
+        "an isolated, muted, distorted, or processed brass instrument",
     ),
     "mallet_bell": (
-        "a bell or chime",
-        "a marimba or xylophone",
-        "a struck mallet instrument",
+        "a bell, chime, gong, or metallic tuned percussion sound",
+        "a marimba, xylophone, vibraphone, glockenspiel, or steelpan",
+        "a struck mallet instrument phrase, hit, or loop",
     ),
     "synth": (
         "an electronic synthesizer",
-        "a synthesized pad or lead",
-        "an electronic musical tone",
+        "a synthesized pad, lead, pluck, chord, arpeggio, or stab",
+        "an electronic musical tone, sequence, or synth loop",
+        "a heavily processed synthetic sound that remains musical",
     ),
     "fx_impact": (
-        "a cinematic impact or boom sound effect",
-        "a crash, slam, or hit sound effect",
-        "a designed impact with a reverberant tail",
+        "a cinematic impact, boom, explosion, slam, or hit sound effect",
+        "a crash, break, smash, thud, or destruction sound effect",
+        "a designed impact with a reverberant or sub-bass tail",
+        "a weapon, gunshot, blast, or explosive transient",
     ),
     "fx_transition": (
-        "a riser, downlifter, or transition sound effect",
-        "a whoosh or sweep sound effect",
-        "a reversed build-up sound effect",
+        "a riser, build, downlifter, faller, or transition sound effect",
+        "a whoosh, swoosh, sweep, pass-by, or movement sound effect",
+        "a reversed build-up, suck-back, cymbal swell, or transition tail",
     ),
     "fx_glitch": (
-        "a digital glitch or stutter sound effect",
-        "a chopped electronic malfunction sound",
-        "a robotic digital sound effect",
+        "a digital glitch, stutter, buffer error, or chopped sound effect",
+        "a robotic, data, modem, computer, or electronic malfunction sound",
+        "a bit-crushed, granular, corrupted, or synthetic digital effect",
     ),
     "fx_alert": (
-        "an emergency siren or alarm sound effect",
-        "a police siren or warning horn",
-        "an electronic warning alert sound",
+        "an emergency siren, alarm, buzzer, bell, or warning horn",
+        "a police, ambulance, fire, security, or industrial alarm",
+        "an electronic warning beep, notification, or alert sound",
     ),
     "fx_machine": (
-        "an engine, motor, or machine sound effect",
-        "a mechanical servo or industrial mechanism",
-        "a vehicle engine or transport sound",
+        "an engine, motor, machine, mechanism, tool, or appliance sound",
+        "a mechanical servo, gear, hydraulic, or industrial mechanism",
+        "a car, truck, train, aircraft, boat, or transport sound",
+        "a household machine, power tool, or electrical device",
     ),
     "fx_nature": (
-        "rain, thunder, wind, fire, or ocean ambience",
-        "a natural water, weather, or elemental sound effect",
-        "an outdoor environmental nature recording",
+        "rain, thunder, wind, fire, ocean, river, or water ambience",
+        "a natural weather, water, earth, or elemental sound effect",
+        "an outdoor environmental nature recording with birds or insects",
     ),
     "fx_texture": (
-        "an ambient texture, drone, or noise bed",
-        "static, vinyl noise, or background atmosphere",
-        "an abstract sustained soundscape",
+        "an ambient texture, drone, rumble, hum, or noise bed",
+        "static, vinyl noise, tape noise, electrical noise, or background atmosphere",
+        "an abstract sustained soundscape, tonal texture, or dark ambience",
     ),
     "fx_foley": (
-        "a real-world foley sound",
-        "a small object, surface, or material sound",
-        "a mechanical or household sound effect",
+        "a real-world foley sound made by an object, body, surface, or material",
+        "a door, footsteps, cloth, paper, glass, metal, wood, plastic, or household sound",
+        "a small mechanical, kitchen, tool, handling, or movement sound effect",
+        "a liquid splash, pour, drip, spray, or water foley sound",
     ),
     "animal_creature": (
-        "an animal or creature vocalization",
-        "a monster, growl, or creature sound effect",
+        "an animal vocalization or animal movement sound",
+        "a dog, cat, bird, farm animal, wild animal, insect, or amphibian",
+        "a monster, creature, dinosaur, growl, roar, hiss, or fantasy beast sound effect",
+        "a processed or designed animal-like creature sound",
     ),
 }
+
 
 
 @dataclass(frozen=True)
@@ -274,8 +293,7 @@ def assess_semantic_label_compatibility(
         family_scores: Similarity scores for all semantic families.
         minimum_top_score: Minimum winning score needed for a veto.
         minimum_contradiction_gap: Required lead over the strongest compatible
-            family. Voice labels use a stricter 0.05 boundary because confusing
-            voice with another source is a high-cost failure.
+            family. The same ambiguity rule is applied to every family.
 
     Returns:
         Compatibility assessment. Broad labels with no defensible source
@@ -298,7 +316,7 @@ def assess_semantic_label_compatibility(
         return SemanticCompatibilityAssessment(False, "semantic_evidence_absent", compatible, 0.0, 0.0)
     best_compatible_score = max(float(family_scores.get(family, -1.0)) for family in compatible)
     contradiction_gap = float(top_score) - best_compatible_score
-    required_gap = min(minimum_contradiction_gap, 0.05) if compatible == ("human_voice",) else minimum_contradiction_gap
+    required_gap = minimum_contradiction_gap
     if predicted_family in compatible:
         reason = "semantic_family_compatible"
         contradictory = False

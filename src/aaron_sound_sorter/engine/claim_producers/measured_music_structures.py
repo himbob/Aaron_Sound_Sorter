@@ -951,14 +951,3 @@ def _path_has_any(path: str, fragments: tuple[str, ...]) -> bool:
     return any(fragment in low for fragment in fragments)
 
 
-def _target_fragments(target: str) -> tuple[str, ...]:
-    low = _norm_path(target)
-    if "bass" in low:
-        return ("bass", "808", "sub")
-    if "keys" in low or "piano" in low or "rhodes" in low:
-        return ("keys", "piano", "rhodes", "electric piano")
-    if "sax" in low or "woodwind" in low:
-        return ("sax", "woodwind", "brass")
-    if "synth" in low:
-        return ("synth", "pad", "lead")
-    return ("instrument loops",)

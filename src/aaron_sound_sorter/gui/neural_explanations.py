@@ -46,8 +46,10 @@ def neural_evidence_lines(row: PreviewRow) -> list[str]:
 
 def neural_memory_summary(row: PreviewRow) -> str:
     """Explain the trained prototype-memory result without model jargon."""
+    if row.neural_decision_state == "provisional":
+        return "Your trained memory: Analyzing..."
     if row.neural_known_distribution is None:
-        return "Your trained memory: No Result."
+        return _missing_lane_summary(row, "Your trained memory")
     label = row.neural_folder or "No Result"
     if row.neural_exact_training_match:
         return f"Your trained memory: exact human-approved audio match → {label}."
@@ -69,10 +71,27 @@ def neural_memory_summary(row: PreviewRow) -> str:
 
 
 def broad_clap_summary(row: PreviewRow) -> str:
-    """Show CLAP's nearest broad guess whenever inference returned one."""
+    """Show CLAP's top broad families instead of hiding the runner-ups."""
+    if row.neural_decision_state == "provisional":
+        return "CLAP broad hearing: Analyzing..."
     if not row.neural_semantic_family:
-        return "CLAP broad hearing: No Result."
-    family = SEMANTIC_FAMILY_NAMES.get(row.neural_semantic_family, row.neural_semantic_family)
+        return _missing_lane_summary(
+            row,
+            "CLAP broad hearing",
+            lane_status=row.neural_semantic_status,
+        )
+    ranked = sorted(
+        row.neural_semantic_family_scores.items(),
+        key=lambda item: (-float(item[1]), item[0]),
+    )[:3]
+    if not ranked:
+        ranked = [(row.neural_semantic_family, row.neural_semantic_score)]
+        if row.neural_semantic_second_family:
+            ranked.append((row.neural_semantic_second_family, row.neural_semantic_second_score))
+    family_text = "; ".join(
+        f"{SEMANTIC_FAMILY_NAMES.get(family, family)} {float(score):.3f}"
+        for family, score in ranked
+    )
     if row.neural_semantic_score < 0.10:
         signal = "weak"
     elif row.neural_semantic_margin >= 0.06:
@@ -82,15 +101,20 @@ def broad_clap_summary(row: PreviewRow) -> str:
     else:
         signal = "close call"
     return (
-        f"CLAP broad hearing: {family} (raw score {row.neural_semantic_score:.3f}; "
-        f"{signal} signal; this is not a probability)."
+        f"CLAP broad hearing (top families; raw similarity, not probability): {family_text}; "
+        f"{signal} signal."
     )
 
 
 def detailed_clap_lines(row: PreviewRow) -> list[str]:
     """Format experimental detailed prompt suggestions for human review."""
     if row.neural_prompt_status != "advisory_only" or not row.neural_prompt_suggestions:
-        return ["CLAP detailed suggestions: No Result; they did not affect sorting."]
+        if row.neural_prompt_status in {"unavailable", "invalid_index", "model_mismatch"}:
+            return [f"CLAP detailed suggestions: Unavailable ({row.neural_prompt_status}); they did not affect sorting."]
+        return [
+            f"{_missing_lane_summary(row, 'CLAP detailed suggestions', lane_status=row.neural_prompt_status)}; "
+            "they did not affect sorting."
+        ]
     lines = ["CLAP detailed suggestions (experimental; advice only):"]
     for suggestion in row.neural_prompt_suggestions[:3]:
         path = str(suggestion.get("path", ""))
@@ -101,11 +125,22 @@ def detailed_clap_lines(row: PreviewRow) -> list[str]:
 
 
 def panns_summary(row: PreviewRow) -> str:
-    """Show PANNs' nearest raw events whenever inference returned any."""
+    """Show raw PANNs events plus candidate-independent grouped families."""
+    if row.neural_decision_state == "provisional":
+        return "PANNs broad events: Analyzing..."
     if not row.panns_events:
-        return "PANNs broad events: No Result."
+        if row.panns_status == "unavailable":
+            return "PANNs broad events: Unavailable; the model did not return an event list."
+        return _missing_lane_summary(row, "PANNs broad events", lane_status=row.panns_status)
     event_text = "; ".join(
         f"{event.get('label', '')} {float(event.get('score', 0.0)):.2f}" for event in row.panns_events[:5]
+    )
+    family_text = "; ".join(
+        f"{SEMANTIC_FAMILY_NAMES.get(family, family)} {float(score):.2f}"
+        for family, score in sorted(
+            row.panns_family_scores.items(),
+            key=lambda item: (-float(item[1]), item[0]),
+        )[:3]
     )
     if row.panns_contradiction_score > row.panns_support_score and row.panns_contradicting_events:
         role = "broad contradiction; may force Review"
@@ -113,7 +148,39 @@ def panns_summary(row: PreviewRow) -> str:
         role = "broad support for trained memory"
     else:
         role = "advice only"
-    return f"PANNs broad events (raw scores; {role}): {event_text}."
+    grouped = f" Grouped families: {family_text}." if family_text else ""
+    return f"PANNs broad events (raw scores; {role}): {event_text}.{grouped}"
+
+
+def _missing_lane_summary(
+    row: PreviewRow,
+    lane_name: str,
+    *,
+    lane_status: str = "",
+) -> str:
+    """Explain why a lane is empty without mislabeling failures as No Result."""
+    if row.neural_decision_state == "provisional":
+        return f"{lane_name}: Analyzing..."
+    if lane_status == "runtime_error":
+        return f"{lane_name}: Runtime Error."
+    if lane_status in {"unavailable", "invalid_index", "model_mismatch"}:
+        return f"{lane_name}: Unavailable ({lane_status})."
+    if row.neural_row_error:
+        detail = _compact_runtime_detail(row.neural_row_error)
+        return f"{lane_name}: Runtime Error ({detail})."
+    if row.neural_runtime_status == "not_completed_timeout":
+        return f"{lane_name}: Not Completed before the neural runtime timeout."
+    if row.neural_runtime_status in {"error", "unavailable"}:
+        detail = _compact_runtime_detail(row.neural_runtime_message)
+        suffix = f" ({detail})" if detail else ""
+        return f"{lane_name}: Runtime {row.neural_runtime_status.title()}{suffix}."
+    return f"{lane_name}: No Result."
+
+
+def _compact_runtime_detail(value: str, limit: int = 180) -> str:
+    """Keep runtime diagnostics readable in the GUI."""
+    text = " ".join(str(value or "").split())
+    return text if len(text) <= limit else text[: limit - 3] + "..."
 
 
 def calibration_summary(row: PreviewRow) -> str:
@@ -132,6 +199,10 @@ def calibration_summary(row: PreviewRow) -> str:
 
 def neural_result_summary(row: PreviewRow) -> str:
     """Explain whether neural evidence controlled or merely advised."""
+    if row.neural_decision_state == "provisional":
+        return "Neural result: Pending; the visible category is not final yet."
+    if row.neural_decision_state == "finalized_without_neural":
+        return "Neural result: Not applied; the row was finalized without neural evidence."
     status = row.consensus_status
     if status == "neural_semantic_family_conflict_review":
         return "Neural result: sent to Review because trained memory and independent CLAP hearing strongly disagreed."

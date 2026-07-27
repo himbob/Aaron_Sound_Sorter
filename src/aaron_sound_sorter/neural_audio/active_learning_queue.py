@@ -179,21 +179,42 @@ def semantic_partition_family(semantic_family: str) -> str:
 def _density_cluster_labels(members: list[ActiveLearningMember], similarity_threshold: float) -> np.ndarray:
     if len(members) == 1:
         return np.zeros(1, dtype=np.int64)
-    try:
-        from sklearn.cluster import DBSCAN
-    except ImportError as exc:
-        raise RuntimeError("cluster-first active learning requires scikit-learn") from exc
     matrix = np.vstack([np.asarray(member.vector, dtype=np.float64) for member in members])
     norms = np.linalg.norm(matrix, axis=1, keepdims=True)
     if np.any(~np.isfinite(norms)) or np.any(norms <= 0.0):
         raise ValueError("density clustering requires finite nonzero embeddings")
     matrix /= norms
+    try:
+        from sklearn.cluster import DBSCAN
+    except ImportError:
+        return _connected_component_cluster_labels(matrix, similarity_threshold)
     return DBSCAN(
         eps=1.0 - similarity_threshold,
         min_samples=1,
         metric="cosine",
         algorithm="brute",
     ).fit_predict(matrix)
+
+
+def _connected_component_cluster_labels(matrix: np.ndarray, similarity_threshold: float) -> np.ndarray:
+    """Match DBSCAN(min_samples=1) with a deterministic NumPy fallback."""
+    similarities = matrix @ matrix.T
+    labels = np.full(matrix.shape[0], -1, dtype=np.int64)
+    next_label = 0
+    for start in range(matrix.shape[0]):
+        if labels[start] >= 0:
+            continue
+        labels[start] = next_label
+        stack = [start]
+        while stack:
+            current = stack.pop()
+            neighbors = np.flatnonzero(similarities[current] >= similarity_threshold - 1e-12)
+            for neighbor in neighbors.tolist():
+                if labels[neighbor] < 0:
+                    labels[neighbor] = next_label
+                    stack.append(neighbor)
+        next_label += 1
+    return labels
 
 
 def _summarize_cluster(

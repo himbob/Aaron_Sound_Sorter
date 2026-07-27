@@ -45,6 +45,15 @@ class PannsMappedEvidence:
     neutral_events: tuple[PannsEventScore, ...]
 
 
+@dataclass(frozen=True)
+class PannsFamilyScore:
+    """Aggregated PANNs support for one broad audible family."""
+
+    family: str
+    score: float
+    events: tuple[PannsEventScore, ...]
+
+
 class PannsMappingRegistry:
     """Validate and apply a versioned PANNs-to-taxonomy mapping.
 
@@ -132,6 +141,92 @@ class PannsMappingRegistry:
             contradicting_events=tuple(sorted(contradicting, key=lambda row: (-row.score, row.label))),
             neutral_events=tuple(sorted(neutral, key=lambda row: (-row.score, row.label))),
         )
+
+    def aggregate_family_scores(
+        self,
+        events: tuple[PannsEventScore, ...],
+    ) -> tuple[PannsFamilyScore, ...]:
+        """Combine related AudioSet events into broad source-family evidence.
+
+        This aggregation is candidate-independent. It lets the GUI show what
+        PANNs broadly heard even when the current sorter proposal belongs to a
+        different family. Several weak, related events are combined with the
+        same bounded corroboration formula used by candidate evaluation.
+        """
+        grouped: dict[str, dict[str, PannsEventScore]] = {}
+        for event in events:
+            mapping = self.mappings.get(event.label)
+            if mapping is None or mapping.neutral or mapping.ambiguous:
+                continue
+            for prefix in mapping.supports:
+                family = _broad_evidence_family(prefix)
+                if not family:
+                    continue
+                grouped.setdefault(family, {})[event.label] = event
+        ranked: list[PannsFamilyScore] = []
+        for family, event_map in grouped.items():
+            family_events = sorted(event_map.values(), key=lambda row: (-row.score, row.label))
+            score = _corroborating_score(family_events)
+            ranked.append(PannsFamilyScore(family, score, tuple(family_events)))
+        return tuple(sorted(ranked, key=lambda row: (-row.score, row.family)))
+
+
+def _broad_evidence_family(prefix: str) -> str:
+    """Translate a taxonomy support prefix into the shared broad-family panel."""
+    normalized = str(prefix).replace("\\", "/")
+    if normalized.startswith(("Instruments/Voice", "FX/Human and Voice FX")):
+        return "human_voice"
+    if normalized.startswith("Drums/Kick Drums"):
+        return "drum_kick"
+    if normalized.startswith(("Drums/Snares", "Drums/Claps Snaps Slaps", "Drums/Rims and Sticks")):
+        return "drum_backbeat"
+    if normalized.startswith(("Drums/Cymbals", "Drums/Hi Hats")):
+        return "drum_cymbal"
+    if normalized.startswith(("Drums/Percussion", "Drums/Toms", "Drums/World Percussion")):
+        return "drum_percussion"
+    if normalized.startswith(("Drums/Drum Loops", "Drums/Drum Fills and Rolls")):
+        return "drum_full"
+    if normalized.startswith("Drums"):
+        return "drums"
+    if normalized.startswith("Instruments/Bass"):
+        return "bass"
+    if normalized.startswith("Instruments/Keys"):
+        return "keys"
+    if normalized.startswith(("Instruments/Guitar", "Instruments/Plucked Strings")):
+        return "guitar_plucked"
+    if normalized.startswith(("Instruments/Strings", "Instruments/Strings Bowed")):
+        return "strings_bowed"
+    if normalized.startswith(("Instruments/Winds", "Instruments/Woodwinds")):
+        return "woodwind_reed"
+    if normalized.startswith("Instruments/Brass"):
+        return "brass"
+    if normalized.startswith(("Instruments/Mallets", "Instruments/Mallets and Bells")):
+        return "mallet_bell"
+    if normalized.startswith("Instruments/Synths"):
+        return "synth"
+    if normalized.startswith("FX/Animals and Creatures"):
+        return "animal_creature"
+    if normalized.startswith("FX/Structural and Transitional FX"):
+        return "fx_transition"
+    if normalized.startswith(("FX/Impacts and Hits", "FX/Crashes and Breaks", "FX/Weapons Explosions and Destruction")):
+        return "fx_impact"
+    if normalized.startswith(("FX/Designed Noise FX/Alarm", "FX/Designed Noise FX/Siren", "FX/Designed Noise FX/Beep", "FX/Designed Noise FX/Blip")):
+        return "fx_alert"
+    if normalized.startswith("FX/Designed Noise FX"):
+        return "fx_glitch"
+    if normalized.startswith("FX/Digital Mechanical Industrial Transport/Glitches and Stutters"):
+        return "fx_glitch"
+    if normalized.startswith("FX/Digital Mechanical Industrial Transport"):
+        return "fx_machine"
+    if normalized.startswith("FX/Everyday Foley/Machines"):
+        return "fx_machine"
+    if normalized.startswith("FX/Everyday Foley"):
+        return "fx_foley"
+    if normalized.startswith(("FX/Textures/Natural Ambience", "FX/Ambiences and Environments/Natural Ambience")):
+        return "fx_nature"
+    if normalized.startswith(("FX/Textures", "FX/Ambiences and Environments")):
+        return "fx_texture"
+    return ""
 
 
 def _validate_mapping_prefixes(mapping: PannsEventMapping, taxonomy: TaxonomyRegistry) -> None:

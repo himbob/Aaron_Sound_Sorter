@@ -47,6 +47,8 @@ REQUIRED_TOOLS: tuple[RequiredTool, ...] = (
     RequiredTool("ruff", "ruff", ("-m", "ruff", "--version")),
     RequiredTool("mypy", "mypy", ("-m", "mypy", "--version")),
     RequiredTool("pydocstyle", "pydocstyle", ("-m", "pydocstyle", "--version")),
+    RequiredTool("sklearn", "scikit-learn test/runtime support", ("-c", "import sklearn; print(sklearn.__version__)")),
+    RequiredTool("vulture", "Vulture dead-code scanner", ("-m", "vulture", "--version")),
 )
 
 

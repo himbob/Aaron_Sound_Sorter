@@ -95,10 +95,6 @@ class ClaimCandidateLookupMixin:
                 best_score = score
         return best_score
 
-    @staticmethod
-    def _path_has_real_candidate(raw: ConsensusClaim, folder_path: str) -> bool:
-        """Return True when a target folder exists in the shared candidate list."""
-        return ClaimCandidateLookupMixin._candidate_score_for_path(raw, folder_path) is not None
 
     def _has_close_candidate(
         self,

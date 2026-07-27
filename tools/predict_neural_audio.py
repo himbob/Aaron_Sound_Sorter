@@ -50,8 +50,30 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Run neural inference for operational paths in one request manifest."""
+    """Run neural inference and checkpoint every completed input row."""
     args = build_parser().parse_args(argv)
+    output_path = args.output_json.expanduser().resolve()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        return _run_prediction_batch(args, output_path)
+    except Exception as exc:
+        existing = _read_prediction_payload(output_path)
+        row_errors = dict(existing.get("row_errors", {}))
+        row_errors["__runtime__"] = f"{type(exc).__name__}: {exc}"
+        _write_prediction_payload(
+            output_path,
+            status="error",
+            message=f"{type(exc).__name__}: {exc}",
+            index_path=str(existing.get("index_path", "")),
+            predictions=list(existing.get("predictions", [])),
+            row_errors=row_errors,
+        )
+        print(f"Neural runtime failed: {type(exc).__name__}: {exc}", file=sys.stderr, flush=True)
+        return 1
+
+
+def _run_prediction_batch(args: argparse.Namespace, output_path: Path) -> int:
+    """Load models once, process rows sequentially, and save partial results."""
     project_root = args.project_root.expanduser().resolve()
     request = json.loads(args.request_json.expanduser().resolve().read_text(encoding="utf-8"))
     items = request.get("items", [])
@@ -74,28 +96,74 @@ def main(argv: list[str] | None = None) -> int:
     panns_mapping = load_optional_panns_mapping(project_root)
 
     predictions: list[dict[str, Any]] = []
-    for item in items:
+    row_errors: dict[str, str] = {}
+    total_items = len(items)
+    _write_prediction_payload(
+        output_path,
+        status="processing",
+        message=f"Neural runtime initialized; 0/{total_items} audio waveform(s) complete.",
+        index_path=str(index_path),
+        predictions=predictions,
+        row_errors=row_errors,
+    )
+
+    for position, item in enumerate(items, start=1):
         if not isinstance(item, dict):
             raise ValueError("each request item must be an object")
-        audio_path = Path(str(item["audio_path"])).expanduser().resolve()
-        record = trainer.cache.get_or_compute(audio_path, trainer.provider)
-        prediction, exact_training_match = select_neural_prediction(
-            index,
+        row_id = str(item.get("row_id", ""))
+        try:
+            audio_path = Path(str(item["audio_path"])).expanduser().resolve()
+            record = trainer.cache.get_or_compute(audio_path, trainer.provider)
+            prediction, exact_training_match = select_neural_prediction(
+                index,
+                record,
+                training_labels_by_hash,
+            )
+            ownership = assess_prototype_ownership(
+                prediction,
+                exact_training_match=exact_training_match,
+                minimum_margin=minimum_margin,
+                minimum_label_examples=minimum_label_examples,
+            )
+        except Exception as exc:
+            row_errors[row_id] = f"{type(exc).__name__}: {exc}"
+            _write_progress_checkpoint(
+                output_path,
+                position=position,
+                total_items=total_items,
+                index_path=index_path,
+                predictions=predictions,
+                row_errors=row_errors,
+            )
+            continue
+
+        semantic_status = "advisory_only"
+        semantic_family = ""
+        semantic_second_family = ""
+        semantic_top_score = 0.0
+        semantic_second_score = 0.0
+        semantic_margin = 0.0
+        semantic_family_scores: dict[str, float] = {}
+        try:
+            semantic = predict_semantic_family(
+                record,
+                semantic_text_embeddings,
+                semantic_prompt_families,
+            )
+            semantic_family = semantic.predicted_family
+            semantic_second_family = semantic.second_family
+            semantic_top_score = semantic.top_score
+            semantic_second_score = semantic.second_score
+            semantic_margin = semantic.margin
+            semantic_family_scores = dict(semantic.family_scores)
+        except Exception:
+            semantic_status = "runtime_error"
+
+        prompt_suggestions, row_prompt_status = predict_optional_prompt_suggestions(
+            prompt_index,
             record,
-            training_labels_by_hash,
+            prompt_brain_status,
         )
-        ownership = assess_prototype_ownership(
-            prediction,
-            exact_training_match=exact_training_match,
-            minimum_margin=minimum_margin,
-            minimum_label_examples=minimum_label_examples,
-        )
-        semantic = predict_semantic_family(
-            record,
-            semantic_text_embeddings,
-            semantic_prompt_families,
-        )
-        prompt_suggestions = () if prompt_index is None else prompt_index.predict(record, top_k=3)
         panns_events, row_panns_status, panns_model_id = predict_optional_panns(
             panns_provider,
             audio_path,
@@ -106,9 +174,13 @@ def main(argv: list[str] | None = None) -> int:
             panns_events,
             prediction.predicted_label,
         )
+        panns_family_scores = map_optional_panns_family_scores(
+            panns_mapping,
+            panns_events,
+        )
         predictions.append(
             {
-                "row_id": str(item["row_id"]),
+                "row_id": row_id,
                 "file_sha256": record.file_sha256,
                 "predicted_label": prediction.predicted_label,
                 "second_label": prediction.second_label,
@@ -121,17 +193,19 @@ def main(argv: list[str] | None = None) -> int:
                 "exact_training_match": ownership.exact_training_match,
                 "ownership_ready": ownership.ready,
                 "ownership_block_reason": ownership.reason,
-                "semantic_family": semantic.predicted_family,
-                "semantic_second_family": semantic.second_family,
-                "semantic_top_score": semantic.top_score,
-                "semantic_second_score": semantic.second_score,
-                "semantic_margin": semantic.margin,
-                "semantic_family_scores": semantic.family_scores,
-                "prompt_brain_status": prompt_brain_status,
+                "semantic_status": semantic_status,
+                "semantic_family": semantic_family,
+                "semantic_second_family": semantic_second_family,
+                "semantic_top_score": semantic_top_score,
+                "semantic_second_score": semantic_second_score,
+                "semantic_margin": semantic_margin,
+                "semantic_family_scores": semantic_family_scores,
+                "prompt_brain_status": row_prompt_status,
                 "prompt_suggestions": [asdict(score) for score in prompt_suggestions],
                 "panns_status": row_panns_status,
                 "panns_model_id": panns_model_id,
                 "panns_events": [asdict(event) for event in panns_events],
+                "panns_family_scores": panns_family_scores,
                 "panns_support_score": panns_evidence.support_score,
                 "panns_contradiction_score": panns_evidence.contradiction_score,
                 "panns_supporting_events": [asdict(event) for event in panns_evidence.supporting_events],
@@ -139,18 +213,86 @@ def main(argv: list[str] | None = None) -> int:
             }
         )
 
-    output_payload = {
+        _write_progress_checkpoint(
+            output_path,
+            position=position,
+            total_items=total_items,
+            index_path=index_path,
+            predictions=predictions,
+            row_errors=row_errors,
+        )
+
+    final_status = "predicted_with_errors" if row_errors else "predicted"
+    _write_prediction_payload(
+        output_path,
+        status=final_status,
+        message=(
+            f"Predicted {len(predictions)} of {total_items} audio waveform(s); "
+            f"{len(row_errors)} row error(s)."
+        ),
+        index_path=str(index_path),
+        predictions=predictions,
+        row_errors=row_errors,
+    )
+    return 0
+
+
+def _write_prediction_payload(
+    output_path: Path,
+    *,
+    status: str,
+    message: str,
+    index_path: str,
+    predictions: list[dict[str, Any]],
+    row_errors: dict[str, str],
+) -> None:
+    """Atomically checkpoint completed neural rows for timeout recovery."""
+    payload = {
         "schema_version": 1,
-        "status": "predicted",
-        "message": f"Predicted {len(predictions)} audio waveform(s).",
-        "index_path": str(index_path),
+        "status": status,
+        "message": message,
+        "index_path": index_path,
         "source_name_policy": "audio waveform only; path and row ID are operational metadata",
         "predictions": predictions,
+        "row_errors": row_errors,
     }
-    output_path = args.output_json.expanduser().resolve()
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(json.dumps(output_payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    return 0
+    temporary_path = output_path.with_name(f".{output_path.name}.tmp")
+    temporary_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    temporary_path.replace(output_path)
+
+
+def _write_progress_checkpoint(
+    output_path: Path,
+    *,
+    position: int,
+    total_items: int,
+    index_path: Path,
+    predictions: list[dict[str, Any]],
+    row_errors: dict[str, str],
+) -> None:
+    """Write one durable per-file progress checkpoint."""
+    _write_prediction_payload(
+        output_path,
+        status="processing",
+        message=(
+            f"Processed {position}/{total_items} audio waveform(s); "
+            f"{len(predictions)} prediction(s), {len(row_errors)} row error(s)."
+        ),
+        index_path=str(index_path),
+        predictions=predictions,
+        row_errors=row_errors,
+    )
+
+
+def _read_prediction_payload(output_path: Path) -> dict[str, Any]:
+    """Read the last complete checkpoint without trusting partial temp files."""
+    if not output_path.is_file():
+        return {}
+    try:
+        payload = json.loads(output_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
 
 
 def load_optional_prompt_index(
@@ -174,6 +316,20 @@ def load_optional_prompt_index(
     except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError):
         return None, "invalid_index"
     return prompt_index, "advisory_only"
+
+
+def predict_optional_prompt_suggestions(
+    prompt_index: ClapPromptIndex | None,
+    record: EmbeddingRecord,
+    configured_status: str,
+) -> tuple[tuple[Any, ...], str]:
+    """Return advisory CLAP prompt guesses without aborting the whole row."""
+    if prompt_index is None:
+        return (), configured_status
+    try:
+        return prompt_index.predict(record, top_k=3), "advisory_only"
+    except (OSError, RuntimeError, ValueError, TypeError, KeyError):
+        return (), "runtime_error"
 
 
 def load_optional_panns_provider(project_root: Path) -> tuple[PannsProvider | None, str]:
@@ -206,6 +362,17 @@ def map_optional_panns_evidence(
         return PannsMappedEvidence(candidate_label, 0.0, 0.0, (), (), ())
     mapped_events = tuple(PannsEventScore(str(event.label), float(event.score)) for event in events)
     return mapping.evaluate(mapped_events, candidate_label)
+
+
+def map_optional_panns_family_scores(
+    mapping: PannsMappingRegistry | None,
+    events: tuple[Any, ...],
+) -> dict[str, float]:
+    """Return candidate-independent grouped PANNs evidence by broad family."""
+    if mapping is None:
+        return {}
+    mapped_events = tuple(PannsEventScore(str(event.label), float(event.score)) for event in events)
+    return {row.family: row.score for row in mapping.aggregate_family_scores(mapped_events)}
 
 
 def predict_optional_panns(

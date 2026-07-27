@@ -27,10 +27,23 @@ from .runtime import (
 from .semantic_panel import (
     SemanticCompatibilityAssessment,
     assess_semantic_label_compatibility,
+    compatible_semantic_families,
 )
 
 MEASURED_CONFLICT_REVIEW = "_TO_REVIEW/Measured Role Conflict"
 MINIMUM_CALIBRATED_OWNERSHIP_PROBABILITY = 0.82
+MINIMUM_CLAP_FAMILY_SUPPORT_SCORE = 0.18
+MAXIMUM_CLAP_COMPATIBLE_GAP = 0.06
+MINIMUM_PANNS_FAMILY_SUPPORT_SCORE = 0.25
+MINIMUM_CROSS_MODEL_CONSENSUS_CONFIDENCE = 0.82
+_CROSS_MODEL_PROMOTABLE_BLOCK_REASONS = frozenset(
+    {
+        "ambiguous_nearest_labels",
+        "insufficient_label_examples",
+        "confidence_calibration_not_promoted",
+        "category_group_not_promoted",
+    }
+)
 
 
 def apply_configured_neural_authority(
@@ -145,6 +158,35 @@ def apply_neural_prediction_to_result(
             )
             evidence["ownership_ready"] = False
             evidence["ownership_block_reason"] = block_reason
+    cross_model_consensus = cross_model_family_consensus(prediction, neural_label)
+    evidence["cross_model_family_consensus"] = cross_model_consensus
+    if (
+        not prediction.ownership_ready
+        and cross_model_consensus["supported"]
+        and prediction.ownership_block_reason in _CROSS_MODEL_PROMOTABLE_BLOCK_REASONS
+        and not neural_structure_conflicts(result, neural_label)
+    ):
+        confidence = float(cross_model_consensus["confidence"])
+        evidence["prototype_ownership_block_reason"] = prediction.ownership_block_reason
+        evidence["ownership_ready"] = True
+        evidence["ownership_reason"] = "cross_model_family_consensus"
+        evidence["ownership_block_reason"] = ""
+        evidence["authority_action"] = "cross_model_family_consensus_owner"
+        reason = (
+            "Familiar source-name-blind memory supplied the detailed category, and "
+            "independent CLAP and PANNs evidence agreed with its broad audible family. "
+            f"The corroborated learned category therefore owns {neural_label}."
+        )
+        return _replace_decision(
+            result,
+            folder_path=neural_label,
+            final_top=neural_label.split("/", 1)[0],
+            consensus_status="neural_cross_model_family_consensus_owner",
+            reason=reason,
+            neural_evidence=evidence,
+            confidence=confidence,
+        )
+
     if prediction.ownership_ready:
         if neural_panns_contradicts(prediction):
             event_names = ", ".join(event.label for event in prediction.panns_contradicting_events[:3])
@@ -286,6 +328,77 @@ def load_optional_confidence_calibration(project_root: Path) -> ConfidenceCalibr
         return ConfidenceCalibrationBundle.load(calibration_dir)
     except (OSError, TypeError, ValueError):
         return None
+
+
+def cross_model_family_consensus(
+    prediction: NeuralRuntimePrediction,
+    neural_label: str,
+) -> dict[str, Any]:
+    """Return conservative positive family support from CLAP and PANNs.
+
+    Learned memory supplies the detailed taxonomy label. CLAP and PANNs may
+    only corroborate its broad audible family; they never invent a leaf. Both
+    independent models must agree, the memory prediction must be in-distribution,
+    and PANNs contradiction must not exceed support.
+    """
+    compatible = compatible_semantic_families(neural_label)
+    clap_scores = {
+        family: float(prediction.semantic_family_scores.get(family, 0.0))
+        for family in compatible
+    }
+    clap_family = max(clap_scores, key=clap_scores.get, default="")
+    clap_score = float(clap_scores.get(clap_family, 0.0))
+    clap_gap = max(0.0, float(prediction.semantic_top_score) - clap_score)
+    clap_supported = bool(
+        compatible
+        and clap_score >= MINIMUM_CLAP_FAMILY_SUPPORT_SCORE
+        and (
+            prediction.semantic_family in compatible
+            or clap_gap <= MAXIMUM_CLAP_COMPATIBLE_GAP
+        )
+    )
+
+    panns_scores = {
+        family: float(prediction.panns_family_scores.get(family, 0.0))
+        for family in compatible
+    }
+    panns_family = max(panns_scores, key=panns_scores.get, default="")
+    panns_family_score = float(panns_scores.get(panns_family, 0.0))
+    panns_score = max(panns_family_score, float(prediction.panns_support_score))
+    panns_supported = bool(
+        compatible
+        and panns_score >= MINIMUM_PANNS_FAMILY_SUPPORT_SCORE
+        and panns_score > float(prediction.panns_contradiction_score)
+    )
+
+    supported = bool(
+        prediction.known_distribution
+        and clap_supported
+        and panns_supported
+    )
+    normalized_clap = min(1.0, clap_score / 0.40)
+    confidence = min(
+        0.98,
+        max(
+            MINIMUM_CROSS_MODEL_CONSENSUS_CONFIDENCE if supported else 0.0,
+            0.60 * float(prediction.top_similarity)
+            + 0.20 * normalized_clap
+            + 0.20 * min(1.0, panns_score),
+        ),
+    )
+    return {
+        "supported": supported,
+        "compatible_families": list(compatible),
+        "clap_supported": clap_supported,
+        "clap_family": clap_family,
+        "clap_score": clap_score,
+        "clap_gap": clap_gap,
+        "panns_supported": panns_supported,
+        "panns_family": panns_family,
+        "panns_score": panns_score,
+        "memory_known_distribution": bool(prediction.known_distribution),
+        "confidence": confidence,
+    }
 
 
 def calibrated_neural_probabilities(
@@ -589,6 +702,7 @@ def _replace_decision(
     consensus_status: str,
     reason: str,
     neural_evidence: dict[str, Any],
+    confidence: float | None = None,
 ) -> SortFileResult:
     trace = dict(result.decision.authority_trace) if isinstance(result.decision.authority_trace, dict) else {}
     trace["neural_runtime"] = neural_evidence
@@ -598,6 +712,9 @@ def _replace_decision(
         "consensus_status": result.decision.consensus_status,
     }
     trace["final_source"] = consensus_status
+    combined_rank_score = result.decision.combined_rank_score
+    if confidence is not None and confidence > 0.0:
+        combined_rank_score = max(0.0, (1.0 / confidence) - 1.0)
     decision: ConsensusDecision = replace(
         result.decision,
         final_label=folder_path,
@@ -605,6 +722,7 @@ def _replace_decision(
         folder_path=folder_path,
         consensus_status=consensus_status,
         reason=reason,
+        combined_rank_score=combined_rank_score,
         authority_trace=trace,
     )
     return replace(result, decision=decision)
@@ -630,6 +748,7 @@ def _prediction_evidence(prediction: NeuralRuntimePrediction) -> dict[str, Any]:
         "semantic_second_score": prediction.semantic_second_score,
         "semantic_margin": prediction.semantic_margin,
         "semantic_family_scores": dict(prediction.semantic_family_scores),
+        "panns_family_scores": dict(prediction.panns_family_scores),
         "panns_support_score": prediction.panns_support_score,
         "panns_contradiction_score": prediction.panns_contradiction_score,
         "panns_supporting_events": [

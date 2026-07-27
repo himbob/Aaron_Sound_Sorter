@@ -79,9 +79,10 @@ def test_web_gui_shell_contains_core_controls() -> None:
     assert "Technical details" in html
     assert "Choose the Correct Folder" in html
     assert "neural_explanation_lines" in html
-    assert "CLAP: No Result." in html
-    assert "PANNs: No Result." in html
-    assert "raw score" in html
+    assert "CLAP: Analyzing..." in html
+    assert "PANNs: Analyzing..." in html
+    assert "neuralLaneEmptyText" in html
+    assert "top broad guesses" in html
     assert "categoryModal" in html
     assert "Choose Approved Folder" in html
     assert "Apply Approved Folder" in html
@@ -194,11 +195,12 @@ def test_session_payload_preserves_preview_rows() -> None:
         "Drums/Kick Drums/Generic Kick/One Shots",
         "FX/Impacts and Hits/Boom/One Shots",
     ]
+    assert payload["rows"][0]["neural_decision_state"] == "finalized_without_neural"
     assert payload["rows"][0]["neural_explanation_lines"][:4] == [
         "Your trained memory: No Result.",
-        "CLAP broad hearing: No Result.",
-        "CLAP detailed suggestions: No Result; they did not affect sorting.",
-        "PANNs broad events: No Result.",
+        "CLAP broad hearing: Unavailable (unavailable).",
+        "CLAP detailed suggestions: Unavailable (unavailable); they did not affect sorting.",
+        "PANNs broad events: Unavailable; the model did not return an event list.",
     ]
 
 

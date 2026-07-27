@@ -539,6 +539,11 @@ class SorterRequestHandler(BaseHTTPRequestHandler):
     def finalize_stopped_preview(self, job: PreviewJob, input_path: Path) -> None:
         """Create a normal review/export session from completed live rows."""
         rows = [job.completed_rows[index] for index in sorted(job.completed_rows)]
+        for row in rows:
+            if row.neural_decision_state == "provisional":
+                row.neural_decision_state = "finalized_without_neural"
+                row.neural_runtime_status = "stopped_before_neural"
+                row.neural_runtime_message = "Preview was stopped before neural analysis finalized this row."
         if not rows:
             job.status = "stopped"
             job.message = "Stopped before any sounds finished. Nothing was discarded because nothing was ready yet."

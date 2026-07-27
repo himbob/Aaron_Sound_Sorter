@@ -132,10 +132,6 @@ def _safe_percentile(values: object, percentile: float) -> float:
     return float(np.percentile(arr, percentile)) if arr.size else 0.0
 
 
-def _safe_sum(values: object) -> float:
-    arr = np.asarray(values, dtype=np.float32).reshape(-1)
-    arr = arr[np.isfinite(arr)]
-    return float(np.sum(arr)) if arr.size else 0.0
 
 
 def _bounded_mono(mono: np.ndarray, sr: int) -> np.ndarray:

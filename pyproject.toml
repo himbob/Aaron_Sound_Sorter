@@ -28,6 +28,8 @@ quality = [
   "ruff>=0.8,<1",
   "mypy>=1.8,<2",
   "pydocstyle>=6.3,<7",
+  "scikit-learn>=1.4,<2",
+  "vulture>=2.16,<3",
 ]
 dev = [
   "pytest>=8,<9",
@@ -36,6 +38,8 @@ dev = [
   "ruff>=0.8,<1",
   "mypy>=1.8,<2",
   "pydocstyle>=6.3,<7",
+  "scikit-learn>=1.4,<2",
+  "vulture>=2.16,<3",
   "packaging>=24,<26",
   "tomli>=2,<3; python_version < '3.11'",
   "build>=1.2,<2",
@@ -49,6 +53,8 @@ quality = [
   "ruff>=0.8,<1",
   "mypy>=1.8,<2",
   "pydocstyle>=6.3,<7",
+  "scikit-learn>=1.4,<2",
+  "vulture>=2.16,<3",
 ]
 dev = [
   "pytest>=8,<9",
@@ -57,6 +63,8 @@ dev = [
   "ruff>=0.8,<1",
   "mypy>=1.8,<2",
   "pydocstyle>=6.3,<7",
+  "scikit-learn>=1.4,<2",
+  "vulture>=2.16,<3",
   "packaging>=24,<26",
   "tomli>=2,<3; python_version < '3.11'",
   "build>=1.2,<2",
@@ -159,3 +167,10 @@ add-ignore = [
 ]
 match = "^(?!test_|\\._).*\\.py$"
 match-dir = "^(?!tests$|_reports$|__pycache__$|\\.pytest_cache$|\\.mypy_cache$|\\.ruff_cache$).*"
+
+[tool.vulture]
+paths = ["src/aaron_sound_sorter"]
+min_confidence = 90
+sort_by_size = true
+exclude = ["*/__pycache__/*", "*/_reports/*"]
+ignore_names = ["visit_*", "test_*", "setUp", "tearDown"]

@@ -234,7 +234,8 @@ class SortPreviewService:
             sort_workers: Per-file classification worker count.
             progress_callback: Optional callback receiving completed file count,
                 total file count, and the latest display file name.
-            row_callback: Optional callback receiving each completed preview row.
+            row_callback: Optional callback receiving each finalized preview row.
+            Rows are not published while neural evidence is still pending.
             cancel_requested: Optional callback returning true when the browser
                 has requested cooperative cancellation.
 
@@ -303,7 +304,10 @@ class SortPreviewService:
                 use_harmonic_brains_in_sort=request.use_harmonic_brains_in_sort,
                 max_workers=request.sort_workers,
                 progress_callback=progress_callback,
-                row_callback=row_callback,
+                # Do not publish the base-sorter candidate. A GUI row is only
+                # complete after memory, CLAP, PANNs, and neural authority have
+                # finished the final category decision.
+                row_callback=None,
                 cancel_requested=cancel_requested,
             )
             _raise_if_preview_cancelled(cancel_requested)
@@ -315,7 +319,7 @@ class SortPreviewService:
                 run_dir,
             )
             apply_neural_runtime_authority(rows, neural_batch, project_root=self.project_root)
-            if row_callback is not None and neural_batch.predictions:
+            if row_callback is not None:
                 for row in rows:
                     row_callback(row)
             session = SortPreviewSession(
@@ -1152,6 +1156,7 @@ def preview_row_from_result(index: int, result: SortFileResult) -> PreviewRow:
         decision_reason=str(decision.reason or ""),
         diagnostic_summary=diagnostic_summary(result),
         candidate_folders=detected_candidate_folders(result),
+        neural_decision_state="provisional",
         result=result,
     )
 
@@ -1174,10 +1179,26 @@ def apply_neural_runtime_authority(
     authority_groups = enabled_authority_groups(project_root) if project_root is not None else None
     for row in rows:
         prediction = predictions.get(row.row_id)
+        row.neural_runtime_status = batch.status
+        row.neural_runtime_message = batch.message
+        row.neural_row_error = str(batch.row_errors.get(row.row_id, ""))
         if prediction is None:
-            if batch.status in {"error", "unavailable"}:
+            row.neural_decision_state = "finalized_without_neural"
+            if row.neural_row_error:
+                row.neural_runtime_status = "row_error"
+                row.diagnostic_summary = (
+                    f"{row.diagnostic_summary}; neural=row_error ({row.neural_row_error})"
+                )
+            elif batch.status == "partial_timeout":
+                row.neural_runtime_status = "not_completed_timeout"
+                row.diagnostic_summary = (
+                    f"{row.diagnostic_summary}; neural=not_completed_timeout ({batch.message})"
+                )
+            elif batch.status in {"error", "unavailable"}:
                 row.diagnostic_summary = f"{row.diagnostic_summary}; neural={batch.status} ({batch.message})"
             continue
+        row.neural_runtime_status = "predicted"
+        row.neural_decision_state = "finalized"
         _apply_neural_prediction(
             row,
             prediction,
@@ -1204,9 +1225,13 @@ def _apply_neural_prediction(
     row.neural_similarity = prediction.top_similarity
     row.neural_margin = prediction.margin
     row.neural_radius_ratio = prediction.radius_ratio
+    row.neural_semantic_status = prediction.semantic_status
     row.neural_semantic_family = prediction.semantic_family
+    row.neural_semantic_second_family = prediction.semantic_second_family
     row.neural_semantic_score = prediction.semantic_top_score
+    row.neural_semantic_second_score = prediction.semantic_second_score
     row.neural_semantic_margin = prediction.semantic_margin
+    row.neural_semantic_family_scores = dict(prediction.semantic_family_scores)
     row.neural_prompt_status = prediction.prompt_brain_status
     row.neural_prompt_suggestions = [
         {
@@ -1224,6 +1249,7 @@ def _apply_neural_prediction(
     row.panns_status = prediction.panns_status
     row.panns_model_id = prediction.panns_model_id
     row.panns_events = [{"label": event.label, "score": event.score} for event in prediction.panns_events]
+    row.panns_family_scores = dict(prediction.panns_family_scores)
     row.panns_support_score = prediction.panns_support_score
     row.panns_contradiction_score = prediction.panns_contradiction_score
     row.panns_supporting_events = [
@@ -1247,7 +1273,8 @@ def _apply_neural_prediction(
         f"radius_ratio={prediction.radius_ratio:.3f}, "
         f"semantic={prediction.semantic_family or 'none'}, "
         f"semantic_score={prediction.semantic_top_score:.3f}, "
-        f"semantic_margin={prediction.semantic_margin:.3f})"
+        f"semantic_margin={prediction.semantic_margin:.3f}, "
+        f"panns_families={dict(prediction.panns_family_scores)})"
     )
     row.diagnostic_summary = f"{row.diagnostic_summary}; {neural_summary}"
     if not is_valid_taxonomy_label(neural_label):
@@ -1433,13 +1460,6 @@ def detected_candidate_folders(result: SortFileResult, *, limit: int = 40) -> li
         ]
     return candidates
 
-
-def _preview_number(value: object) -> float:
-    """Return one finite-enough GUI diagnostic number or zero."""
-    try:
-        return float(value or 0.0)
-    except (TypeError, ValueError):
-        return 0.0
 
 
 def add_guess_folders(
@@ -1818,6 +1838,10 @@ def preview_manifest_fields() -> list[str]:
         "decision_reason",
         "diagnostic_summary",
         "candidate_folders_json",
+        "neural_decision_state",
+        "neural_runtime_status",
+        "neural_runtime_message",
+        "neural_row_error",
         "neural_folder",
         "neural_known_distribution",
         "neural_ownership_ready",
@@ -1827,6 +1851,7 @@ def preview_manifest_fields() -> list[str]:
         "neural_similarity",
         "neural_margin",
         "neural_radius_ratio",
+        "neural_semantic_status",
         "neural_semantic_family",
         "neural_semantic_score",
         "neural_semantic_margin",
@@ -1859,6 +1884,10 @@ def preview_row_to_csv(row: PreviewRow) -> dict[str, str]:
         "decision_reason": row.decision_reason,
         "diagnostic_summary": row.diagnostic_summary,
         "candidate_folders_json": json.dumps(row.candidate_folders, sort_keys=True),
+        "neural_decision_state": row.neural_decision_state,
+        "neural_runtime_status": row.neural_runtime_status,
+        "neural_runtime_message": row.neural_runtime_message,
+        "neural_row_error": row.neural_row_error,
         "neural_folder": row.neural_folder,
         "neural_known_distribution": (
             "" if row.neural_known_distribution is None else ("1" if row.neural_known_distribution else "0")
@@ -1872,6 +1901,7 @@ def preview_row_to_csv(row: PreviewRow) -> dict[str, str]:
         "neural_similarity": f"{row.neural_similarity:.8f}",
         "neural_margin": f"{row.neural_margin:.8f}",
         "neural_radius_ratio": f"{row.neural_radius_ratio:.8f}",
+        "neural_semantic_status": row.neural_semantic_status,
         "neural_semantic_family": row.neural_semantic_family,
         "neural_semantic_score": f"{row.neural_semantic_score:.8f}",
         "neural_semantic_margin": f"{row.neural_semantic_margin:.8f}",

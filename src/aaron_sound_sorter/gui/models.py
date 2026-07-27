@@ -38,6 +38,13 @@ class PreviewRow:
         diagnostic_summary: Compact human-readable voter/shape summary.
         candidate_folders: Diagnostic candidate folders proposed by voters and
             final arbitration. These are displayed only as human override hints.
+        neural_decision_state: Whether the visible category is still provisional
+            or has been finalized after neural evidence was applied.
+        neural_runtime_status: Batch or per-row neural execution state. This
+            distinguishes a genuine empty model result from timeout/runtime
+            failure.
+        neural_runtime_message: Human-readable runtime detail for diagnostics.
+        neural_row_error: Per-file neural worker error, when one occurred.
         neural_folder: Source-name-blind neural prototype prediction.
         neural_known_distribution: Whether the prediction falls inside a
             learned neighborhood. ``None`` means neural inference was absent.
@@ -50,9 +57,14 @@ class PreviewRow:
         neural_similarity: Cosine similarity to the winning prototype.
         neural_margin: Similarity lead over the second label.
         neural_radius_ratio: Distance relative to the learned label radius.
+        neural_semantic_status: Availability state for broad CLAP semantic
+            hearing.
         neural_semantic_family: Independent audio/text source-family winner.
+        neural_semantic_second_family: Runner-up broad CLAP family.
         neural_semantic_score: Similarity for the semantic family winner.
+        neural_semantic_second_score: Similarity for the runner-up family.
         neural_semantic_margin: Lead over the second semantic family.
+        neural_semantic_family_scores: Raw scores for every broad CLAP family.
         neural_prompt_status: Availability state for the read-only detailed
             CLAP prompt brain.
         neural_prompt_suggestions: Experimental detailed category suggestions
@@ -60,6 +72,7 @@ class PreviewRow:
         panns_status: Availability state for the independent PANNs lane.
         panns_model_id: Pinned PANNs checkpoint and preprocessing identity.
         panns_events: Raw broad AudioSet events for human-visible evidence.
+        panns_family_scores: Candidate-independent grouped PANNs family evidence.
         panns_support_score: Strongest mapped event supporting trained memory.
         panns_contradiction_score: Strongest mapped event rejecting trained memory.
         panns_supporting_events: Mapped broad events supporting trained memory.
@@ -88,6 +101,10 @@ class PreviewRow:
     decision_reason: str
     diagnostic_summary: str
     candidate_folders: list[str] = field(default_factory=list)
+    neural_decision_state: str = "finalized_without_neural"
+    neural_runtime_status: str = "not_run"
+    neural_runtime_message: str = ""
+    neural_row_error: str = ""
     neural_folder: str = ""
     neural_known_distribution: bool | None = None
     neural_ownership_ready: bool | None = None
@@ -97,14 +114,19 @@ class PreviewRow:
     neural_similarity: float = 0.0
     neural_margin: float = 0.0
     neural_radius_ratio: float = 0.0
+    neural_semantic_status: str = "unavailable"
     neural_semantic_family: str = ""
+    neural_semantic_second_family: str = ""
     neural_semantic_score: float = 0.0
+    neural_semantic_second_score: float = 0.0
     neural_semantic_margin: float = 0.0
+    neural_semantic_family_scores: dict[str, float] = field(default_factory=dict)
     neural_prompt_status: str = "unavailable"
     neural_prompt_suggestions: list[dict[str, str | float]] = field(default_factory=list)
     panns_status: str = "unavailable"
     panns_model_id: str = ""
     panns_events: list[dict[str, str | float]] = field(default_factory=list)
+    panns_family_scores: dict[str, float] = field(default_factory=dict)
     panns_support_score: float = 0.0
     panns_contradiction_score: float = 0.0
     panns_supporting_events: list[dict[str, str | float]] = field(default_factory=list)
