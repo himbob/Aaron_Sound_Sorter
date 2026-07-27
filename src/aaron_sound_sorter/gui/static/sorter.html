@@ -1238,12 +1238,16 @@ const trainingStatus = document.getElementById("trainingStatus");
     quickOpenTrainingReportButton.disabled = openTrainingReportButton.disabled;
   }
 
-  function setBusy(isBusy) {
+  function hasProvisionalRows() {
+  return state.rows.some(row => String(row?.neural_decision_state || "provisional") === "provisional");
+}
+
+function setBusy(isBusy) {
   document.body.classList.toggle("busy", isBusy);
   previewButton.disabled = isBusy;
   stopPreviewButton.disabled = !isBusy || !state.livePreviewJobId;
   cancelPreviewButton.disabled = !isBusy || !state.livePreviewJobId;
-  exportButton.disabled = isBusy || !state.sessionId;
+  exportButton.disabled = isBusy || !state.sessionId || hasProvisionalRows();
   trainCorrectionsButton.disabled = isBusy || correctionRows().length === 0 || !state.sessionId || Boolean(state.trainingJobId) || Boolean(state.exportJobId);
   syncStickyActionDock();
 }
@@ -1336,12 +1340,16 @@ function selectedRowFingerprint(row) {
     row.proposed_folder,
     row.consensus_status,
     row.decision_reason,
+    row.neural_decision_state,
+    row.neural_runtime_status,
     row.neural_folder,
     row.neural_known_distribution,
     row.neural_exact_training_match,
     row.neural_semantic_family,
+    row.neural_semantic_family_scores,
     row.neural_semantic_margin,
     row.panns_events,
+    row.panns_family_scores,
     row.candidate_folders,
     row.possible_fx_folders,
     row.neural_explanation_lines,
@@ -1654,7 +1662,7 @@ async function loadSession(sessionId) {
   }
   openReportButton.disabled = !state.lastReportPath;
   openTrainingReportButton.disabled = true;
-  exportButton.disabled = !state.sessionId;
+  exportButton.disabled = !state.sessionId || hasProvisionalRows();
   trainingStatus.hidden = true;
   syncLabelOptions(state.labels);
     renderRows();
@@ -1864,6 +1872,12 @@ function refreshSelectedRowDetails({ preserveDisclosureState = false } = {}) {
   }
 
   function humanDecisionReason(row) {
+    if (String(row.neural_decision_state || "provisional") === "provisional") {
+      return "This category is provisional. Neural memory, CLAP, and PANNs are still analyzing.";
+    }
+    if (String(row.neural_decision_state || "") === "finalized_without_neural") {
+      return "This row was finalized without neural evidence. The normal sorter controlled the category.";
+    }
     const reasons = {
       neural_legacy_owner_conflict_review: "The systems disagreed about this sound, so the sorter safely asked you.",
       neural_semantic_family_conflict_review: "Trained memory and broad audio hearing disagreed, so the sorter safely asked you.",
@@ -1877,34 +1891,85 @@ function refreshSelectedRowDetails({ preserveDisclosureState = false } = {}) {
   }
 
   function humanEvidenceLines(row) {
+    const decisionState = String(row.neural_decision_state || "provisional");
+    if (decisionState === "provisional") {
+      return [
+        "Decision: Provisional — neural evidence is still analyzing.",
+        "Memory: Analyzing...",
+        "CLAP: Analyzing...",
+        "PANNs: Analyzing..."
+      ];
+    }
+
     let memory;
     if (row.neural_exact_training_match) {
       memory = `Memory: exact match to audio you approved as ${row.neural_folder}.`;
     } else if (row.neural_known_distribution) {
       memory = `Memory: familiar audio; nearest category is ${row.neural_folder || "unclear"}.`;
+    } else if (row.neural_folder) {
+      memory = `Memory: unfamiliar audio; nearest guess is ${row.neural_folder}.`;
     } else {
-      memory = `Memory: unfamiliar audio; nearest guess is ${row.neural_folder || "unclear"}.`;
+      memory = neuralLaneEmptyText(row, "Memory", row.neural_runtime_status);
     }
-    const clapFamilyRaw = String(row.neural_semantic_family || "").trim();
-    const clap = clapFamilyRaw
-      ? `CLAP: nearest guess is ${clapFamilyRaw.replaceAll("_", " ")} `
-        + `(raw score ${Number(row.neural_semantic_score || 0).toFixed(3)}`
-        + `${Number(row.neural_semantic_margin || 0) < 0.025 ? "; weak close call" : ""}).`
-      : "CLAP: No Result.";
+
+    const clapScores = row.neural_semantic_family_scores && typeof row.neural_semantic_family_scores === "object"
+      ? Object.entries(row.neural_semantic_family_scores)
+          .filter(([, score]) => Number.isFinite(Number(score)))
+          .sort((left, right) => Number(right[1]) - Number(left[1]))
+          .slice(0, 3)
+      : [];
+    if (!clapScores.length && row.neural_semantic_family) {
+      clapScores.push([row.neural_semantic_family, Number(row.neural_semantic_score || 0)]);
+      if (row.neural_semantic_second_family) {
+        clapScores.push([row.neural_semantic_second_family, Number(row.neural_semantic_second_score || 0)]);
+      }
+    }
+    const clap = clapScores.length
+      ? `CLAP: top broad guesses are ${clapScores.map(([family, score]) => `${String(family).replaceAll("_", " ")} ${Number(score).toFixed(3)}`).join(", ")}`
+        + `${Number(row.neural_semantic_margin || 0) < 0.025 ? " (weak close call)" : ""}.`
+      : neuralLaneEmptyText(row, "CLAP", row.neural_semantic_status);
+
     const pannsEvents = Array.isArray(row.panns_events)
       ? row.panns_events.slice(0, 5).filter(event => event && event.label)
       : [];
-    const panns = pannsEvents.length
-      ? `PANNs: nearest events are ${pannsEvents.map(event => `${event.label} ${Number(event.score || 0).toFixed(3)}`).join(", ")}.`
-      : "PANNs: No Result.";
-    return [memory, clap, panns];
+    const pannsFamilies = row.panns_family_scores && typeof row.panns_family_scores === "object"
+      ? Object.entries(row.panns_family_scores)
+          .filter(([, score]) => Number.isFinite(Number(score)))
+          .sort((left, right) => Number(right[1]) - Number(left[1]))
+          .slice(0, 3)
+      : [];
+    let panns;
+    if (pannsEvents.length) {
+      const grouped = pannsFamilies.length
+        ? ` Grouped family evidence: ${pannsFamilies.map(([family, score]) => `${String(family).replaceAll("_", " ")} ${Number(score).toFixed(3)}`).join(", ")}.`
+        : "";
+      panns = `PANNs: nearest events are ${pannsEvents.map(event => `${event.label} ${Number(event.score || 0).toFixed(3)}`).join(", ")}.${grouped}`;
+    } else {
+      panns = neuralLaneEmptyText(row, "PANNs", row.panns_status);
+    }
+
+    const stateLine = decisionState === "finalized_without_neural"
+      ? "Decision: Finalized without neural evidence."
+      : "Decision: Finalized after available neural evidence was applied.";
+    return [stateLine, memory, clap, panns];
   }
+
+  function neuralLaneEmptyText(row, laneName, laneStatus) {
+    const status = String(laneStatus || "");
+    if (status === "runtime_error" || status === "row_error") return `${laneName}: Runtime Error.`;
+    if (["unavailable", "invalid_index", "model_mismatch"].includes(status)) return `${laneName}: Unavailable.`;
+    if (String(row.neural_runtime_status || "") === "not_completed_timeout") return `${laneName}: Not Completed before timeout.`;
+    if (String(row.neural_runtime_status || "") === "stopped_before_neural") return `${laneName}: Not Run because preview was stopped.`;
+    return `${laneName}: No Result.`;
+  }
+
 
   function technicalDetailText(row) {
     const alternatives = candidateFolders(row)
       .filter(label => label !== row.approved_folder && label !== row.proposed_folder)
       .slice(0, 12);
     return [
+      `Decision state: ${row.neural_decision_state || "provisional"}`,
       `Decision: ${row.consensus_status}`,
       `Approved: ${row.approved_folder}`,
       `Proposed: ${row.proposed_folder}`,

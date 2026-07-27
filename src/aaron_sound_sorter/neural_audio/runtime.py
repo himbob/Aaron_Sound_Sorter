@@ -51,6 +51,7 @@ class NeuralRuntimePrediction:
     exact_training_match: bool = False
     ownership_ready: bool = False
     ownership_block_reason: str = ""
+    semantic_status: str = "unavailable"
     semantic_family: str = ""
     semantic_second_family: str = ""
     semantic_top_score: float = 0.0
@@ -62,6 +63,7 @@ class NeuralRuntimePrediction:
     panns_status: str = "unavailable"
     panns_model_id: str = ""
     panns_events: tuple[NeuralEventSuggestion, ...] = ()
+    panns_family_scores: Mapping[str, float] = field(default_factory=dict)
     panns_support_score: float = 0.0
     panns_contradiction_score: float = 0.0
     panns_supporting_events: tuple[NeuralEventSuggestion, ...] = ()
@@ -78,6 +80,7 @@ class NeuralRuntimeBatch:
     index_path: str = ""
     report_path: Path | None = None
     log_path: Path | None = None
+    row_errors: Mapping[str, str] = field(default_factory=dict)
 
 
 def load_neural_training_config(project_root: Path) -> dict[str, Any]:
@@ -108,10 +111,12 @@ def run_configured_neural_predictions(
     *,
     timeout_seconds: float = 1800.0,
 ) -> NeuralRuntimeBatch:
-    """Embed and classify a GUI batch in the isolated neural environment.
+    """Embed and classify GUI audio while preserving completed partial rows.
 
-    Paths cross this boundary only so the subprocess can read audio bytes.
-    The model receives decoded waveforms, and results are joined by GUI row ID.
+    The neural worker loads the large models once and checkpoints after every
+    input file. The parent timeout scales with batch size. If the worker still
+    times out or crashes, any completed rows are recovered from the checkpoint
+    instead of turning the entire preview into ``No Result``.
     """
     root = Path(project_root).expanduser().resolve()
     config = load_neural_training_config(root)
@@ -136,39 +141,88 @@ def run_configured_neural_predictions(
         ],
     }
     request_path.write_text(json.dumps(request_payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    base_timeout = max(60.0, float(config.get("runtime_batch_base_timeout_seconds", 300.0)))
+    per_file_timeout = max(1.0, float(config.get("runtime_timeout_seconds_per_file", 45.0)))
+    effective_timeout = max(float(timeout_seconds), base_timeout + per_file_timeout * len(audio_by_row_id))
+    command = [
+        str(configured_neural_python(root)),
+        str(root / "tools" / "predict_neural_audio.py"),
+        "--project-root",
+        str(root),
+        "--request-json",
+        str(request_path),
+        "--output-json",
+        str(response_path),
+    ]
     try:
-        command = [
-            str(configured_neural_python(root)),
-            str(root / "tools" / "predict_neural_audio.py"),
-            "--project-root",
-            str(root),
-            "--request-json",
-            str(request_path),
-            "--output-json",
-            str(response_path),
-        ]
         completed = subprocess.run(
             command,
             cwd=root,
             check=False,
             capture_output=True,
             text=True,
-            timeout=timeout_seconds,
+            timeout=effective_timeout,
+        )
+    except subprocess.TimeoutExpired as exc:
+        stdout = _subprocess_text(exc.stdout)
+        stderr = _subprocess_text(exc.stderr)
+        log_path.write_text(
+            f"timeout_after={effective_timeout:.1f}\n\nSTDOUT\n{stdout}\n\nSTDERR\n{stderr}\n",
+            encoding="utf-8",
+        )
+        return _batch_from_checkpoint(
+            response_path,
+            log_path,
+            status="partial_timeout",
+            fallback_message=(
+                f"Neural runtime timed out after {effective_timeout:.0f} seconds; "
+                "completed rows were preserved."
+            ),
         )
     except (OSError, subprocess.SubprocessError) as exc:
         log_path.write_text(f"Neural prediction launch failed: {exc}\n", encoding="utf-8")
         return NeuralRuntimeBatch("unavailable", str(exc), (), log_path=log_path)
 
     log_path.write_text(
-        f"returncode={completed.returncode}\n\nSTDOUT\n{completed.stdout}\n\nSTDERR\n{completed.stderr}\n",
+        f"returncode={completed.returncode}\n"
+        f"effective_timeout={effective_timeout:.1f}\n\n"
+        f"STDOUT\n{completed.stdout}\n\nSTDERR\n{completed.stderr}\n",
         encoding="utf-8",
     )
-    if completed.returncode != 0 or not response_path.is_file():
-        message = f"Neural prediction process failed with exit code {completed.returncode}."
-        return NeuralRuntimeBatch("error", message, (), report_path=response_path, log_path=log_path)
+    if completed.returncode != 0:
+        return _batch_from_checkpoint(
+            response_path,
+            log_path,
+            status="error",
+            fallback_message=f"Neural prediction process failed with exit code {completed.returncode}.",
+        )
+    return _batch_from_checkpoint(
+        response_path,
+        log_path,
+        status="predicted",
+        fallback_message="Neural prediction process produced no response file.",
+    )
+
+
+def _batch_from_checkpoint(
+    response_path: Path,
+    log_path: Path,
+    *,
+    status: str,
+    fallback_message: str,
+) -> NeuralRuntimeBatch:
+    """Parse a final or partial worker checkpoint without discarding good rows."""
+    if not response_path.is_file():
+        return NeuralRuntimeBatch(status, fallback_message, (), report_path=response_path, log_path=log_path)
     try:
         payload = json.loads(response_path.read_text(encoding="utf-8"))
         predictions = tuple(_prediction_from_mapping(row) for row in payload.get("predictions", []))
+        raw_errors = payload.get("row_errors", {})
+        row_errors = (
+            {str(row_id): str(message) for row_id, message in raw_errors.items()}
+            if isinstance(raw_errors, dict)
+            else {}
+        )
     except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError) as exc:
         return NeuralRuntimeBatch(
             "error",
@@ -177,14 +231,27 @@ def run_configured_neural_predictions(
             report_path=response_path,
             log_path=log_path,
         )
+    payload_status = str(payload.get("status", status))
+    if status in {"partial_timeout", "error"}:
+        payload_status = status
     return NeuralRuntimeBatch(
-        status=str(payload.get("status", "built")),
-        message=str(payload.get("message", "")),
+        status=payload_status,
+        message=str(payload.get("message", "")) or fallback_message,
         predictions=predictions,
         index_path=str(payload.get("index_path", "")),
         report_path=response_path,
         log_path=log_path,
+        row_errors=row_errors,
     )
+
+
+def _subprocess_text(value: str | bytes | None) -> str:
+    """Normalize subprocess timeout output for readable logs."""
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return str(value)
 
 
 def run_configured_neural_rebuild(
@@ -246,6 +313,7 @@ def _prediction_from_mapping(payload: Any) -> NeuralRuntimePrediction:
         exact_training_match=bool(payload.get("exact_training_match", False)),
         ownership_ready=bool(payload.get("ownership_ready", False)),
         ownership_block_reason=str(payload.get("ownership_block_reason", "")),
+        semantic_status=str(payload.get("semantic_status", "unavailable")),
         semantic_family=str(payload.get("semantic_family", "")),
         semantic_second_family=str(payload.get("semantic_second_family", "")),
         semantic_top_score=float(payload.get("semantic_top_score", 0.0)),
@@ -261,6 +329,9 @@ def _prediction_from_mapping(payload: Any) -> NeuralRuntimePrediction:
         panns_status=str(payload.get("panns_status", "unavailable")),
         panns_model_id=str(payload.get("panns_model_id", "")),
         panns_events=tuple(_event_suggestion_from_mapping(event) for event in payload.get("panns_events", [])),
+        panns_family_scores={
+            str(family): float(score) for family, score in dict(payload.get("panns_family_scores", {})).items()
+        },
         panns_support_score=float(payload.get("panns_support_score", 0.0)),
         panns_contradiction_score=float(payload.get("panns_contradiction_score", 0.0)),
         panns_supporting_events=tuple(

@@ -1381,49 +1381,6 @@ class FamilyClaimArbiter:
             max_score=8.0,
         )
 
-    def _facts_or_candidates_support_drum_one_shot(
-        self,
-        facts: SharedAudioFacts | None,
-        raw_claim: ConsensusClaim,
-        winning_claim: ConsensusClaim,
-    ) -> bool:
-        """Require some non-physics agreement before a final drum rescue can fire."""
-        if raw_claim.family == "Drums" or winning_claim.family == "Drums":
-            return True
-        fragments = (
-            "drum",
-            "kick",
-            "snare",
-            "tom",
-            "percussion",
-            "clap",
-            "hat",
-            "cymbal",
-            "rim",
-            "stick",
-            "conga",
-            "bongo",
-            "tabla",
-            "bell",
-            "metallic",
-            "world",
-        )
-        if self._shared_candidate_has_top_family(
-            winning_claim,
-            fragments,
-            top_family="Drums",
-            max_score=14.0,
-            max_brain_rank=8,
-            max_physics_rank=4,
-        ):
-            return True
-        return self._facts_have_internal_candidate(
-            facts,
-            fragments,
-            top_family="Drums",
-            max_rank=6,
-            max_score=8.0,
-        )
 
     @staticmethod
     def _facts_have_physics_drum_candidate(
@@ -3659,69 +3616,6 @@ class FamilyClaimArbiter:
             "DesignedNoiseHybrid": ("designed", "hybrid", "noise"),
         }.get(branch, ("fx",))
 
-    def _parent_music_loop_release_claim(
-        self,
-        winning_claim: ConsensusClaim,
-        facts: SharedAudioFacts | None,
-    ) -> ConsensusClaim | None:
-        """Return broad parent music-loop release when parent evidence is decisive.
-
-        This prevents transition-shape false positives from stealing choppy,
-        tonal, music-like loops when the parent role audit already says the safe
-        broad top family is Instruments. It does not choose a concrete source.
-        """
-        if facts is None or winning_claim.family not in {"FX", "_TO_REVIEW", "Instruments"}:
-            return None
-        parent = (
-            facts.evidence.get("parent_eligibility_v2", {})
-            if isinstance(getattr(facts, "evidence", None), dict)
-            else {}
-        )
-        if not isinstance(parent, dict):
-            return None
-        broad_folder = str(parent.get("broad_folder_path") or "")
-        role_name = str(parent.get("role_name") or "")
-        try:
-            confidence = float(parent.get("confidence", 0.0) or 0.0)
-        except Exception:
-            confidence = 0.0
-        allowed = parent.get("allowed_top_families", [])
-        if (
-            not broad_folder.startswith("Instruments/")
-            or "Instruments" not in allowed
-            or role_name
-            not in {
-                "mixed_music_loop",
-                "pitched_music_loop",
-                "pitched_reed_or_instrument_loop",
-                "pitched_reed_or_instrument_phrase",
-                "bass_loop",
-            }
-            or confidence < 0.60
-        ):
-            return None
-        if self._shape_number(facts, "drumlike_frame_ratio") > 0.18:
-            return None
-        if (
-            self._shape_number(facts, "pitched_event_ratio") < 0.45
-            and self._shape_number(facts, "sustained_tonal_frame_ratio") < 0.35
-        ):
-            return None
-        return claim_from_folder_path(
-            folder_path=broad_folder,
-            source="final_parent_music_loop_release_invariant",
-            reason=(
-                "final structure invariant used decisive parent music-loop evidence to avoid a false transition-FX leaf"
-            ),
-            shared=winning_claim.shared_candidates,
-            raw_candidate_score=winning_claim.raw_candidate_score,
-            brain_rank=winning_claim.brain_rank,
-            physics_rank=winning_claim.physics_rank,
-            shared_winner=winning_claim.shared_winner or winning_claim.folder_path,
-            can_override=True,
-            strength=max(0.90, winning_claim.strength),
-            is_real_candidate=winning_claim.is_real_candidate,
-        )
 
     def _facts_support_clean_tonal_non_drum_hit(
         self,
@@ -3955,41 +3849,6 @@ class FamilyClaimArbiter:
                 return True
         return False
 
-    def _protect_measured_drum_loop_from_fx_or_instrument(
-        self,
-        winning_claim: ConsensusClaim,
-        facts: SharedAudioFacts | None,
-    ) -> ConsensusClaim:
-        """Final structure invariant for measured drum loops stolen by FX.
-
-        This is deliberately a broad role repair, not an identity rescue.  It
-        only fires when measured drum-loop roles are strong and a real Drum
-        Loops candidate exists in the voter/candidate window.  That protects
-        kick-clap, hat/top, and percussion loops from FX glitch/riser theft
-        without using filenames or forcing a specific drum subtype.
-        """
-        path = self._norm_claim_path(winning_claim.folder_path or winning_claim.label)
-        if winning_claim.family == "Drums" and "drum loops" in path:
-            return winning_claim
-        if not self._facts_support_final_drum_loop(facts, winning_claim):
-            return winning_claim
-        return claim_from_folder_path(
-            folder_path="Drums/Drum Loops/Loops",
-            source="final_measured_drum_loop_invariant",
-            reason=(
-                "final structure invariant kept strong measured drum-loop "
-                "evidence out of FX/instrument leaves after voter disagreement; "
-                "kick/drum-loop true-bucket rescue"
-            ),
-            shared=winning_claim.shared_candidates,
-            raw_candidate_score=winning_claim.raw_candidate_score,
-            brain_rank=winning_claim.brain_rank,
-            physics_rank=winning_claim.physics_rank,
-            shared_winner=winning_claim.shared_winner or winning_claim.folder_path,
-            can_override=True,
-            strength=max(0.94, winning_claim.strength),
-            is_real_candidate=winning_claim.is_real_candidate,
-        )
 
     def _review_pitched_music_hit_stolen_by_drum_leaf(
         self,
@@ -7344,18 +7203,6 @@ class FamilyClaimArbiter:
                 return True
         return False
 
-    @staticmethod
-    def _shared_candidate_best_score(winning_claim: ConsensusClaim, fragments: tuple[str, ...]) -> float:
-        best = 9999.0
-        for row in winning_claim.shared_candidates or []:
-            path = str(row.get("folder_path") or row.get("label") or "").lower().replace("\\", "/")
-            if not any(fragment in path for fragment in fragments):
-                continue
-            try:
-                best = min(best, float(row.get("combined_rank_score", 9999.0) or 9999.0))
-            except Exception:
-                continue
-        return best
 
     def _blocked_drum_loop_claim_is_safe(
         self,
@@ -10411,50 +10258,7 @@ class FamilyClaimArbiter:
             and self._reed_sax_physics_witness_score(facts) < 0.62
         )
 
-    @staticmethod
-    def _dry_probe_has_sax_or_reed(facts: SharedAudioFacts | None) -> bool:
-        """Return True when the existing dry/wet probe exposes sax/reed evidence."""
-        if facts is None or not isinstance(getattr(facts, "evidence", None), dict):
-            return False
-        probe = facts.evidence.get("dry_wet_conflict_probe")
-        if not isinstance(probe, dict) or not bool(probe.get("enabled")):
-            return False
-        if bool(probe.get("dry_has_sax_or_reed")):
-            return True
-        buckets = probe.get("dry_source_buckets")
-        if isinstance(buckets, (list, tuple, set)) and any(str(item) == "sax_reed" for item in buckets):
-            return True
-        paths = probe.get("dry_top_paths")
-        if isinstance(paths, (list, tuple, set)):
-            return any(
-                any(token in str(path).lower().replace("\\", "/") for token in ("sax", "saxophone", "woodwind"))
-                for path in paths
-            )
-        return False
 
-    def _facts_support_dark_low_mid_sax_loop(
-        self,
-        facts: SharedAudioFacts | None,
-    ) -> bool:
-        """Return True for dark low-mid sax/reed loop evidence without filename clues."""
-        if facts is None:
-            return False
-        if self._facts_support_clean_vintage_keys_loop(facts):
-            return False
-        sax_score = self._subpanel_score(facts, "woodwind_sax_score")
-        return bool(
-            sax_score >= 0.64
-            and sax_score >= self._subpanel_score(facts, "voice_score") + 0.06
-            and sax_score >= self._subpanel_score(facts, "brass_trumpet_score") + 0.08
-            and _shape_vote_from_facts(facts) in {"pitched_phrase", "vocal_phrase", "solo_phrase", "sustained_pad"}
-            and _shape_confidence_from_facts(facts) >= 0.84
-            and self._shape_number(facts, "pitched_event_ratio") >= 0.90
-            and self._shape_number(facts, "f0_voiced_ratio") >= 0.86
-            and self._shape_number(facts, "high_event_ratio") <= 0.035
-            and self._shape_number(facts, "spectral_flatness_mean") <= 0.040
-            and self._shape_number(facts, "percussive_event_ratio") <= 0.10
-            and self._shape_number(facts, "drumlike_frame_ratio") <= 0.10
-        )
 
     def _facts_support_clean_vintage_keys_loop(
         self,

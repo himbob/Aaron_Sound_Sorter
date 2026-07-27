@@ -168,9 +168,22 @@ class PannsProvider:
             return audio.astype(np.float32, copy=False)
         try:
             import librosa
-        except ImportError as exc:
-            raise RuntimeError("PANNs resampling requires librosa") from exc
+        except ImportError:
+            return self._linear_resample(audio, source_rate, self.sample_rate)
         return librosa.resample(audio, orig_sr=source_rate, target_sr=self.sample_rate).astype(np.float32)
+
+    @staticmethod
+    def _linear_resample(audio: np.ndarray, source_rate: int, target_rate: int) -> np.ndarray:
+        """Provide a bounded deterministic fallback when librosa is unavailable."""
+        if source_rate <= 0 or target_rate <= 0:
+            raise ValueError("PANNs sample rates must be positive")
+        waveform = np.asarray(audio, dtype=np.float32).reshape(-1)
+        if waveform.size <= 1:
+            return waveform.copy()
+        output_size = max(1, int(round(waveform.size * float(target_rate) / float(source_rate))))
+        source_positions = np.linspace(0.0, 1.0, waveform.size, endpoint=False, dtype=np.float64)
+        target_positions = np.linspace(0.0, 1.0, output_size, endpoint=False, dtype=np.float64)
+        return np.interp(target_positions, source_positions, waveform).astype(np.float32)
 
     def _segments(self, audio: np.ndarray) -> list[np.ndarray]:
         if self.max_segments < 1 or self.max_segment_seconds <= 0:

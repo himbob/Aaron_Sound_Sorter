@@ -68,6 +68,7 @@ def _prediction(
     semantic_family: str = "",
     semantic_top_score: float = 0.0,
     semantic_family_scores: dict[str, float] | None = None,
+    panns_family_scores: dict[str, float] | None = None,
     panns_support_score: float = 0.0,
     panns_contradiction_score: float = 0.0,
     panns_supporting_events: tuple[NeuralEventSuggestion, ...] = (),
@@ -90,6 +91,7 @@ def _prediction(
         semantic_family=semantic_family,
         semantic_top_score=semantic_top_score,
         semantic_family_scores=semantic_family_scores or {},
+        panns_family_scores=panns_family_scores or {},
         panns_support_score=panns_support_score,
         panns_contradiction_score=panns_contradiction_score,
         panns_supporting_events=panns_supporting_events,
@@ -354,3 +356,103 @@ def test_cli_neural_unready_conflict_defers_to_exact_human_teacher() -> None:
 
     assert updated.decision == original.decision
     assert updated.facts.evidence["neural_runtime"]["authority_action"] == "defer_to_exact_human_teacher"
+
+
+@pytest.mark.parametrize(
+    ("label", "family", "legacy"),
+    [
+        (
+            "FX/Human and Voice FX/Altered Voice/Long FX",
+            "human_voice",
+            "_TO_REVIEW/Measured Role Conflict",
+        ),
+        (
+            "Instruments/Synths/Synth Pad/Loops",
+            "synth",
+            "Instruments/Keys/Electric Piano/Loops",
+        ),
+        (
+            "Drums/Kick Drums/Generic Kick/One Shots",
+            "drum_kick",
+            "FX/Impacts and Hits/Generic Impact/One Shots",
+        ),
+        (
+            "FX/Animals and Creatures/Animal Vocalizations/Long FX",
+            "animal_creature",
+            "FX/Textures/Abstract Texture/Long FX",
+        ),
+    ],
+)
+def test_familiar_memory_with_clap_and_panns_family_agreement_takes_ownership(
+    label: str,
+    family: str,
+    legacy: str,
+) -> None:
+    updated = apply_neural_prediction_to_result(
+        _result(legacy, loop_like=label.endswith(("Loops", "Long FX"))),
+        _prediction(
+            label,
+            ready=False,
+            known=True,
+            reason="ambiguous_nearest_labels",
+            semantic_family=family,
+            semantic_top_score=0.344,
+            semantic_family_scores={family: 0.344, "fx_impact": 0.18},
+            panns_family_scores={family: 0.429},
+            panns_support_score=0.429,
+        ),
+    )
+
+    assert updated.decision.folder_path == label
+    assert updated.decision.consensus_status == "neural_cross_model_family_consensus_owner"
+    evidence = updated.facts.evidence["neural_runtime"]["cross_model_family_consensus"]
+    assert evidence["supported"] is True
+    assert evidence["confidence"] >= 0.82
+    assert updated.facts.evidence["neural_runtime"]["ownership_ready"] is True
+    assert updated.facts.evidence["neural_runtime"]["authority_action"] == (
+        "cross_model_family_consensus_owner"
+    )
+
+
+def test_cross_model_consensus_requires_both_independent_models() -> None:
+    label = "FX/Human and Voice FX/Altered Voice/Long FX"
+    original = _result("_TO_REVIEW/Measured Role Conflict")
+    updated = apply_neural_prediction_to_result(
+        original,
+        _prediction(
+            label,
+            ready=False,
+            known=True,
+            reason="ambiguous_nearest_labels",
+            semantic_family="human_voice",
+            semantic_top_score=0.344,
+            semantic_family_scores={"human_voice": 0.344},
+            panns_family_scores={},
+            panns_support_score=0.0,
+        ),
+    )
+
+    assert updated.decision.folder_path != label
+    assert updated.facts.evidence["neural_runtime"]["cross_model_family_consensus"]["supported"] is False
+
+
+def test_cross_model_consensus_does_not_promote_out_of_distribution_memory() -> None:
+    label = "FX/Human and Voice FX/Altered Voice/Long FX"
+    original = _result("_TO_REVIEW/Measured Role Conflict")
+    updated = apply_neural_prediction_to_result(
+        original,
+        _prediction(
+            label,
+            ready=False,
+            known=False,
+            reason="outside_learned_radius",
+            semantic_family="human_voice",
+            semantic_top_score=0.344,
+            semantic_family_scores={"human_voice": 0.344},
+            panns_family_scores={"human_voice": 0.429},
+            panns_support_score=0.429,
+        ),
+    )
+
+    assert updated.decision.folder_path != label
+    assert updated.facts.evidence["neural_runtime"]["cross_model_family_consensus"]["supported"] is False

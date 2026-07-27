@@ -1,55 +1,2054 @@
 {
   "schema_version": 1,
-  "mapping_version": "2026-07-26-v2",
-  "description": "Read-only broad AudioSet event mapping. PANNs may support or contradict broad Aaron families but may not own detailed folders.",
+  "mapping_version": "panns-audioset-broad-family-v2",
+  "description": "Read-only broad AudioSet event mapping with grouped family evidence across voice, drums, instruments, animals, machines, nature, foley, impacts, alerts, textures, and transitions. PANNs may support or contradict broad Aaron families but may not own detailed folders.",
   "production_ownership_enabled": false,
   "events": {
-    "Singing": {"supports": ["Instruments/Voice", "FX/Human and Voice FX"], "contradicts": ["Drums", "Instruments", "FX"], "minimum_support_score": 0.30},
-    "Yodeling": {"supports": ["Instruments/Voice", "FX/Human and Voice FX"], "contradicts": ["Drums", "Instruments", "FX"], "minimum_support_score": 0.30},
-    "A capella": {"supports": ["Instruments/Voice", "FX/Human and Voice FX"], "contradicts": ["Drums", "Instruments", "FX"], "minimum_support_score": 0.30},
-    "Speech": {"supports": ["Instruments/Voice", "FX/Human and Voice FX"], "contradicts": ["Drums", "Instruments", "FX"], "minimum_support_score": 0.30},
-    "Rapping": {"supports": ["Instruments/Voice", "FX/Human and Voice FX"], "contradicts": ["Drums", "Instruments", "FX"], "minimum_support_score": 0.30},
-    "Sigh": {"supports": ["Instruments/Voice", "FX/Human and Voice FX"], "contradicts": ["Drums", "Instruments", "FX"], "minimum_support_score": 0.30},
-    "Gasp": {"supports": ["Instruments/Voice", "FX/Human and Voice FX"], "contradicts": ["Drums", "Instruments", "FX"], "minimum_support_score": 0.30},
-    "Wail, moan": {"supports": ["Instruments/Voice", "FX/Human and Voice FX"], "contradicts": ["Drums", "Instruments", "FX"], "minimum_support_score": 0.30},
-    "Screaming": {"supports": ["Instruments/Voice", "FX/Human and Voice FX"], "contradicts": ["Drums", "Instruments", "FX"], "minimum_support_score": 0.30},
-    "Whispering": {"supports": ["Instruments/Voice", "FX/Human and Voice FX"], "contradicts": ["Drums", "Instruments", "FX"], "minimum_support_score": 0.30},
-    "Laughter": {"supports": ["Instruments/Voice", "FX/Human and Voice FX"], "contradicts": ["Drums", "Instruments", "FX"], "minimum_support_score": 0.30},
-    "Crying, sobbing": {"supports": ["Instruments/Voice", "FX/Human and Voice FX"], "contradicts": ["Drums", "Instruments", "FX"], "minimum_support_score": 0.30},
-    "Choir": {"supports": ["Instruments/Voice/Choir"], "contradicts": ["Drums"], "minimum_support_score": 0.35},
-    "Saxophone": {"supports": ["Instruments/Woodwinds/Saxophone"], "contradicts": ["Instruments/Voice", "Drums", "FX/Human and Voice FX"], "minimum_support_score": 0.35},
-    "Flute": {"supports": ["Instruments/Woodwinds/Flute"], "contradicts": ["Instruments/Voice", "Drums"], "minimum_support_score": 0.35},
-    "Clarinet": {"supports": ["Instruments/Woodwinds/Clarinet"], "contradicts": ["Instruments/Voice", "Drums"], "minimum_support_score": 0.35},
-    "Trumpet": {"supports": ["Instruments/Brass/Trumpet"], "contradicts": ["Instruments/Voice", "Drums"], "minimum_support_score": 0.35},
-    "Trombone": {"supports": ["Instruments/Brass/Trombone"], "contradicts": ["Instruments/Voice", "Drums"], "minimum_support_score": 0.35},
-    "Guitar": {"supports": ["Instruments/Guitar", "Instruments/Plucked Strings"], "contradicts": ["Instruments/Voice", "Drums"], "minimum_support_score": 0.35},
-    "Piano": {"supports": ["Instruments/Keys/Piano"], "contradicts": ["Instruments/Voice", "Drums"], "minimum_support_score": 0.35},
-    "Organ": {"supports": ["Instruments/Keys/Organ"], "contradicts": ["Drums"], "minimum_support_score": 0.35},
-    "Electronic organ": {"supports": ["Instruments/Keys/Organ"], "contradicts": ["Instruments/Voice", "Drums"], "minimum_support_score": 0.35},
-    "Hammond organ": {"supports": ["Instruments/Keys/Organ"], "contradicts": ["Instruments/Voice", "Drums"], "minimum_support_score": 0.35},
-    "Keyboard (musical)": {"supports": ["Instruments/Keys"], "contradicts": ["Instruments/Voice", "Drums"], "minimum_support_score": 0.35},
-    "Electric piano": {"supports": ["Instruments/Keys/Piano", "Instruments/Keys/Electric Piano"], "contradicts": ["Instruments/Voice", "Drums"], "minimum_support_score": 0.35},
-    "Synthesizer": {"supports": ["Instruments/Synths"], "contradicts": ["Instruments/Voice", "Drums"], "minimum_support_score": 0.35},
-    "Bass guitar": {"supports": ["Instruments/Bass/Electric Bass"], "contradicts": ["Instruments/Voice"], "minimum_support_score": 0.35},
-    "Drum": {"supports": ["Drums"], "contradicts": ["Instruments/Voice", "Instruments/Woodwinds"], "minimum_support_score": 0.35},
-    "Bass drum": {"supports": ["Drums/Kick Drums"], "contradicts": ["Instruments/Voice", "Instruments/Woodwinds"], "minimum_support_score": 0.35},
-    "Snare drum": {"supports": ["Drums/Snares"], "contradicts": ["Instruments/Voice", "Instruments/Woodwinds"], "minimum_support_score": 0.35},
-    "Cymbal": {"supports": ["Drums/Cymbals", "Drums/Hi Hats"], "contradicts": ["Instruments/Voice"], "minimum_support_score": 0.35},
-    "Percussion": {"supports": ["Drums/Percussion", "Drums/World Percussion"], "contradicts": ["Instruments/Voice"], "minimum_support_score": 0.35},
-    "Dog": {"supports": ["FX/Animals and Creatures/Dog"], "contradicts": ["Instruments/Voice", "Drums"], "minimum_support_score": 0.30},
-    "Cat": {"supports": ["FX/Animals and Creatures/Cat"], "contradicts": ["Instruments/Voice", "Drums"], "minimum_support_score": 0.30},
-    "Bird": {"supports": ["FX/Animals and Creatures/Bird"], "contradicts": ["Instruments/Voice", "Drums"], "minimum_support_score": 0.30},
-    "Engine": {"supports": ["FX/Digital Mechanical Industrial Transport/Machines", "FX/Everyday Foley/Machines"], "contradicts": ["Instruments/Voice"], "minimum_support_score": 0.30},
-    "Water": {"supports": ["FX/Everyday Foley/Water Foley", "FX/Textures/Natural Ambience"], "contradicts": ["Instruments/Voice", "Drums"], "minimum_support_score": 0.30},
-    "Rain": {"supports": ["FX/Textures/Natural Ambience/Rain"], "contradicts": ["Instruments/Voice", "Drums"], "minimum_support_score": 0.30},
-    "Thunder": {"supports": ["FX/Textures/Natural Ambience/Thunder", "FX/Impacts and Hits/Boom"], "contradicts": ["Instruments/Voice"], "minimum_support_score": 0.30},
-    "Fire": {"supports": ["FX/Textures/Natural Ambience/Fire"], "contradicts": ["Instruments/Voice", "Drums"], "minimum_support_score": 0.30},
-    "Explosion": {"supports": ["FX/Impacts and Hits", "FX/Crashes and Breaks"], "contradicts": ["Instruments/Voice"], "minimum_support_score": 0.30},
-    "Glass": {"supports": ["FX/Crashes and Breaks/Glass and Metal", "FX/Everyday Foley/Glass"], "contradicts": ["Instruments/Voice"], "minimum_support_score": 0.30},
-    "Whoosh, swoosh, swish": {"supports": ["FX/Structural and Transitional FX"], "contradicts": ["Instruments/Voice"], "minimum_support_score": 0.30},
-    "Ambient music": {"supports": [], "contradicts": [], "minimum_support_score": 1.0, "neutral": true},
-    "Silence": {"supports": [], "contradicts": [], "minimum_support_score": 1.0, "neutral": true},
-    "Music": {"supports": [], "contradicts": [], "minimum_support_score": 1.0, "neutral": true},
-    "Musical instrument": {"supports": ["Instruments"], "contradicts": [], "minimum_support_score": 0.50, "ambiguous": true}
+    "Singing": {
+      "supports": [
+        "Instruments/Voice",
+        "FX/Human and Voice FX"
+      ],
+      "contradicts": [
+        "Drums",
+        "Instruments",
+        "FX"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Yodeling": {
+      "supports": [
+        "Instruments/Voice",
+        "FX/Human and Voice FX"
+      ],
+      "contradicts": [
+        "Drums",
+        "Instruments",
+        "FX"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "A capella": {
+      "supports": [
+        "Instruments/Voice",
+        "FX/Human and Voice FX"
+      ],
+      "contradicts": [
+        "Drums",
+        "Instruments",
+        "FX"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Speech": {
+      "supports": [
+        "Instruments/Voice",
+        "FX/Human and Voice FX"
+      ],
+      "contradicts": [
+        "Drums",
+        "Instruments",
+        "FX"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Rapping": {
+      "supports": [
+        "Instruments/Voice",
+        "FX/Human and Voice FX"
+      ],
+      "contradicts": [
+        "Drums",
+        "Instruments",
+        "FX"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Sigh": {
+      "supports": [
+        "Instruments/Voice",
+        "FX/Human and Voice FX"
+      ],
+      "contradicts": [
+        "Drums",
+        "Instruments",
+        "FX"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Gasp": {
+      "supports": [
+        "Instruments/Voice",
+        "FX/Human and Voice FX"
+      ],
+      "contradicts": [
+        "Drums",
+        "Instruments",
+        "FX"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Wail, moan": {
+      "supports": [
+        "Instruments/Voice",
+        "FX/Human and Voice FX"
+      ],
+      "contradicts": [
+        "Drums",
+        "Instruments",
+        "FX"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Screaming": {
+      "supports": [
+        "Instruments/Voice",
+        "FX/Human and Voice FX"
+      ],
+      "contradicts": [
+        "Drums",
+        "Instruments",
+        "FX"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Whispering": {
+      "supports": [
+        "Instruments/Voice",
+        "FX/Human and Voice FX"
+      ],
+      "contradicts": [
+        "Drums",
+        "Instruments",
+        "FX"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Laughter": {
+      "supports": [
+        "Instruments/Voice",
+        "FX/Human and Voice FX"
+      ],
+      "contradicts": [
+        "Drums",
+        "Instruments",
+        "FX"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Crying, sobbing": {
+      "supports": [
+        "Instruments/Voice",
+        "FX/Human and Voice FX"
+      ],
+      "contradicts": [
+        "Drums",
+        "Instruments",
+        "FX"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Choir": {
+      "supports": [
+        "Instruments/Voice/Choir"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.35
+    },
+    "Saxophone": {
+      "supports": [
+        "Instruments/Woodwinds/Saxophone"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums",
+        "FX/Human and Voice FX"
+      ],
+      "minimum_support_score": 0.35
+    },
+    "Flute": {
+      "supports": [
+        "Instruments/Woodwinds/Flute"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.35
+    },
+    "Clarinet": {
+      "supports": [
+        "Instruments/Woodwinds/Clarinet"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.35
+    },
+    "Trumpet": {
+      "supports": [
+        "Instruments/Brass/Trumpet"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.35
+    },
+    "Trombone": {
+      "supports": [
+        "Instruments/Brass/Trombone"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.35
+    },
+    "Guitar": {
+      "supports": [
+        "Instruments/Guitar",
+        "Instruments/Plucked Strings"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.35
+    },
+    "Piano": {
+      "supports": [
+        "Instruments/Keys/Piano"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.35
+    },
+    "Organ": {
+      "supports": [
+        "Instruments/Keys/Organ"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.35
+    },
+    "Electronic organ": {
+      "supports": [
+        "Instruments/Keys/Organ"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.35
+    },
+    "Hammond organ": {
+      "supports": [
+        "Instruments/Keys/Organ"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.35
+    },
+    "Keyboard (musical)": {
+      "supports": [
+        "Instruments/Keys"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.35
+    },
+    "Electric piano": {
+      "supports": [
+        "Instruments/Keys/Piano",
+        "Instruments/Keys/Electric Piano"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.35
+    },
+    "Synthesizer": {
+      "supports": [
+        "Instruments/Synths"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.35
+    },
+    "Bass guitar": {
+      "supports": [
+        "Instruments/Bass/Electric Bass"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.35
+    },
+    "Drum": {
+      "supports": [
+        "Drums"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Instruments/Woodwinds"
+      ],
+      "minimum_support_score": 0.35
+    },
+    "Bass drum": {
+      "supports": [
+        "Drums/Kick Drums"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Instruments/Woodwinds"
+      ],
+      "minimum_support_score": 0.35
+    },
+    "Snare drum": {
+      "supports": [
+        "Drums/Snares"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Instruments/Woodwinds"
+      ],
+      "minimum_support_score": 0.35
+    },
+    "Cymbal": {
+      "supports": [
+        "Drums/Cymbals",
+        "Drums/Hi Hats"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.35
+    },
+    "Percussion": {
+      "supports": [
+        "Drums/Percussion",
+        "Drums/World Percussion"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.35
+    },
+    "Dog": {
+      "supports": [
+        "FX/Animals and Creatures/Dog"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Cat": {
+      "supports": [
+        "FX/Animals and Creatures/Cat"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Bird": {
+      "supports": [
+        "FX/Animals and Creatures/Bird"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Engine": {
+      "supports": [
+        "FX/Digital Mechanical Industrial Transport/Machines",
+        "FX/Everyday Foley/Machines"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Water": {
+      "supports": [
+        "FX/Everyday Foley/Water Foley",
+        "FX/Textures/Natural Ambience"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Rain": {
+      "supports": [
+        "FX/Textures/Natural Ambience/Rain"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Thunder": {
+      "supports": [
+        "FX/Textures/Natural Ambience/Thunder",
+        "FX/Impacts and Hits/Boom"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Fire": {
+      "supports": [
+        "FX/Textures/Natural Ambience/Fire"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Explosion": {
+      "supports": [
+        "FX/Impacts and Hits",
+        "FX/Crashes and Breaks"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Glass": {
+      "supports": [
+        "FX/Crashes and Breaks/Glass and Metal",
+        "FX/Everyday Foley/Glass"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Whoosh, swoosh, swish": {
+      "supports": [
+        "FX/Structural and Transitional FX"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Ambient music": {
+      "supports": [],
+      "contradicts": [],
+      "minimum_support_score": 1.0,
+      "neutral": true
+    },
+    "Silence": {
+      "supports": [],
+      "contradicts": [],
+      "minimum_support_score": 1.0,
+      "neutral": true
+    },
+    "Music": {
+      "supports": [],
+      "contradicts": [],
+      "minimum_support_score": 1.0,
+      "neutral": true
+    },
+    "Musical instrument": {
+      "supports": [
+        "Instruments"
+      ],
+      "contradicts": [],
+      "minimum_support_score": 0.5,
+      "ambiguous": true
+    },
+    "Male singing": {
+      "supports": [
+        "Instruments/Voice",
+        "FX/Human and Voice FX"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Female singing": {
+      "supports": [
+        "Instruments/Voice",
+        "FX/Human and Voice FX"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Child singing": {
+      "supports": [
+        "Instruments/Voice",
+        "FX/Human and Voice FX"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Synthetic singing": {
+      "supports": [
+        "Instruments/Voice",
+        "FX/Human and Voice FX"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Humming": {
+      "supports": [
+        "Instruments/Voice",
+        "FX/Human and Voice FX"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Whistling": {
+      "supports": [
+        "Instruments/Voice",
+        "FX/Human and Voice FX"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Beatboxing": {
+      "supports": [
+        "Instruments/Voice",
+        "FX/Human and Voice FX"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Conversation": {
+      "supports": [
+        "Instruments/Voice",
+        "FX/Human and Voice FX"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Narration, monologue": {
+      "supports": [
+        "Instruments/Voice",
+        "FX/Human and Voice FX"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Babbling": {
+      "supports": [
+        "Instruments/Voice",
+        "FX/Human and Voice FX"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Speech synthesizer": {
+      "supports": [
+        "Instruments/Voice",
+        "FX/Human and Voice FX"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Shout": {
+      "supports": [
+        "Instruments/Voice",
+        "FX/Human and Voice FX"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Bellow": {
+      "supports": [
+        "Instruments/Voice",
+        "FX/Human and Voice FX"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Whoop": {
+      "supports": [
+        "Instruments/Voice",
+        "FX/Human and Voice FX"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Yell": {
+      "supports": [
+        "Instruments/Voice",
+        "FX/Human and Voice FX"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Children shouting": {
+      "supports": [
+        "Instruments/Voice",
+        "FX/Human and Voice FX"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Breathing": {
+      "supports": [
+        "FX/Human and Voice FX"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Snoring": {
+      "supports": [
+        "FX/Human and Voice FX"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Cough": {
+      "supports": [
+        "FX/Human and Voice FX"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Throat clearing": {
+      "supports": [
+        "FX/Human and Voice FX"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Sneeze": {
+      "supports": [
+        "FX/Human and Voice FX"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Baby cry, infant cry": {
+      "supports": [
+        "FX/Human and Voice FX"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Whimper": {
+      "supports": [
+        "FX/Human and Voice FX"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Drum kit": {
+      "supports": [
+        "Drums"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Drum machine": {
+      "supports": [
+        "Drums"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Drum roll": {
+      "supports": [
+        "Drums"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Rimshot": {
+      "supports": [
+        "Drums/Rims and Sticks"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Hi-hat": {
+      "supports": [
+        "Drums/Hi Hats"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Crash cymbal": {
+      "supports": [
+        "Drums/Cymbals"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Tambourine": {
+      "supports": [
+        "Drums/Percussion",
+        "Drums/World Percussion"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Maraca": {
+      "supports": [
+        "Drums/Percussion",
+        "Drums/World Percussion"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Rattle (instrument)": {
+      "supports": [
+        "Drums/Percussion",
+        "Drums/World Percussion"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Gong": {
+      "supports": [
+        "Drums/Percussion",
+        "Drums/World Percussion"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Violin, fiddle": {
+      "supports": [
+        "Instruments/Strings Bowed"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Viola": {
+      "supports": [
+        "Instruments/Strings Bowed"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Cello": {
+      "supports": [
+        "Instruments/Strings Bowed"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Double bass": {
+      "supports": [
+        "Instruments/Strings Bowed"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "String section": {
+      "supports": [
+        "Instruments/Strings Bowed"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Harp": {
+      "supports": [
+        "Instruments/Plucked Strings"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Banjo": {
+      "supports": [
+        "Instruments/Plucked Strings"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Mandolin": {
+      "supports": [
+        "Instruments/Plucked Strings"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Sitar": {
+      "supports": [
+        "Instruments/Plucked Strings"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Ukulele": {
+      "supports": [
+        "Instruments/Plucked Strings"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Oboe": {
+      "supports": [
+        "Instruments/Woodwinds"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Bassoon": {
+      "supports": [
+        "Instruments/Woodwinds"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Recorder": {
+      "supports": [
+        "Instruments/Woodwinds"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "French horn": {
+      "supports": [
+        "Instruments/Brass"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Tuba": {
+      "supports": [
+        "Instruments/Brass"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Marimba, xylophone": {
+      "supports": [
+        "Instruments/Mallets and Bells"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Glockenspiel": {
+      "supports": [
+        "Instruments/Mallets and Bells"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Vibraphone": {
+      "supports": [
+        "Instruments/Mallets and Bells"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Steelpan": {
+      "supports": [
+        "Instruments/Mallets and Bells"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Tubular bells": {
+      "supports": [
+        "Instruments/Mallets and Bells"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.3
+    },
+    "Domestic animals, pets": {
+      "supports": [
+        "FX/Animals and Creatures"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.25,
+      "ambiguous": true
+    },
+    "Livestock, farm animals, working animals": {
+      "supports": [
+        "FX/Animals and Creatures"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.25,
+      "ambiguous": true
+    },
+    "Wild animals": {
+      "supports": [
+        "FX/Animals and Creatures"
+      ],
+      "contradicts": [
+        "Drums"
+      ],
+      "minimum_support_score": 0.25,
+      "ambiguous": true
+    },
+    "Roaring cats (lions, tigers)": {
+      "supports": [
+        "FX/Animals and Creatures"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Mouse": {
+      "supports": [
+        "FX/Animals and Creatures"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Horse": {
+      "supports": [
+        "FX/Animals and Creatures"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Cattle, bovinae": {
+      "supports": [
+        "FX/Animals and Creatures"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Pig": {
+      "supports": [
+        "FX/Animals and Creatures"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Goat": {
+      "supports": [
+        "FX/Animals and Creatures"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Sheep": {
+      "supports": [
+        "FX/Animals and Creatures"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Chicken, rooster": {
+      "supports": [
+        "FX/Animals and Creatures"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Duck": {
+      "supports": [
+        "FX/Animals and Creatures"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Goose": {
+      "supports": [
+        "FX/Animals and Creatures"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Turkey": {
+      "supports": [
+        "FX/Animals and Creatures"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Frog": {
+      "supports": [
+        "FX/Animals and Creatures"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Insect": {
+      "supports": [
+        "FX/Animals and Creatures"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Cricket": {
+      "supports": [
+        "FX/Animals and Creatures"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Mosquito": {
+      "supports": [
+        "FX/Animals and Creatures"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Fly, housefly": {
+      "supports": [
+        "FX/Animals and Creatures"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Bee, wasp, etc.": {
+      "supports": [
+        "FX/Animals and Creatures"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Vehicle": {
+      "supports": [
+        "FX/Digital Mechanical Industrial Transport/Machines"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Car": {
+      "supports": [
+        "FX/Digital Mechanical Industrial Transport/Machines"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Motor vehicle (road)": {
+      "supports": [
+        "FX/Digital Mechanical Industrial Transport/Machines"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Motorcycle": {
+      "supports": [
+        "FX/Digital Mechanical Industrial Transport/Machines"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Aircraft": {
+      "supports": [
+        "FX/Digital Mechanical Industrial Transport/Machines"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Helicopter": {
+      "supports": [
+        "FX/Digital Mechanical Industrial Transport/Machines"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Train": {
+      "supports": [
+        "FX/Digital Mechanical Industrial Transport/Machines"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Rail transport": {
+      "supports": [
+        "FX/Digital Mechanical Industrial Transport/Machines"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Boat, Water vehicle": {
+      "supports": [
+        "FX/Digital Mechanical Industrial Transport/Machines"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Engine starting": {
+      "supports": [
+        "FX/Digital Mechanical Industrial Transport/Machines"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Idling": {
+      "supports": [
+        "FX/Digital Mechanical Industrial Transport/Machines"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Accelerating, revving, vroom": {
+      "supports": [
+        "FX/Digital Mechanical Industrial Transport/Machines"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Door": {
+      "supports": [
+        "FX/Everyday Foley"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Doorbell": {
+      "supports": [
+        "FX/Everyday Foley"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Knock": {
+      "supports": [
+        "FX/Everyday Foley"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Tap": {
+      "supports": [
+        "FX/Everyday Foley"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Squeak": {
+      "supports": [
+        "FX/Everyday Foley"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Cupboard open or close": {
+      "supports": [
+        "FX/Everyday Foley"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Drawer open or close": {
+      "supports": [
+        "FX/Everyday Foley"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Keys jangling": {
+      "supports": [
+        "FX/Everyday Foley"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Coin (dropping)": {
+      "supports": [
+        "FX/Everyday Foley"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Scissors": {
+      "supports": [
+        "FX/Everyday Foley"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Vacuum cleaner": {
+      "supports": [
+        "FX/Everyday Foley"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Blender": {
+      "supports": [
+        "FX/Everyday Foley"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Microwave oven": {
+      "supports": [
+        "FX/Everyday Foley"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Hair dryer": {
+      "supports": [
+        "FX/Everyday Foley"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Electric shaver, electric razor": {
+      "supports": [
+        "FX/Everyday Foley"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Toothbrush": {
+      "supports": [
+        "FX/Everyday Foley"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Printer": {
+      "supports": [
+        "FX/Everyday Foley"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Hammer": {
+      "supports": [
+        "FX/Everyday Foley/Machines"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Sawing": {
+      "supports": [
+        "FX/Everyday Foley/Machines"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Power tool": {
+      "supports": [
+        "FX/Everyday Foley/Machines"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Drill": {
+      "supports": [
+        "FX/Everyday Foley/Machines"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Frying (food)": {
+      "supports": [
+        "FX/Everyday Foley"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Dishes, pots, and pans": {
+      "supports": [
+        "FX/Everyday Foley"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Cutlery, silverware": {
+      "supports": [
+        "FX/Everyday Foley"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Chopping (food)": {
+      "supports": [
+        "FX/Everyday Foley"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Ocean": {
+      "supports": [
+        "FX/Textures/Natural Ambience"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Waves, surf": {
+      "supports": [
+        "FX/Textures/Natural Ambience"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Stream": {
+      "supports": [
+        "FX/Textures/Natural Ambience"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Waterfall": {
+      "supports": [
+        "FX/Textures/Natural Ambience"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Wind": {
+      "supports": [
+        "FX/Textures/Natural Ambience"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Rustling leaves": {
+      "supports": [
+        "FX/Textures/Natural Ambience"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Crackling fire": {
+      "supports": [
+        "FX/Textures/Natural Ambience"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Raindrop": {
+      "supports": [
+        "FX/Textures/Natural Ambience"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Rain on surface": {
+      "supports": [
+        "FX/Textures/Natural Ambience"
+      ],
+      "contradicts": [
+        "Instruments/Voice",
+        "Drums"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Water tap, faucet": {
+      "supports": [
+        "FX/Everyday Foley/Water Foley"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Sink (filling or washing)": {
+      "supports": [
+        "FX/Everyday Foley/Water Foley"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Bathtub (filling or washing)": {
+      "supports": [
+        "FX/Everyday Foley/Water Foley"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Toilet flush": {
+      "supports": [
+        "FX/Everyday Foley/Water Foley"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Splash, splatter": {
+      "supports": [
+        "FX/Everyday Foley/Water Foley"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Slosh": {
+      "supports": [
+        "FX/Everyday Foley/Water Foley"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Drip": {
+      "supports": [
+        "FX/Everyday Foley/Water Foley"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Pour": {
+      "supports": [
+        "FX/Everyday Foley/Water Foley"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Trickle, dribble": {
+      "supports": [
+        "FX/Everyday Foley/Water Foley"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Gush": {
+      "supports": [
+        "FX/Everyday Foley/Water Foley"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Spray": {
+      "supports": [
+        "FX/Everyday Foley/Water Foley"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Pump (liquid)": {
+      "supports": [
+        "FX/Everyday Foley/Water Foley"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Stir": {
+      "supports": [
+        "FX/Everyday Foley/Water Foley"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Boiling": {
+      "supports": [
+        "FX/Everyday Foley/Water Foley"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Gunshot, gunfire": {
+      "supports": [
+        "FX/Impacts and Hits"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Machine gun": {
+      "supports": [
+        "FX/Impacts and Hits"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Fusillade": {
+      "supports": [
+        "FX/Impacts and Hits"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Artillery fire": {
+      "supports": [
+        "FX/Impacts and Hits"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Cap gun": {
+      "supports": [
+        "FX/Impacts and Hits"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Fireworks": {
+      "supports": [
+        "FX/Impacts and Hits"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Firecracker": {
+      "supports": [
+        "FX/Impacts and Hits"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Burst, pop": {
+      "supports": [
+        "FX/Impacts and Hits"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Boom": {
+      "supports": [
+        "FX/Impacts and Hits"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Eruption": {
+      "supports": [
+        "FX/Impacts and Hits"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Crack": {
+      "supports": [
+        "FX/Crashes and Breaks",
+        "FX/Everyday Foley"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Shatter": {
+      "supports": [
+        "FX/Crashes and Breaks",
+        "FX/Everyday Foley"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Wood": {
+      "supports": [
+        "FX/Crashes and Breaks",
+        "FX/Everyday Foley"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Chop": {
+      "supports": [
+        "FX/Crashes and Breaks",
+        "FX/Everyday Foley"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Splinter": {
+      "supports": [
+        "FX/Crashes and Breaks",
+        "FX/Everyday Foley"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Siren": {
+      "supports": [
+        "FX/Designed Noise FX/Alarm"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Civil defense siren": {
+      "supports": [
+        "FX/Designed Noise FX/Alarm"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Police car (siren)": {
+      "supports": [
+        "FX/Designed Noise FX/Alarm"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Ambulance (siren)": {
+      "supports": [
+        "FX/Designed Noise FX/Alarm"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Fire engine, fire truck (siren)": {
+      "supports": [
+        "FX/Designed Noise FX/Alarm"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Alarm": {
+      "supports": [
+        "FX/Designed Noise FX/Alarm"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Smoke detector, smoke alarm": {
+      "supports": [
+        "FX/Designed Noise FX/Alarm"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Fire alarm": {
+      "supports": [
+        "FX/Designed Noise FX/Alarm"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Buzzer": {
+      "supports": [
+        "FX/Designed Noise FX/Alarm"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Beep, bleep": {
+      "supports": [
+        "FX/Designed Noise FX/Alarm"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Telephone bell ringing": {
+      "supports": [
+        "FX/Designed Noise FX/Alarm"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Ringtone": {
+      "supports": [
+        "FX/Designed Noise FX/Alarm"
+      ],
+      "contradicts": [
+        "Instruments/Voice"
+      ],
+      "minimum_support_score": 0.25
+    },
+    "Computer keyboard": {
+      "supports": [
+        "FX/Digital Mechanical Industrial Transport"
+      ],
+      "contradicts": [],
+      "minimum_support_score": 0.3,
+      "ambiguous": true
+    },
+    "Typing": {
+      "supports": [
+        "FX/Digital Mechanical Industrial Transport"
+      ],
+      "contradicts": [],
+      "minimum_support_score": 0.3,
+      "ambiguous": true
+    },
+    "Electronic tuner": {
+      "supports": [
+        "FX/Digital Mechanical Industrial Transport"
+      ],
+      "contradicts": [],
+      "minimum_support_score": 0.3,
+      "ambiguous": true
+    },
+    "Effects unit": {
+      "supports": [
+        "FX/Digital Mechanical Industrial Transport"
+      ],
+      "contradicts": [],
+      "minimum_support_score": 0.3,
+      "ambiguous": true
+    },
+    "Chorus effect": {
+      "supports": [
+        "FX/Digital Mechanical Industrial Transport"
+      ],
+      "contradicts": [],
+      "minimum_support_score": 0.3,
+      "ambiguous": true
+    },
+    "Distortion": {
+      "supports": [
+        "FX/Digital Mechanical Industrial Transport"
+      ],
+      "contradicts": [],
+      "minimum_support_score": 0.3,
+      "ambiguous": true
+    },
+    "Echo": {
+      "supports": [
+        "FX/Digital Mechanical Industrial Transport"
+      ],
+      "contradicts": [],
+      "minimum_support_score": 0.3,
+      "ambiguous": true
+    },
+    "Electronic music": {
+      "supports": [
+        "Instruments/Synths"
+      ],
+      "contradicts": [],
+      "minimum_support_score": 0.45,
+      "ambiguous": true
+    },
+    "Sound effect": {
+      "supports": [
+        "FX"
+      ],
+      "contradicts": [],
+      "minimum_support_score": 0.6,
+      "ambiguous": true
+    }
   }
 }

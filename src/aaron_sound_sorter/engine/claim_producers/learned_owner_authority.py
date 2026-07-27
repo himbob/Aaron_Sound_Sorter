@@ -226,18 +226,6 @@ class LearnedOwnerAuthorityClaimProducer:
         candidates.sort(key=lambda candidate: (-candidate.confidence, -candidate.support, candidate.score))
         return candidates[0]
 
-    def _best_voice_candidate_from_learned_lanes(
-        self,
-        context: DecisionContext,
-    ) -> LearnedOwnerCandidate | None:
-        candidates: list[LearnedOwnerCandidate] = []
-        from_memory = self._candidate_from_memory_facts(context)
-        if from_memory is not None:
-            candidates.append(from_memory)
-        if not candidates:
-            return None
-        candidates.sort(key=lambda candidate: (-candidate.confidence, -candidate.support, candidate.score))
-        return candidates[0]
 
     def _candidate_from_memory_facts(self, context: DecisionContext) -> LearnedOwnerCandidate | None:
         candidates = [

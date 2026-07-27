@@ -7,3 +7,5 @@ coverage[toml]>=7,<8
 ruff>=0.8,<1
 mypy>=1.8,<2
 pydocstyle>=6.3,<7
+scikit-learn>=1.4,<2
+vulture>=2.16,<3

@@ -319,14 +319,8 @@ def _label_text(label: str) -> str:
     return public_label(label).lower().replace("\\", "/")
 
 
-def _is_drum_loop_label(label: str) -> bool:
-    text = _label_text(label)
-    return text.startswith("drums/") and "/loops" in text
 
 
-def _is_global_drum_loop_label(label: str) -> bool:
-    text = _label_text(label)
-    return text.startswith("drums/drum loops")
 
 
 def global_drum_loop_review_label(brain: dict, top5: Sequence[Tuple[str, float]] = ()) -> str:
@@ -334,18 +328,10 @@ def global_drum_loop_review_label(brain: dict, top5: Sequence[Tuple[str, float]]
     return ""
 
 
-def _drum_component_from_label(label: str) -> str:
-    return ""
 
 
-def _top5_drum_component_set(top5: Sequence[Tuple[str, float]]) -> Set[str]:
-    return set()
 
 
-def _physics_matches_local_drum_loop_component(
-    component: str, low_total: float, mid: float, high_total: float, pitch: float
-) -> bool:
-    return False
 
 
 def drum_local_loop_conflict_reason(
@@ -708,9 +694,6 @@ def sibling_imbalance_ambiguity_reason(
     return ""
 
 
-def _safe_label_structure(brain: dict, label: str) -> str:
-    struct = brain.get("structure_by_label", {}) if isinstance(brain.get("structure_by_label", {}), dict) else {}
-    return str(struct.get(label, label_default_structure(label)) or label_default_structure(label))
 
 
 def _score_label_for_dynamic_structure_gate(brain: dict, label: str, fingerprint: Sequence[float]) -> float:
