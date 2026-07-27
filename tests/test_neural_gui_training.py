@@ -180,7 +180,7 @@ def test_newer_gui_label_supersedes_same_audio_without_duplicate_training(tmp_pa
     assert [event["action"] for event in events] == ["queued", "relabeled"]
 
 
-def test_versioned_prototype_rebuild_teaches_correction_and_is_filename_invariant(
+def test_stable_prototype_rebuild_teaches_correction_and_is_filename_invariant(
     tmp_path: Path,
 ) -> None:
     training_root = tmp_path / "training"
@@ -221,13 +221,15 @@ def test_versioned_prototype_rebuild_teaches_correction_and_is_filename_invarian
     assert summary.correction_predictions[0].prototype_predicted_after == SYNTH_LABEL
     assert summary.correction_predictions[0].known_distribution_after
     assert summary.invalidated_evaluation_hashes == (sha256_file(correction_path),)
-    assert pointer_path.read_text(encoding="utf-8").startswith("neural_artifacts/indexes/run_")
+    assert pointer_path.read_text(encoding="utf-8") == "neural_artifacts/indexes/active/index\n"
+    assert summary.index_path == tmp_path / "neural_artifacts/indexes/active/index"
     assert json.loads(summary.report_path.read_text(encoding="utf-8"))["production_ownership_enabled"] is False
 
     repeated_summary = trainer.rebuild()
     assert repeated_summary.status == "unchanged"
     assert repeated_summary.index_path == summary.index_path
-    assert len(list((tmp_path / "neural_artifacts/indexes").glob("run_*"))) == 1
+    assert len(list((tmp_path / "neural_artifacts/indexes").glob("run_*"))) == 0
+    assert (tmp_path / "neural_artifacts/indexes/active/build_summary.json").is_file()
 
     renamed = tmp_path / "completely_different_display_name.wav"
     renamed.write_bytes(correction_path.read_bytes())

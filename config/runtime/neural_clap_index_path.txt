@@ -1,1 +1,1 @@
-neural_artifacts/prototype_indexes/hf_clap/run_20260727_152926_173578/index
+neural_artifacts/prototype_indexes/hf_clap/active/index

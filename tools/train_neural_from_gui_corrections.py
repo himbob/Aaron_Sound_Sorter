@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Queue GUI corrections and rebuild the configured CLAP prototypes."""
+"""Queue GUI corrections and atomically rebuild the stable CLAP index."""
 
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Run durable intake and the configured versioned prototype rebuild."""
+    """Run durable intake and atomically replace the configured active index."""
     args = build_parser().parse_args(argv)
     project_root = args.project_root.expanduser().resolve()
     inbox = NeuralTrainingInbox(project_root)

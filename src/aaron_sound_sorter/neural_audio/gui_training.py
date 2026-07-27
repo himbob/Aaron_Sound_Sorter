@@ -7,6 +7,7 @@ import fcntl
 import hashlib
 import json
 import os
+import shutil
 import tempfile
 from collections import defaultdict
 from collections.abc import Iterator, Mapping, Sequence
@@ -120,7 +121,7 @@ class PendingTrainingConflict:
 
 @dataclass(frozen=True)
 class NeuralPrototypeBuildSummary:
-    """Result of a versioned incremental prototype rebuild."""
+    """Result of an atomic rebuild of the stable active prototype index."""
 
     status: str
     message: str
@@ -258,7 +259,7 @@ class NeuralTrainingInbox:
 
 
 class NeuralPrototypeTrainer:
-    """Rebuild one provider index from frozen curated rows plus GUI intake."""
+    """Rebuild one stable provider index from curated rows plus GUI intake."""
 
     def __init__(
         self,
@@ -294,7 +295,7 @@ class NeuralPrototypeTrainer:
         )
 
     def rebuild(self) -> NeuralPrototypeBuildSummary:
-        """Build and activate a new version while retaining older versions."""
+        """Build and atomically replace the stable active index."""
         base_rows = _read_csv(self.base_split_path)
         inbox_rows = _read_csv(self.inbox_path)
         eligible_inbox_rows, pending_training_conflicts = _partition_confirmed_inbox_rows(
@@ -372,7 +373,7 @@ class NeuralPrototypeTrainer:
         training_signature: str,
         pending_training_conflicts: tuple[PendingTrainingConflict, ...],
     ) -> NeuralPrototypeBuildSummary:
-        """Build one new version after acquiring the rebuild lock."""
+        """Build and atomically activate the stable checked-in index."""
         baseline_index = self._build_index(base_examples) if base_examples else None
         updated_index = self._build_index(examples)
         correction_predictions = self._correction_predictions(
@@ -382,37 +383,50 @@ class NeuralPrototypeTrainer:
         )
         invalidated_evaluation_hashes = _evaluation_overlap_hashes(base_rows, correction_examples)
 
-        version = datetime.now(timezone.utc).strftime("run_%Y%m%d_%H%M%S_%f")
-        version_root = self.index_root / version
-        index_path = version_root / "index"
-        updated_index.save(index_path)
-        self.pointer_path.parent.mkdir(parents=True, exist_ok=True)
+        self.index_root.mkdir(parents=True, exist_ok=True)
+        active_root = self.index_root / "active"
+        index_path = active_root / "index"
         previous_index_path = (
             self.pointer_path.read_text(encoding="utf-8").strip() if self.pointer_path.is_file() else ""
         )
+        staging_root = Path(tempfile.mkdtemp(prefix=".active-build-", dir=self.index_root))
+        try:
+            staging_index_path = staging_root / "index"
+            updated_index.save(staging_index_path)
+            _write_training_manifest(staging_root / "training_manifest.csv", examples)
+            _write_prediction_manifest(staging_root / "correction_verification.csv", correction_predictions)
+            report_path = staging_root / "build_summary.json"
+            report_payload = {
+                "schema_version": 1,
+                "status": "built",
+                "provider_id": self.provider.provider_id,
+                "model_id": self.provider.model_id,
+                "index_path": _project_relative_value(self.project_root, index_path),
+                "previous_index_path": previous_index_path,
+                "training_example_count": len(examples),
+                "label_count": len({example.label for example in examples}),
+                "missing_audio_hashes": list(missing_audio_hashes),
+                "training_signature": training_signature,
+                "invalidated_evaluation_hashes": list(invalidated_evaluation_hashes),
+                "correction_predictions": [asdict(row) for row in correction_predictions],
+                "pending_training_conflicts": [asdict(row) for row in pending_training_conflicts],
+                "source_name_policy": "audio bytes and explicit human labels only",
+                "production_ownership_enabled": self.production_ownership_enabled,
+                "exact_training_policy": EXACT_TRAINING_POLICY,
+            }
+            report_path.write_text(
+                json.dumps(report_payload, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            PrototypeIndex.load(staging_index_path)
+            _replace_directory_atomic(staging_root, active_root)
+        finally:
+            if staging_root.exists():
+                shutil.rmtree(staging_root, ignore_errors=True)
+
+        self.pointer_path.parent.mkdir(parents=True, exist_ok=True)
         _write_text_atomic(self.pointer_path, _project_relative_value(self.project_root, index_path) + "\n")
-        _write_training_manifest(version_root / "training_manifest.csv", examples)
-        _write_prediction_manifest(version_root / "correction_verification.csv", correction_predictions)
-        report_path = version_root / "build_summary.json"
-        report_payload = {
-            "schema_version": 1,
-            "status": "built",
-            "provider_id": self.provider.provider_id,
-            "model_id": self.provider.model_id,
-            "index_path": _project_relative_value(self.project_root, index_path),
-            "previous_index_path": previous_index_path,
-            "training_example_count": len(examples),
-            "label_count": len({example.label for example in examples}),
-            "missing_audio_hashes": list(missing_audio_hashes),
-            "training_signature": training_signature,
-            "invalidated_evaluation_hashes": list(invalidated_evaluation_hashes),
-            "correction_predictions": [asdict(row) for row in correction_predictions],
-            "pending_training_conflicts": [asdict(row) for row in pending_training_conflicts],
-            "source_name_policy": "audio bytes and explicit human labels only",
-            "production_ownership_enabled": self.production_ownership_enabled,
-            "exact_training_policy": EXACT_TRAINING_POLICY,
-        }
-        report_path.write_text(json.dumps(report_payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        report_path = active_root / "build_summary.json"
         return NeuralPrototypeBuildSummary(
             status="built",
             message=f"Built {len(examples)} examples across {len(updated_index.metadata.label_example_counts)} labels.",
@@ -436,6 +450,9 @@ class NeuralPrototypeTrainer:
         index_path = Path(pointer_value).expanduser()
         if not index_path.is_absolute():
             index_path = self.project_root / index_path
+        active_index_path = self.index_root / "active" / "index"
+        if index_path.resolve() != active_index_path.resolve():
+            return None
         report_path = index_path.parent / "build_summary.json"
         if not report_path.is_file():
             return None
@@ -587,6 +604,26 @@ def _exclusive_rebuild_lock(lock_path: Path) -> Iterator[None]:
             yield
         finally:
             fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
+
+
+def _replace_directory_atomic(staging_directory: Path, destination: Path) -> None:
+    """Replace one complete directory while restoring the prior active copy on failure."""
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    backup = destination.with_name(f".{destination.name}.old")
+    if backup.exists():
+        shutil.rmtree(backup)
+    backup_moved = False
+    if destination.exists():
+        os.replace(destination, backup)
+        backup_moved = True
+    try:
+        os.replace(staging_directory, destination)
+    except Exception:
+        if backup_moved and backup.exists() and not destination.exists():
+            os.replace(backup, destination)
+        raise
+    if backup.exists():
+        shutil.rmtree(backup)
 
 
 def _write_csv_atomic(path: Path, rows: Sequence[Mapping[str, Any]], fields: Sequence[str]) -> None:
