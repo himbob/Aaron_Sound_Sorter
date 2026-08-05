@@ -19,7 +19,7 @@ That command builds a persistent `stage4_folder_brain.json` at the project root,
 Only use this when you specifically want the heavy developer reports:
 
 ```bash
-python3 Aaron_Sound_Sorter.py train-brain "/Volumes/T9/music_production/samples/Sorted samples" --full-diagnostics
+python3 Aaron_Sound_Sorter.py train-brain "/path/to/sample-library/Sorted samples" --full-diagnostics
 ```
 
 ## Current architecture

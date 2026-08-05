@@ -47,7 +47,7 @@ def resolve_fx_zip(project_root: Path, explicit: str) -> Path:
             return candidate.resolve()
     candidates = [
         project_root / "FX_Aaron2.zip",
-        Path("/Volumes/T9/music_production/samples/FX_Aaron2.zip"),
+        Path("/path/to/sample-library/FX_Aaron2.zip"),
         Path("/mnt/data/FX_Aaron2.zip"),
     ]
     for candidate in candidates:

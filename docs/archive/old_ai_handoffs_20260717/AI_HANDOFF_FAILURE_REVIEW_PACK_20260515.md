@@ -21,7 +21,7 @@ The sample library is large. Symlinks let Aaron inspect failures locally without
 ## Default command
 
 ```bash
-cd /Volumes/T9/testbed/Aaron_Sound_Sorter
+cd /path/to/Aaron_Sound_Sorter
 ./commands/quality/BUILD_FAILURE_REVIEW_PACK.command
 ```
 

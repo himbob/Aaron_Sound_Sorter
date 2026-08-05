@@ -190,5 +190,5 @@ Use the same method:
 ## Install command
 
 ```bash
-cd /Volumes/T9/testbed/Aaron_Sound_Sorter && rm -rf /tmp/ass_v31171 && unzip -q ~/Downloads/Aaron_Sound_Sorter_v31171_percussion_offsets110_145_parent_release_patch.zip -d /tmp/ass_v31171 && rsync -av /tmp/ass_v31171/Aaron_Sound_Sorter_v31171_percussion_offsets110_145_parent_release_patch/ ./
+cd /path/to/Aaron_Sound_Sorter && rm -rf /tmp/ass_v31171 && unzip -q ~/Downloads/Aaron_Sound_Sorter_v31171_percussion_offsets110_145_parent_release_patch.zip -d /tmp/ass_v31171 && rsync -av /tmp/ass_v31171/Aaron_Sound_Sorter_v31171_percussion_offsets110_145_parent_release_patch/ ./
 ```

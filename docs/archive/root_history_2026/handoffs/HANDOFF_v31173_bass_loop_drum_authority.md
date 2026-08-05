@@ -106,5 +106,5 @@ printed two dots and then hit the outer sandbox timeout, matching prior local-co
 ## Install command
 
 ```bash
-cd /Volumes/T9/testbed/Aaron_Sound_Sorter && rm -rf /tmp/ass_v31173 && unzip -q ~/Downloads/Aaron_Sound_Sorter_v31173_bass_loop_drum_authority_patch.zip -d /tmp/ass_v31173 && rsync -av /tmp/ass_v31173/Aaron_Sound_Sorter_v31173_bass_loop_drum_authority_patch/ ./
+cd /path/to/Aaron_Sound_Sorter && rm -rf /tmp/ass_v31173 && unzip -q ~/Downloads/Aaron_Sound_Sorter_v31173_bass_loop_drum_authority_patch.zip -d /tmp/ass_v31173 && rsync -av /tmp/ass_v31173/Aaron_Sound_Sorter_v31173_bass_loop_drum_authority_patch/ ./
 ```

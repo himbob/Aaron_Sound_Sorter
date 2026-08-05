@@ -5,21 +5,21 @@ When validating code changes, do not rely only on the all-at-once locked smoke a
 Preferred validation command:
 
 ```bash
-cd /Volumes/T9/testbed/Aaron_Sound_Sorter
+cd /path/to/Aaron_Sound_Sorter
 ./commands/quality/RUN_LOCKED_SMOKE_ACCEPTANCE_ONE_BY_ONE.command
 ```
 
 To run a single case:
 
 ```bash
-cd /Volumes/T9/testbed/Aaron_Sound_Sorter
+cd /path/to/Aaron_Sound_Sorter
 ./commands/quality/RUN_LOCKED_SMOKE_ACCEPTANCE_ONE_BY_ONE.command --case-id clap_clean_clap2
 ```
 
 To force the same Python used by the local project virtual environment:
 
 ```bash
-cd /Volumes/T9/testbed/Aaron_Sound_Sorter
+cd /path/to/Aaron_Sound_Sorter
 PROJECT_ROOT="$PWD" \
 PYTHON_BIN="$PWD/.venv_phase4/bin/python" \
 ./commands/quality/RUN_LOCKED_SMOKE_ACCEPTANCE_ONE_BY_ONE.command

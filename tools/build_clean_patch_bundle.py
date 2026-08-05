@@ -448,7 +448,7 @@ def write_installer(staged_root: Path, bundle_name: str) -> None:
     installer_text = f"""#!/bin/bash
 set -euo pipefail
 
-PROJECT_ROOT="${{PROJECT_ROOT:-/Volumes/T9/testbed/Aaron_Sound_Sorter}}"
+PROJECT_ROOT="${{PROJECT_ROOT:-/path/to/Aaron_Sound_Sorter}}"
 SCRIPT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
 FILES_DIR="$SCRIPT_DIR/files"
 
@@ -522,7 +522,7 @@ def write_manifest(staged_root: Path, request: BundleRequest, selected_paths: Se
             "",
             "```bash",
             "chmod +x INSTALL_NO_BACKUP.command",
-            'PROJECT_ROOT="/Volumes/T9/testbed/Aaron_Sound_Sorter" ./INSTALL_NO_BACKUP.command',
+            'PROJECT_ROOT="/path/to/Aaron_Sound_Sorter" ./INSTALL_NO_BACKUP.command',
             "```",
             "",
             "## Hygiene policy",

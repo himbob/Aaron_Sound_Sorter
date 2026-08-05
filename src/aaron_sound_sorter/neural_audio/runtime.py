@@ -105,8 +105,6 @@ def configured_neural_python(project_root: Path) -> Path:
     return python_path
 
 
-
-
 class ConfiguredNeuralPredictionProcess:
     """One long-lived neural worker whose atomic checkpoints can be polled.
 
@@ -185,10 +183,7 @@ class ConfiguredNeuralPredictionProcess:
         ]
         try:
             self._log_handle = self.log_path.open("w", encoding="utf-8")
-            self._log_handle.write(
-                f"effective_timeout={self._effective_timeout:.1f}\n"
-                f"command={' '.join(command)}\n\n"
-            )
+            self._log_handle.write(f"effective_timeout={self._effective_timeout:.1f}\ncommand={' '.join(command)}\n\n")
             self._log_handle.flush()
             self._process = subprocess.Popen(
                 command,
@@ -384,8 +379,7 @@ def run_configured_neural_predictions(
             log_path,
             status="partial_timeout",
             fallback_message=(
-                f"Neural runtime timed out after {effective_timeout:.0f} seconds; "
-                "completed rows were preserved."
+                f"Neural runtime timed out after {effective_timeout:.0f} seconds; completed rows were preserved."
             ),
         )
     except (OSError, subprocess.SubprocessError) as exc:

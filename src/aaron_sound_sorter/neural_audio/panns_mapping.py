@@ -210,7 +210,14 @@ def _broad_evidence_family(prefix: str) -> str:
         return "fx_transition"
     if normalized.startswith(("FX/Impacts and Hits", "FX/Crashes and Breaks", "FX/Weapons Explosions and Destruction")):
         return "fx_impact"
-    if normalized.startswith(("FX/Designed Noise FX/Alarm", "FX/Designed Noise FX/Siren", "FX/Designed Noise FX/Beep", "FX/Designed Noise FX/Blip")):
+    if normalized.startswith(
+        (
+            "FX/Designed Noise FX/Alarm",
+            "FX/Designed Noise FX/Siren",
+            "FX/Designed Noise FX/Beep",
+            "FX/Designed Noise FX/Blip",
+        )
+    ):
         return "fx_alert"
     if normalized.startswith("FX/Designed Noise FX"):
         return "fx_glitch"

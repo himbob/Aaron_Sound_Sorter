@@ -28,8 +28,8 @@ from pathlib import Path
 csv.field_size_limit(sys.maxsize)
 
 AUDIO_EXTENSIONS = {".wav", ".aif", ".aiff", ".flac", ".ogg"}
-DEFAULT_SAMPLE_ROOT = Path("/Volumes/T9/music_production/samples")
-DEFAULT_PROJECT_ROOT = Path("/Volumes/T9/testbed/Aaron_Sound_Sorter")
+DEFAULT_SAMPLE_ROOT = Path("/path/to/sample-library")
+DEFAULT_PROJECT_ROOT = Path("/path/to/Aaron_Sound_Sorter")
 DEFAULT_PANEL_SIZE = 5000
 DEFAULT_PER_CATEGORY_LIMIT = 120
 DEFAULT_SEED = 20260721

@@ -917,7 +917,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--current-sort-manifest", type=Path)
     parser.add_argument("--teaching-manifest", type=Path)
     parser.add_argument("--runtime-benchmark", type=Path)
-    parser.add_argument("--samples-root", type=Path, default=Path("/Volumes/T9/music_production/samples"))
+    parser.add_argument("--samples-root", type=Path, default=Path("/path/to/sample-library"))
     return parser
 
 

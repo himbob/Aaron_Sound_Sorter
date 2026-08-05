@@ -82,7 +82,7 @@ The JSONL evidence includes the sorter proposal, human-approved folder, feature 
 ## How To Launch
 
 ```bash
-cd /Volumes/T9/testbed/Aaron_Sound_Sorter
+cd /path/to/Aaron_Sound_Sorter
 ./commands/gui/RUN_SORTER_GUI.command
 ```
 
@@ -95,8 +95,8 @@ For validation without opening a browser:
 Optional:
 
 ```bash
-PROJECT_ROOT="/Volumes/T9/testbed/Aaron_Sound_Sorter" \
-PYTHON_BIN="/Volumes/T9/testbed/Aaron_Sound_Sorter/.venv_phase4/bin/python" \
+PROJECT_ROOT="/path/to/Aaron_Sound_Sorter" \
+PYTHON_BIN="/path/to/Aaron_Sound_Sorter/.venv_phase4/bin/python" \
 ./commands/gui/RUN_SORTER_GUI.command
 ```
 

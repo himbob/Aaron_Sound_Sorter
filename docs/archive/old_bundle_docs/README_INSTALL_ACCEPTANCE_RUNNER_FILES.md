@@ -11,7 +11,7 @@ AI_READ_THIS_FIRST_ACCEPTANCE_APPEND.md
 Then make the command executable:
 
 ```bash
-cd /Volumes/T9/testbed/Aaron_Sound_Sorter
+cd /path/to/Aaron_Sound_Sorter
 chmod +x commands/quality/RUN_LOCKED_SMOKE_ACCEPTANCE_ONE_BY_ONE.command
 ```
 
@@ -20,7 +20,7 @@ Optional: paste the contents of `AI_READ_THIS_FIRST_ACCEPTANCE_APPEND.md` into `
 Test the runner:
 
 ```bash
-cd /Volumes/T9/testbed/Aaron_Sound_Sorter
+cd /path/to/Aaron_Sound_Sorter
 ./commands/quality/RUN_LOCKED_SMOKE_ACCEPTANCE_ONE_BY_ONE.command --list-cases
 ./commands/quality/RUN_LOCKED_SMOKE_ACCEPTANCE_ONE_BY_ONE.command --case-id clap_clean_clap2
 ```

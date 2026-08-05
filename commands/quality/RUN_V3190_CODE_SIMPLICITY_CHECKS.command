@@ -1,8 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-PROJECT_ROOT="${PROJECT_ROOT:-/Volumes/T9/testbed/Aaron_Sound_Sorter}"
-FX_ZIP="${FX_ZIP:-/Volumes/T9/music_production/samples/FX_Aaron2.zip}"
+PROJECT_ROOT="${PROJECT_ROOT:-$(git -C "$(dirname "$0")" rev-parse --show-toplevel 2>/dev/null)}"
+FX_ZIP="${FX_ZIP:-/path/to/sample-library/FX_Aaron2.zip}"
 REPORT_ROOT="$PROJECT_ROOT/reports/v3190_code_simplicity_checks"
 STAMP="$(date +%Y%m%d_%H%M%S)"
 RUN_DIR="$REPORT_ROOT/run_$STAMP"

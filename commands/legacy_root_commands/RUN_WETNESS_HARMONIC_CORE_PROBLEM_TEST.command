@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-PROJECT_ROOT="/Volumes/T9/testbed/Aaron_Sound_Sorter"
+PROJECT_ROOT="/path/to/Aaron_Sound_Sorter"
 INPUT="${1:-}"
 if [ -z "$INPUT" ]; then
   echo "Usage: $0 /path/to/problem.wav"

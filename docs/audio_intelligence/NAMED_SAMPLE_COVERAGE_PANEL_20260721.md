@@ -144,7 +144,7 @@ These are not fixed yet:
 Run the cleaned full panel when you have time:
 
 ```bash
-cd /Volumes/T9/testbed/Aaron_Sound_Sorter
+cd /path/to/Aaron_Sound_Sorter
 AARON_SORT_WORKERS=6 python3 Aaron_Sound_Sorter.py sort \
   _reports/named_sample_coverage/run_20260721_103325/input_panel \
   _reports/named_sample_coverage/run_20260721_103325/sort_output \

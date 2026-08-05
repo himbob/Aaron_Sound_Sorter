@@ -1,6 +1,6 @@
 #!/bin/bash
 set -euo pipefail
-PROJECT_ROOT="/Volumes/T9/testbed/Aaron_Sound_Sorter"
+PROJECT_ROOT="/path/to/Aaron_Sound_Sorter"
 REPORT_ROOT="$PROJECT_ROOT/_reports/claim_validity_refactor/run_$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$REPORT_ROOT"
 cd "$PROJECT_ROOT"

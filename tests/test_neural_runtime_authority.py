@@ -409,9 +409,7 @@ def test_familiar_memory_with_clap_and_panns_family_agreement_takes_ownership(
     assert evidence["supported"] is True
     assert evidence["confidence"] >= 0.82
     assert updated.facts.evidence["neural_runtime"]["ownership_ready"] is True
-    assert updated.facts.evidence["neural_runtime"]["authority_action"] == (
-        "cross_model_family_consensus_owner"
-    )
+    assert updated.facts.evidence["neural_runtime"]["authority_action"] == ("cross_model_family_consensus_owner")
 
 
 def test_cross_model_consensus_requires_both_independent_models() -> None:

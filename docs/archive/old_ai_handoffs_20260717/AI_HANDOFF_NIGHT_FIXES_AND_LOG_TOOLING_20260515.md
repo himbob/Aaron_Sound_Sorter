@@ -273,8 +273,8 @@ Example:
 
 ```bash
 python3 tools/run_single_file_log_panel.py \
-  --project-root /Volumes/T9/testbed/Aaron_Sound_Sorter \
-  --zip /Volumes/T9/music_production/samples/one_shot_percussive_sounds.zip \
+  --project-root /path/to/Aaron_Sound_Sorter \
+  --zip /path/to/sample-library/one_shot_percussive_sounds.zip \
   --expected-top Drums \
   --per-category 3 \
   --max-total 36 \
@@ -322,8 +322,8 @@ Runs py_compile plus the safe synthetic/non-audio pytest panel.
 Defaults to:
 
 ```text
-ROOT=/Volumes/T9/testbed/Aaron_Sound_Sorter
-ZIP_PATH=/Volumes/T9/music_production/samples/FX_Aaron2.zip
+ROOT=/path/to/Aaron_Sound_Sorter
+ZIP_PATH=/path/to/sample-library/FX_Aaron2.zip
 ```
 
 Examples:
@@ -333,7 +333,7 @@ Examples:
 ./commands/quality/RUN_NIGHT_SINGLE_FILE_LOG_PANEL.command
 
 # One-shot percussion panel, assume everything should be Drums or Review
-ZIP_PATH="/Volumes/T9/music_production/samples/one_shot_percussive_sounds.zip" \
+ZIP_PATH="/path/to/sample-library/one_shot_percussive_sounds.zip" \
 EXPECTED_TOP="Drums" \
 MAX_TOTAL=36 \
 ./commands/quality/RUN_NIGHT_SINGLE_FILE_LOG_PANEL.command
@@ -415,7 +415,7 @@ After patch:
 Run the new log panel on Aaron's Mac:
 
 ```bash
-ZIP_PATH="/Volumes/T9/music_production/samples/FX_Aaron2.zip" \
+ZIP_PATH="/path/to/sample-library/FX_Aaron2.zip" \
 MAX_TOTAL=60 \
 ./commands/quality/RUN_NIGHT_SINGLE_FILE_LOG_PANEL.command
 ```
@@ -423,7 +423,7 @@ MAX_TOTAL=60 \
 Then run:
 
 ```bash
-ZIP_PATH="/Volumes/T9/music_production/samples/one_shot_percussive_sounds.zip" \
+ZIP_PATH="/path/to/sample-library/one_shot_percussive_sounds.zip" \
 EXPECTED_TOP="Drums" \
 MAX_TOTAL=60 \
 ./commands/quality/RUN_NIGHT_SINGLE_FILE_LOG_PANEL.command

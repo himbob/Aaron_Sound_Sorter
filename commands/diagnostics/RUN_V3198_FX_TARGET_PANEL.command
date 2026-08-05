@@ -26,7 +26,7 @@ project = Path.cwd()
 input_dir = sorted((project / "_reports/v3198_fx_target_panel").glob("run_*/input"))[-1]
 zip_candidates = [
     project / "FX_Aaron2.zip",
-    Path("/Volumes/T9/music_production/samples/FX_Aaron2.zip"),
+    Path("/path/to/sample-library/FX_Aaron2.zip"),
     Path("/mnt/data/FX_Aaron2.zip"),
 ]
 want = {
@@ -50,7 +50,7 @@ for zip_path in zip_candidates:
                     print(f"EXTRACTED: {base}")
     break
 
-for root in [project, Path("/Volumes/T9/music_production/samples"), Path("/mnt/data")]:
+for root in [project, Path("/path/to/sample-library"), Path("/mnt/data")]:
     if not root.exists():
         continue
     for p in root.rglob("*.wav"):

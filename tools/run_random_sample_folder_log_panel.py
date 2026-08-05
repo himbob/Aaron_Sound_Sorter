@@ -422,7 +422,7 @@ def write_summary(
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project-root", type=Path, default=Path.cwd())
-    parser.add_argument("--sample-root", type=Path, default=Path("/Volumes/T9/music_production/samples"))
+    parser.add_argument("--sample-root", type=Path, default=Path("/path/to/sample-library"))
     parser.add_argument("--brain", default="stage4_folder_brain.json")
     parser.add_argument("--out-root", type=Path, default=Path("reports/random_sample_folder_log_panel"))
     parser.add_argument("--folder-count", type=int, default=20)

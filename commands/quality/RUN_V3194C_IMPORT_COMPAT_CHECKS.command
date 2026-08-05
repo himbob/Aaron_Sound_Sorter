@@ -1,6 +1,6 @@
 #!/bin/bash
 set -euo pipefail
-PROJECT_DIR="/Volumes/T9/testbed/Aaron_Sound_Sorter"
+PROJECT_DIR="/path/to/Aaron_Sound_Sorter"
 cd "$PROJECT_DIR"
 
 echo "Cleaning macOS metadata files..."

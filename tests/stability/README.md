@@ -14,7 +14,7 @@ Each `anchors_*.json` file is a category trap pack with four scenario types:
 Run the gate:
 
 ```bash
-cd /Volumes/T9/testbed/Aaron_Sound_Sorter
+cd /path/to/Aaron_Sound_Sorter
 ./commands/quality/RUN_CATEGORY_STABILITY_GATE.command
 ```
 

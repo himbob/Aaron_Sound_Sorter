@@ -21,7 +21,8 @@ from tests.sorter_harness import DEFAULT_BRAIN, REGRESSION_AUDIO_DIR, row_label,
 
 BRAIN = DEFAULT_BRAIN
 AUDIO_DIR = REGRESSION_AUDIO_DIR
-SYNTHETIC_FIXTURE_MODE = AUDIO_DIR.is_symlink()
+PRIVATE_AUDIO_MARKER = AUDIO_DIR / ".verified-private-audio-v1"
+SYNTHETIC_FIXTURE_MODE = AUDIO_DIR.is_symlink() or not PRIVATE_AUDIO_MARKER.is_file()
 
 
 def _run_sort(sample_name: str) -> str:
@@ -51,7 +52,10 @@ def _assert_not_contains(label: str, *needles: str) -> None:
 
 def _skip_in_synthetic_fixture_mode() -> None:
     if SYNTHETIC_FIXTURE_MODE:
-        pytest.skip("private regression audio is absent; generated stand-ins cover representative cases elsewhere")
+        pytest.skip(
+            "verified private regression audio is absent; generated or recovered aliases "
+            "must not be graded as the original sound"
+        )
 
 
 @pytest.mark.parametrize(
@@ -94,6 +98,7 @@ def test_scy_drums_top_loop_is_drum_loop_not_fx() -> None:
 
 
 def test_saxophone_loop_stays_instrument_loop_while_role_gate_is_diagnostic_only() -> None:
+    _skip_in_synthetic_fixture_mode()
     label = _run_sort("1.Saxophone_1_110bpm_Am.wav")
     _assert_contains(label, "Instruments")
     _assert_not_contains(label, "Drums", "FX", "Bird", "Animal")
@@ -101,6 +106,7 @@ def test_saxophone_loop_stays_instrument_loop_while_role_gate_is_diagnostic_only
 
 
 def test_sparse_sax_solo_phrase_does_not_become_voice() -> None:
+    _skip_in_synthetic_fixture_mode()
     label = _run_sort("HipHopTapes_28_Saxophone_D#m_90bpm.wav")
     _assert_contains(label, "Instruments")
     _assert_not_contains(label, "Voice", "Vocal", "Drums", "FX")
@@ -108,6 +114,7 @@ def test_sparse_sax_solo_phrase_does_not_become_voice() -> None:
 
 
 def test_uploaded_vocal_phrase_we_up_is_voice_not_transition_fx() -> None:
+    _skip_in_synthetic_fixture_mode()
     label = _run_sort("Vocal Phrase We Up 140bpm.wav")
     _assert_contains(label, "Instruments", "Voice")
     _assert_not_contains(label, "FX", "Riser", "Transition", "Synths", "Sax", "Brass", "Drums")

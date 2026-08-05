@@ -226,7 +226,6 @@ class LearnedOwnerAuthorityClaimProducer:
         candidates.sort(key=lambda candidate: (-candidate.confidence, -candidate.support, candidate.score))
         return candidates[0]
 
-
     def _candidate_from_memory_facts(self, context: DecisionContext) -> LearnedOwnerCandidate | None:
         candidates = [
             candidate

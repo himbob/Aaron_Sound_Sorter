@@ -12,10 +12,10 @@ The project goal is not perfect AI. The design document says the sorter should b
 Use this path by default:
 
 ```bash
-/Volumes/T9/testbed/Aaron_Sound_Sorter
+/path/to/Aaron_Sound_Sorter
 ```
 
-Do not default to the old `/Users/aaron/Documents/Codex/...` path.
+Do not default to the old `/Users/your-name/Documents/Codex/...` path.
 
 ## What likely went wrong
 
@@ -54,7 +54,7 @@ This is intentionally broad and role-level. Do not satisfy it with filename rule
 Install it with `INSTALL_CRISIS_HANDOFF_TEST_BUNDLE.command`, then run:
 
 ```bash
-cd /Volumes/T9/testbed/Aaron_Sound_Sorter
+cd /path/to/Aaron_Sound_Sorter
 python3 -m pytest -q tests/test_uploaded_regression_audio.py
 ```
 

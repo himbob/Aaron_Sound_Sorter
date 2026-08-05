@@ -342,26 +342,17 @@ def cross_model_family_consensus(
     and PANNs contradiction must not exceed support.
     """
     compatible = compatible_semantic_families(neural_label)
-    clap_scores = {
-        family: float(prediction.semantic_family_scores.get(family, 0.0))
-        for family in compatible
-    }
+    clap_scores = {family: float(prediction.semantic_family_scores.get(family, 0.0)) for family in compatible}
     clap_family = max(clap_scores, key=clap_scores.get, default="")
     clap_score = float(clap_scores.get(clap_family, 0.0))
     clap_gap = max(0.0, float(prediction.semantic_top_score) - clap_score)
     clap_supported = bool(
         compatible
         and clap_score >= MINIMUM_CLAP_FAMILY_SUPPORT_SCORE
-        and (
-            prediction.semantic_family in compatible
-            or clap_gap <= MAXIMUM_CLAP_COMPATIBLE_GAP
-        )
+        and (prediction.semantic_family in compatible or clap_gap <= MAXIMUM_CLAP_COMPATIBLE_GAP)
     )
 
-    panns_scores = {
-        family: float(prediction.panns_family_scores.get(family, 0.0))
-        for family in compatible
-    }
+    panns_scores = {family: float(prediction.panns_family_scores.get(family, 0.0)) for family in compatible}
     panns_family = max(panns_scores, key=panns_scores.get, default="")
     panns_family_score = float(panns_scores.get(panns_family, 0.0))
     panns_score = max(panns_family_score, float(prediction.panns_support_score))
@@ -371,19 +362,13 @@ def cross_model_family_consensus(
         and panns_score > float(prediction.panns_contradiction_score)
     )
 
-    supported = bool(
-        prediction.known_distribution
-        and clap_supported
-        and panns_supported
-    )
+    supported = bool(prediction.known_distribution and clap_supported and panns_supported)
     normalized_clap = min(1.0, clap_score / 0.40)
     confidence = min(
         0.98,
         max(
             MINIMUM_CROSS_MODEL_CONSENSUS_CONFIDENCE if supported else 0.0,
-            0.60 * float(prediction.top_similarity)
-            + 0.20 * normalized_clap
-            + 0.20 * min(1.0, panns_score),
+            0.60 * float(prediction.top_similarity) + 0.20 * normalized_clap + 0.20 * min(1.0, panns_score),
         ),
     )
     return {

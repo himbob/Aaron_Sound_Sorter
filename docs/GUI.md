@@ -18,9 +18,9 @@ Use:
 
 Approved corrections enter the durable, source-blind neural inbox. The GUI
 rebuilds versioned CLAP prototypes first and refreshes transitional memory lanes
-second. The latest approved label owns that exact audio immediately;
-generalized category ownership stays disabled until calibration and held-out
-gates pass. Unknown cross-family conflicts go to Review.
+second. New approved audio is remembered immediately; a locked-seed relabel
+needs the same choice twice. Generalized ownership stays disabled until
+calibration and held-out gates pass. Unknown cross-family conflicts go to Review.
 
 For large inputs, the queue renders 200 rows at a time and downloads only new
 row updates. **Stop & Keep Results** preserves completed sounds as a normal
@@ -35,8 +35,8 @@ What the clues mean:
 - **Neural result:** says which lane controlled the proposal.
 
 CLAP and PANNs listen to decoded audio. Paths are used only to open and copy
-files. Your latest explicit correction supersedes an older label for the exact
-same audio; independent model guesses remain visible diagnostics.
+files. A correction that conflicts with a locked seed needs the same choice
+twice before its prototype changes. Independent guesses remain diagnostics.
 
 The selected-file panel shows the decision and one short reason. Open **Why
 did it do this?** for plain evidence or **Technical details** for the full

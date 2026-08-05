@@ -226,10 +226,7 @@ def _run_prediction_batch(args: argparse.Namespace, output_path: Path) -> int:
     _write_prediction_payload(
         output_path,
         status=final_status,
-        message=(
-            f"Predicted {len(predictions)} of {total_items} audio waveform(s); "
-            f"{len(row_errors)} row error(s)."
-        ),
+        message=(f"Predicted {len(predictions)} of {total_items} audio waveform(s); {len(row_errors)} row error(s)."),
         index_path=str(index_path),
         predictions=predictions,
         row_errors=row_errors,

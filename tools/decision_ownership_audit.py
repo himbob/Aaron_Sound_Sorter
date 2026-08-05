@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-PROJECT_ROOT = Path("/Volumes/T9/testbed/Aaron_Sound_Sorter")
+PROJECT_ROOT = Path("/path/to/Aaron_Sound_Sorter")
 DEFAULT_REPORT_ROOT = Path("_reports/decision_ownership_audit")
 
 LEARNED_OWNER_SOURCES = {

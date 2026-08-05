@@ -1,7 +1,7 @@
 Archived Aaron Sound Sorter bundle
 Created: Sat May 30 09:05:00 PDT 2026
 Mode: AI_HANDOFF_WITH_BRAINS
-Project root source: /Volumes/T9/testbed/Aaron_Sound_Sorter
+Project root source: /path/to/Aaron_Sound_Sorter
 Includes active root brain JSONs: yes
 Includes locked smoke acceptance audio fixtures: 1
 Locked smoke expected cases: 32

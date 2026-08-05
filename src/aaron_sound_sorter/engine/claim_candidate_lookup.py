@@ -95,7 +95,6 @@ class ClaimCandidateLookupMixin:
                 best_score = score
         return best_score
 
-
     def _has_close_candidate(
         self,
         raw: ConsensusClaim,

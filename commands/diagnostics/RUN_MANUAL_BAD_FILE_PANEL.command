@@ -13,8 +13,8 @@ find . -name '._*' -type f -delete
 find . -name '.DS_Store' -type f -delete
 
 for root in \
-  "/Volumes/T9/testbed/Aaron_Sound_Sorter" \
-  "/Volumes/T9/music_production/samples" \
+  "/path/to/Aaron_Sound_Sorter" \
+  "/path/to/sample-library" \
   "$HOME/Downloads"; do
   [ -d "$root" ] || continue
   find "$root" -type f ! -name '._*' \( \

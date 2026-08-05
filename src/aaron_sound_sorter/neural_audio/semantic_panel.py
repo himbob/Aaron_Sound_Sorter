@@ -149,7 +149,6 @@ SEMANTIC_FAMILY_PROMPTS: Mapping[str, tuple[str, ...]] = {
 }
 
 
-
 @dataclass(frozen=True)
 class SemanticFamilyPrediction:
     """Independent zero-shot source-family evidence for one audio embedding.

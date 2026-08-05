@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import shutil
 from collections.abc import Mapping
 from pathlib import Path
 
@@ -176,8 +177,52 @@ def test_newer_gui_label_supersedes_same_audio_without_duplicate_training(tmp_pa
     assert summary.superseded_count == 1
     assert len(current_rows) == 1
     assert current_rows[0]["approved_folder"] == SYNTH_LABEL
+    assert current_rows[0]["confirmation_count"] == "1"
     events = [json.loads(line) for line in summary.event_log_path.read_text(encoding="utf-8").splitlines()]
     assert [event["action"] for event in events] == ["queued", "relabeled"]
+
+
+def test_legacy_confirmation_totals_cannot_bypass_new_policy(tmp_path: Path) -> None:
+    staged = write_audio(tmp_path / "training" / "sound.wav", 330.0)
+    inbox = NeuralTrainingInbox(tmp_path)
+    manifest = write_import_manifest(tmp_path / "_reports/run_1/import.csv", staged, SYNTH_LABEL)
+    initial = inbox.queue_import_manifest(manifest)
+    rows = list(csv.DictReader(initial.current_manifest_path.open(encoding="utf-8")))
+    rows[0]["confirmation_count"] = "99"
+    rows[0]["confirmation_policy"] = "latest_explicit_user_label_by_content_hash_v2"
+    with initial.current_manifest_path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=rows[0], lineterminator="\n")
+        writer.writeheader()
+        writer.writerows(rows)
+
+    summary = inbox.queue_import_manifest(manifest)
+    current = list(csv.DictReader(summary.current_manifest_path.open(encoding="utf-8")))
+
+    assert current[0]["confirmation_count"] == "1"
+    assert current[0]["confirmation_policy"] == "two_step_locked_seed_override_by_content_hash_v3"
+
+
+def test_inbox_collapses_same_audio_from_older_normalization_hash_schema(tmp_path: Path) -> None:
+    staged = write_audio(tmp_path / "training" / "sound.wav", 330.0)
+    inbox = NeuralTrainingInbox(tmp_path)
+    manifest = write_import_manifest(tmp_path / "_reports/run_1/import.csv", staged, SYNTH_LABEL)
+    initial = inbox.queue_import_manifest(manifest)
+    rows = list(csv.DictReader(initial.current_manifest_path.open(encoding="utf-8")))
+    stale = dict(rows[0])
+    stale["candidate_id"] = "gui_stale_normalization_schema"
+    stale["normalized_audio_sha256"] = "f" * 64
+    stale["duplicate_group_id"] = "audio_group_stale"
+    stale["last_approved_utc"] = "2026-01-01T00:00:00+00:00"
+    with initial.current_manifest_path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=rows[0], lineterminator="\n")
+        writer.writeheader()
+        writer.writerows([stale, rows[0]])
+
+    summary = inbox.queue_import_manifest(manifest)
+    current = list(csv.DictReader(summary.current_manifest_path.open(encoding="utf-8")))
+
+    assert len(current) == 1
+    assert current[0]["file_sha256"] == sha256_file(staged)
 
 
 def test_stable_prototype_rebuild_teaches_correction_and_is_filename_invariant(
@@ -242,7 +287,7 @@ def test_stable_prototype_rebuild_teaches_correction_and_is_filename_invariant(
     assert index.predict(renamed_record).predicted_label == SYNTH_LABEL
 
 
-def test_explicit_gui_relabel_immediately_supersedes_locked_seed(tmp_path: Path) -> None:
+def test_locked_seed_relabel_requires_two_identical_gui_approvals(tmp_path: Path) -> None:
     training_root = tmp_path / "training"
     trusted_audio = write_audio(training_root / "audio.wav", 440.0)
     base_split = tmp_path / "neural_artifacts/base/dataset_splits.csv"
@@ -268,9 +313,13 @@ def test_explicit_gui_relabel_immediately_supersedes_locked_seed(tmp_path: Path)
 
     first_build = trainer.rebuild()
 
-    assert first_build.pending_training_conflicts == ()
+    assert len(first_build.pending_training_conflicts) == 1
+    assert first_build.pending_training_conflicts[0].locked_label == VOICE_LABEL
+    assert first_build.pending_training_conflicts[0].proposed_label == SYNTH_LABEL
+    assert first_build.pending_training_conflicts[0].confirmation_count == 1
+    assert first_build.pending_training_conflicts[0].required_confirmation_count == 2
     first_manifest = list(csv.DictReader((first_build.index_path.parent / "training_manifest.csv").open()))
-    assert {row["label"] for row in first_manifest} == {SYNTH_LABEL}
+    assert {row["label"] for row in first_manifest} == {VOICE_LABEL}
 
     inbox.queue_import_manifest(import_manifest)
     confirmed_build = trainer.rebuild()
@@ -278,6 +327,46 @@ def test_explicit_gui_relabel_immediately_supersedes_locked_seed(tmp_path: Path)
     assert confirmed_build.pending_training_conflicts == ()
     confirmed_manifest = list(csv.DictReader((confirmed_build.index_path.parent / "training_manifest.csv").open()))
     assert {row["label"] for row in confirmed_manifest} == {SYNTH_LABEL}
+
+
+def test_rebuild_reuses_cached_embedding_when_approved_audio_is_missing(tmp_path: Path) -> None:
+    training_root = tmp_path / "training"
+    trusted_audio = write_audio(training_root / "audio.wav", 440.0)
+    base_split = tmp_path / "neural_artifacts/base/dataset_splits.csv"
+    write_base_split(base_split, [], trusted_audio, trusted_audio)
+    identity = audio_identity(trusted_audio)
+    digest = identity["file_sha256"]
+    trainer = NeuralPrototypeTrainer(
+        project_root=tmp_path,
+        provider=ContentVectorProvider({digest: np.array([0.0, 1.0], dtype=np.float32)}),
+        cache_root=tmp_path / "neural_artifacts/cache",
+        index_root=tmp_path / "neural_artifacts/indexes",
+        pointer_path=tmp_path / "config/runtime/index.txt",
+        base_split_path=base_split,
+        inbox_path=tmp_path / "neural_artifacts/gui_training_inbox/current.csv",
+        training_root=training_root,
+    )
+
+    initial = trainer.rebuild()
+    assert initial.training_example_count == 1
+    trusted_audio.unlink()
+    shutil.rmtree(initial.index_path.parent)
+
+    rebuilt = trainer.rebuild()
+
+    assert rebuilt.status == "built"
+    assert rebuilt.training_example_count == 1
+    assert rebuilt.missing_audio_hashes == ()
+    assert list(csv.DictReader((rebuilt.index_path.parent / "training_manifest.csv").open())) == [
+        {
+            "file_sha256": digest,
+            "decoded_audio_sha256": identity["decoded_audio_sha256"],
+            "normalized_audio_sha256": identity["normalized_audio_sha256"],
+            "duplicate_group_id": "base_0",
+            "label": VOICE_LABEL,
+            "source_kind": "locked_human_seed",
+        }
+    ]
 
 
 def test_sample_library_uri_restores_explicit_hash_verified_training_audio(tmp_path: Path) -> None:

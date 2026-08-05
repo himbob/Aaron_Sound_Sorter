@@ -1,6 +1,6 @@
 #!/bin/bash
 set -euo pipefail
-ROOT="${ROOT:-/Volumes/T9/testbed/Aaron_Sound_Sorter}"
+ROOT="${ROOT:-/path/to/Aaron_Sound_Sorter}"
 cd "$ROOT"
 PY=".venv_phase4/bin/python"
 if [ ! -x "$PY" ]; then

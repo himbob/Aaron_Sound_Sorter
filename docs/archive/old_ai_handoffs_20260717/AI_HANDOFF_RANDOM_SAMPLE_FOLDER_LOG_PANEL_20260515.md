@@ -7,7 +7,7 @@ Date: 2026-05-15
 The ZIP-based single-file log panel is good for known archives, but Aaron also needs a broader drive-level sweep that samples real folders under:
 
 ```text
-/Volumes/T9/music_production/samples
+/path/to/sample-library
 ```
 
 This tool randomly selects folders that directly contain audio files and runs the sorter one file at a time.
@@ -38,7 +38,7 @@ follow symlinks
 ## Useful command
 
 ```bash
-cd /Volumes/T9/testbed/Aaron_Sound_Sorter
+cd /path/to/Aaron_Sound_Sorter
 ./commands/quality/RUN_RANDOM_SAMPLE_FOLDER_LOG_PANEL.command
 ```
 

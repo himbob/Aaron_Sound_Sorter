@@ -99,7 +99,7 @@ Default bundles should exclude:
 Default active project root:
 
 ```bash
-/Volumes/T9/testbed/Aaron_Sound_Sorter
+/path/to/Aaron_Sound_Sorter
 ```
 
 Do not write generated upload-back ZIPs, reports, or scratch output to the project root. Put them under `_reports`, `reports`, or another clear subfolder.

@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
-"""Remove or reject private source names in publishable runtime brains."""
+"""Reject private/generated assets and local paths tracked by Git."""
 
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import hashlib
 import json
 import os
 import re
+import subprocess
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +24,31 @@ SOURCE_KEY_RENAMES = {
     "source_pack": "source_group_id",
     "source_pack_counts_top10": "source_group_counts_top10",
 }
+FORBIDDEN_TRACKED_PREFIXES = ("_models/", "_reports/", "neural_artifacts/", "training/")
+FORBIDDEN_TRACKED_PATTERNS = (
+    "stage4_*brain*.json",
+    "tests/acceptance/**/trusted_training_seed*.json",
+)
+FORBIDDEN_TRACKED_SUFFIXES = (
+    ".aac",
+    ".aif",
+    ".aiff",
+    ".au",
+    ".flac",
+    ".m4a",
+    ".mp3",
+    ".ogg",
+    ".rar",
+    ".tar",
+    ".tgz",
+    ".wav",
+    ".zip",
+    ".7z",
+)
+PRIVATE_MACHINE_MARKERS = (
+    "".join(("/Users", "/aaron")),
+    "".join(("/Volumes", "/T9")),
+)
 
 
 def opaque_identifier(value: str) -> str:
@@ -75,9 +103,60 @@ def private_value_locations(value: Any, *, location: str = "$") -> list[str]:
     return violations
 
 
-def runtime_brain_paths(project_root: Path) -> list[Path]:
-    """Return active root brain JSON paths in stable order."""
-    return sorted(path for path in project_root.glob("stage4_*brain*.json") if path.is_file())
+def tracked_repository_paths(project_root: Path) -> tuple[str, ...]:
+    """Return normalized Git-tracked paths without inspecting ignored local data."""
+    completed = subprocess.run(
+        ["git", "ls-files", "-z"],
+        cwd=project_root,
+        check=True,
+        capture_output=True,
+    )
+    return tuple(sorted(path for path in completed.stdout.decode("utf-8").split("\0") if path))
+
+
+def forbidden_tracked_paths(paths: Iterable[str]) -> list[str]:
+    """Return tracked paths forbidden by the public repository contract."""
+    violations: list[str] = []
+    for raw_path in paths:
+        path = str(raw_path).replace("\\", "/")
+        basename = Path(path).name
+        if path.startswith(FORBIDDEN_TRACKED_PREFIXES):
+            violations.append(path)
+            continue
+        if any(
+            fnmatch.fnmatch(path, pattern) or fnmatch.fnmatch(basename, pattern)
+            for pattern in FORBIDDEN_TRACKED_PATTERNS
+        ):
+            violations.append(path)
+            continue
+        if path.casefold().endswith(FORBIDDEN_TRACKED_SUFFIXES):
+            violations.append(path)
+    return sorted(set(violations))
+
+
+def tracked_private_path_locations(project_root: Path, paths: Iterable[str]) -> list[str]:
+    """Return tracked text locations containing this machine's private roots."""
+    violations: list[str] = []
+    for relative_path in paths:
+        path = project_root / relative_path
+        if not path.is_file():
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        for line_number, line in enumerate(text.splitlines(), start=1):
+            if any(marker in line for marker in PRIVATE_MACHINE_MARKERS):
+                violations.append(f"{relative_path}:{line_number}")
+    return violations
+
+
+def runtime_brain_paths(project_root: Path, tracked_paths: Iterable[str] | None = None) -> list[Path]:
+    """Return tracked root brain JSON paths in stable order."""
+    candidates = tracked_paths if tracked_paths is not None else tracked_repository_paths(project_root)
+    return sorted(
+        project_root / path for path in candidates if "/" not in path and fnmatch.fnmatch(path, "stage4_*brain*.json")
+    )
 
 
 def write_sanitized_brain(path: Path) -> None:
@@ -89,10 +168,10 @@ def write_sanitized_brain(path: Path) -> None:
     os.replace(temporary_path, path)
 
 
-def audit_brains(project_root: Path) -> list[str]:
+def audit_brains(project_root: Path, tracked_paths: Iterable[str] | None = None) -> list[str]:
     """Return publishability violations without printing private values."""
     violations: list[str] = []
-    for path in runtime_brain_paths(project_root):
+    for path in runtime_brain_paths(project_root, tracked_paths):
         payload = json.loads(path.read_text(encoding="utf-8"))
         for location in private_value_locations(payload):
             violations.append(f"{path.name}:{location}")
@@ -108,22 +187,30 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
-    """Sanitize when requested, then fail if publishable brains still leak names."""
+    """Sanitize when requested, then enforce the public repository contract."""
     args = parse_args()
     project_root = args.project_root.expanduser().resolve()
-    paths = runtime_brain_paths(project_root)
+    tracked_paths = tracked_repository_paths(project_root)
+    paths = runtime_brain_paths(project_root, tracked_paths)
     if args.apply:
         for path in paths:
             write_sanitized_brain(path)
-    violations = audit_brains(project_root)
+    brain_violations = audit_brains(project_root, tracked_paths)
+    asset_violations = forbidden_tracked_paths(tracked_paths)
+    path_violations = tracked_private_path_locations(project_root, tracked_paths)
+    violations = [
+        *(f"private brain metadata: {value}" for value in brain_violations),
+        *(f"forbidden tracked asset: {value}" for value in asset_violations),
+        *(f"private machine path: {value}" for value in path_violations),
+    ]
     if violations:
-        print("FAIL: publishable runtime brains contain private source metadata:")
+        print("FAIL: public repository safety violations:")
         for violation in violations[:100]:
             print(f"- {violation}")
         if len(violations) > 100:
             print(f"- ... {len(violations) - 100} more")
         return 1
-    print(f"PASS: {len(paths)} runtime brain file(s) contain no local paths or audio filenames.")
+    print(f"PASS: {len(tracked_paths)} tracked path(s) contain no private/generated runtime assets.")
     return 0
 
 

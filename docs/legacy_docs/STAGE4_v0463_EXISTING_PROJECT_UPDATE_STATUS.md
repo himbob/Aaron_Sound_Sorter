@@ -2,7 +2,7 @@
 
 This update is designed to update the existing Aaron Sound Sorter project in place:
 
-`/Users/aaron/Documents/Codex/2026-04-25/files-mentioned-by-the-user-create/Aaron_Sound_Sorter`
+`/Users/your-name/Documents/Codex/2026-04-25/files-mentioned-by-the-user-create/Aaron_Sound_Sorter`
 
 It does not create a second working project folder.
 

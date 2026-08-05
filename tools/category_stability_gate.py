@@ -23,7 +23,7 @@ from typing import Any
 
 import locked_smoke_acceptance as smoke
 
-DEFAULT_PROJECT_ROOT = Path("/Volumes/T9/testbed/Aaron_Sound_Sorter")
+DEFAULT_PROJECT_ROOT = Path("/path/to/Aaron_Sound_Sorter")
 DEFAULT_STABILITY_REL = Path("tests/stability")
 DEFAULT_SAMPLES_REL = Path("tests/acceptance/locked_smoke_v1/samples")
 DEFAULT_TIMEOUT_SECONDS = 90

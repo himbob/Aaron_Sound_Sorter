@@ -1,7 +1,7 @@
 # AI Handoff — v31.89 Real-Sample Brain-Lane Fixes
 
 Date: 2026-05-18
-Project root expected on Aaron's Mac: `/Volumes/T9/testbed/Aaron_Sound_Sorter`
+Project root expected on Aaron's Mac: `/path/to/Aaron_Sound_Sorter`
 Bundle name: `ASS_v3189_force_with_handoff.zip`
 
 ## Read this first
@@ -183,7 +183,7 @@ This is intentional for now. It may feel less specific, but it is much better th
 Run these one at a time:
 
 ```bash
-cd /Volumes/T9/testbed/Aaron_Sound_Sorter
+cd /path/to/Aaron_Sound_Sorter
 ./commands/quality/RUN_NO_SOURCE_NAME_SORTING_AUDIT.command
 ```
 

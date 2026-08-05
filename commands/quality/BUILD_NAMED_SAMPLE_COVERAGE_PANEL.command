@@ -1,7 +1,7 @@
 #!/bin/bash
 set -uo pipefail
 
-PROJECT_ROOT="${PROJECT_ROOT:-/Volumes/T9/testbed/Aaron_Sound_Sorter}"
+PROJECT_ROOT="${PROJECT_ROOT:-$(git -C "$(dirname "$0")" rev-parse --show-toplevel 2>/dev/null)}"
 cd "$PROJECT_ROOT" || exit 2
 
 PYTHON_BIN="${PYTHON_BIN:-}"
@@ -13,7 +13,7 @@ if [ -z "$PYTHON_BIN" ]; then
   fi
 fi
 
-SAMPLES_ROOT="${SAMPLES_ROOT:-/Volumes/T9/music_production/samples}"
+SAMPLES_ROOT="${SAMPLES_ROOT:-/path/to/sample-library}"
 PANEL_SIZE="${PANEL_SIZE:-5000}"
 PER_CATEGORY_LIMIT="${PER_CATEGORY_LIMIT:-120}"
 LINK_MODE="${LINK_MODE:-symlink}"

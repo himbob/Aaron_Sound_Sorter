@@ -287,7 +287,7 @@ def run_trusted_memory_seed(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     """Build the command-line parser."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--project-root", default="/Volumes/T9/testbed/Aaron_Sound_Sorter")
+    parser.add_argument("--project-root", default="/path/to/Aaron_Sound_Sorter")
     parser.add_argument("--panel", default=str(DEFAULT_PANEL))
     parser.add_argument("--samples-dir", default="")
     parser.add_argument("--evidence-weight", type=int, default=DEFAULT_EVIDENCE_WEIGHT)

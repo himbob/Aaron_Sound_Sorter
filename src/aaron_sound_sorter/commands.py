@@ -1160,8 +1160,8 @@ def build_argument_parser() -> argparse.ArgumentParser:
     )
     run.add_argument(
         "--real-preview-root",
-        default="/Volumes/T9/music_production/samples",
-        help="Blind real-library preview root. Training/report folders are excluded.",
+        default=os.environ.get("AARON_SAMPLE_LIBRARY_ROOT", ""),
+        help="Blind real-library preview root. Defaults to AARON_SAMPLE_LIBRARY_ROOT.",
     )
     run.add_argument(
         "--real-preview-max-files",

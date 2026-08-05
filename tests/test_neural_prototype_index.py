@@ -65,6 +65,21 @@ def test_prediction_uses_finite_reduction_without_matmul_warnings() -> None:
     assert np.isfinite(prediction.top_similarity)
 
 
+def test_prototype_build_uses_finite_reduction_without_matmul_warnings() -> None:
+    random = np.random.default_rng(20260805)
+    records = {
+        "A": [rec("p", "m", index, random.normal(size=512)) for index in range(1, 26)],
+        "B": [rec("p", "m", index, random.normal(size=512)) for index in range(30, 55)],
+    }
+
+    with np.errstate(all="raise"):
+        index = PrototypeIndexBuilder().build(records)
+
+    assert len(index.prototypes) > 2
+    assert all(np.all(np.isfinite(prototype.vector)) for prototype in index.prototypes)
+    assert index.metadata.build_settings["algorithm_version"] == "spherical-kmeans-finite-reduction-v2"
+
+
 def test_label_similarities_exposes_content_scores_without_source_names() -> None:
     index = PrototypeIndexBuilder().build(
         {

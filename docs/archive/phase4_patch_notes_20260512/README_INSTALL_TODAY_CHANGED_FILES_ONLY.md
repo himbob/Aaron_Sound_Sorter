@@ -5,7 +5,7 @@ This ZIP contains only files changed or added during the 2026-05-11 work session
 Install from project root:
 
 ```bash
-cd /Volumes/T9/testbed/Aaron_Sound_Sorter
+cd /path/to/Aaron_Sound_Sorter
 unzip -o /path/to/Aaron_Sound_Sorter_TODAY_CHANGED_FILES_ONLY_20260511.zip -d .
 chmod +x commands/review/RUN_METALLIC_PERCUSSION_REVIEW.command
 chmod +x commands/review/APPLY_APPROVED_METALLIC_MOVES.command

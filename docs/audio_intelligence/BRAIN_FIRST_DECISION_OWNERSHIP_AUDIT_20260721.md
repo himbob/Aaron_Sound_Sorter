@@ -25,7 +25,7 @@ training feels ignored.
 ## New Command
 
 ```bash
-cd /Volumes/T9/testbed/Aaron_Sound_Sorter
+cd /path/to/Aaron_Sound_Sorter
 ./commands/quality/RUN_DECISION_OWNERSHIP_AUDIT.command path/to/Aaron_Sorted_Sounds_manifest.csv
 ```
 

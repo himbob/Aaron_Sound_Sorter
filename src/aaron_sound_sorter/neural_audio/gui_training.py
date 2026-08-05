@@ -23,7 +23,7 @@ from .cache import EmbeddingCache
 from .contracts import EmbeddingRecord
 from .curation import TRAINING_USE
 from .hashing import decoded_audio_sha256, normalized_audio_sha256, sha256_file
-from .prototype_index import PrototypeIndex, PrototypeIndexBuilder
+from .prototype_index import PROTOTYPE_BUILD_ALGORITHM_VERSION, PrototypeIndex, PrototypeIndexBuilder
 from .providers.base import EmbeddingProvider
 
 INBOX_FIELDS = (
@@ -42,13 +42,14 @@ INBOX_FIELDS = (
     "first_approved_utc",
     "last_approved_utc",
     "confirmation_count",
+    "confirmation_policy",
     "source_manifest",
 )
 TRAINABLE_IMPORT_STATUSES = frozenset({"staged", "duplicate_existing"})
 DEFAULT_INBOX_ROOT = Path("neural_artifacts") / "gui_training_inbox"
 DEFAULT_TRAINING_CONFIG = Path("config") / "neural_training.json"
-EXACT_TRAINING_POLICY = "latest_explicit_user_label_by_content_hash_v2"
-LOCKED_SEED_OVERRIDE_CONFIRMATIONS = 1
+EXACT_TRAINING_POLICY = "two_step_locked_seed_override_by_content_hash_v3"
+LOCKED_SEED_OVERRIDE_CONFIRMATIONS = 2
 
 
 @dataclass(frozen=True)
@@ -79,7 +80,7 @@ class NeuralIntakeSummary:
 class NeuralTrainingExample:
     """One content-identified example used to build neural prototypes."""
 
-    audio_path: Path
+    audio_path: Path | None
     label: str
     file_sha256: str
     decoded_audio_sha256: str
@@ -105,12 +106,7 @@ class CorrectionPrediction:
 
 @dataclass(frozen=True)
 class PendingTrainingConflict:
-    """Compatibility record for an unresolved legacy training conflict.
-
-    Explicit GUI corrections currently require one approval and therefore
-    supersede an older locked seed immediately. The record remains part of the
-    build contract so older reports can still be loaded.
-    """
+    """Record an override awaiting a second identical human approval."""
 
     file_sha256: str
     locked_label: str
@@ -165,7 +161,7 @@ class NeuralTrainingInbox:
         manifest_path = Path(import_manifest_path).expanduser().resolve()
         existing_rows = {
             row["duplicate_group_id"]: row
-            for row in _read_csv(self.current_manifest_path)
+            for row in _deduplicate_current_rows(_read_csv(self.current_manifest_path))
             if row.get("duplicate_group_id")
         }
         queued_count = 0
@@ -193,12 +189,19 @@ class NeuralTrainingInbox:
                 errors.append(f"row {position}: audio identity failed: {exc}")
                 continue
             duplicate_group_id = _duplicate_group_id(file_digest, decoded_digest, normalized_digest)
-            previous = existing_rows.get(duplicate_group_id)
-            confirmation_count = int(previous.get("confirmation_count", "0") or 0) + 1 if previous else 1
+            previous = _matching_current_row(
+                existing_rows.values(),
+                (normalized_digest, decoded_digest, file_digest, duplicate_group_id),
+            )
             first_approved_utc = (
                 str(previous.get("first_approved_utc", "")).strip() if previous else approved_utc
             ) or approved_utc
             previous_label = str(previous.get("approved_folder", "")).strip() if previous else ""
+            confirmation_count = (
+                int(previous.get("confirmation_count", "0") or 0) + 1
+                if previous and previous_label == label and previous.get("confirmation_policy") == EXACT_TRAINING_POLICY
+                else 1
+            )
             if previous_label == label:
                 reaffirmed_count += 1
                 event_action = "reaffirmed"
@@ -223,8 +226,13 @@ class NeuralTrainingInbox:
                 "first_approved_utc": first_approved_utc,
                 "last_approved_utc": approved_utc,
                 "confirmation_count": str(confirmation_count),
+                "confirmation_policy": EXACT_TRAINING_POLICY,
                 "source_manifest": _project_uri(self.project_root, manifest_path),
             }
+            if previous is not None:
+                previous_group_id = str(previous.get("duplicate_group_id", ""))
+                if previous_group_id and previous_group_id != duplicate_group_id:
+                    existing_rows.pop(previous_group_id, None)
             existing_rows[duplicate_group_id] = current_row
             events.append(
                 {
@@ -307,12 +315,16 @@ class NeuralPrototypeTrainer:
             for row in [*base_rows, *eligible_inbox_rows]
             if str(row.get("file_sha256", "")).strip()
         }
+        cached_records = {
+            digest: record for digest in wanted_hashes if (record := self.cache.load(self.provider, digest)) is not None
+        }
         training_hash_paths = _training_paths_by_hash(self.training_root, wanted_hashes)
         base_examples, missing_base = _examples_from_rows(
             base_rows,
             project_root=self.project_root,
             sample_library_root=self.sample_library_root,
             training_hash_paths=training_hash_paths,
+            cached_records=cached_records,
             only_training_use=True,
         )
         correction_examples, missing_corrections = _examples_from_rows(
@@ -320,6 +332,7 @@ class NeuralPrototypeTrainer:
             project_root=self.project_root,
             sample_library_root=self.sample_library_root,
             training_hash_paths=training_hash_paths,
+            cached_records=cached_records,
             only_training_use=False,
         )
         examples = _merge_examples(base_examples, correction_examples)
@@ -483,8 +496,17 @@ class NeuralPrototypeTrainer:
     def _build_index(self, examples: Sequence[NeuralTrainingExample]) -> PrototypeIndex:
         embedded: dict[str, list[EmbeddingRecord]] = defaultdict(list)
         for example in examples:
-            embedded[example.label].append(self.cache.get_or_compute(example.audio_path, self.provider))
+            embedded[example.label].append(self._embedding_for_example(example))
         return self.builder.build(embedded)
+
+    def _embedding_for_example(self, example: NeuralTrainingExample) -> EmbeddingRecord:
+        """Load a content-addressed vector, computing it only when audio exists."""
+        if example.audio_path is not None:
+            return self.cache.get_or_compute(example.audio_path, self.provider)
+        cached = self.cache.load(self.provider, example.file_sha256)
+        if cached is None:
+            raise FileNotFoundError(f"approved embedding is unavailable: {example.file_sha256}")
+        return cached
 
     def _correction_predictions(
         self,
@@ -495,7 +517,7 @@ class NeuralPrototypeTrainer:
     ) -> tuple[CorrectionPrediction, ...]:
         rows: list[CorrectionPrediction] = []
         for example in correction_examples:
-            record = self.cache.get_or_compute(example.audio_path, self.provider)
+            record = self._embedding_for_example(example)
             predicted_before = baseline_index.predict(record).predicted_label if baseline_index else ""
             prototype_after = updated_index.predict(record)
             after = updated_index.predict(record, exact_label=example.label)
@@ -584,6 +606,7 @@ def _training_signature(
         "keep_fraction": keep_fraction,
         "production_ownership_enabled": production_ownership_enabled,
         "exact_training_policy": EXACT_TRAINING_POLICY,
+        "prototype_build_algorithm_version": PROTOTYPE_BUILD_ALGORITHM_VERSION,
         "examples": sorted((example.file_sha256, example.label) for example in examples),
         "pending_training_conflicts": sorted(
             (conflict.file_sha256, conflict.locked_label, conflict.proposed_label, conflict.confirmation_count)
@@ -776,6 +799,7 @@ def _examples_from_rows(
     sample_library_root: Path | None,
     training_hash_paths: Mapping[str, Path],
     only_training_use: bool,
+    cached_records: Mapping[str, EmbeddingRecord] | None = None,
 ) -> tuple[list[NeuralTrainingExample], set[str]]:
     examples: list[NeuralTrainingExample] = []
     missing: set[str] = set()
@@ -793,7 +817,15 @@ def _examples_from_rows(
         )
         if audio_path is None or not audio_path.is_file() or (file_digest and sha256_file(audio_path) != file_digest):
             audio_path = training_hash_paths.get(file_digest)
+        cached_record = (cached_records or {}).get(file_digest)
         if audio_path is None or not audio_path.is_file():
+            if cached_record is not None:
+                audio_path = None
+            else:
+                if file_digest:
+                    missing.add(file_digest)
+                continue
+        if audio_path is None and cached_record is None:
             if file_digest:
                 missing.add(file_digest)
             continue
@@ -808,7 +840,9 @@ def _examples_from_rows(
             NeuralTrainingExample(
                 audio_path=audio_path,
                 label=label,
-                file_sha256=file_digest or sha256_file(audio_path),
+                file_sha256=(
+                    file_digest or (sha256_file(audio_path) if audio_path is not None else cached_record.file_sha256)
+                ),
                 decoded_audio_sha256=decoded_digest,
                 normalized_audio_sha256=normalized_digest,
                 duplicate_group_id=duplicate_group_id,
@@ -822,11 +856,10 @@ def _partition_confirmed_inbox_rows(
     base_rows: Sequence[Mapping[str, str]],
     inbox_rows: Sequence[Mapping[str, str]],
 ) -> tuple[list[Mapping[str, str]], tuple[PendingTrainingConflict, ...]]:
-    """Apply the latest explicit GUI label over an older locked training seed.
+    """Require two matching approvals before overriding a locked seed.
 
-    The comparison uses content identity plus explicit supervised labels. One
-    approval is sufficient because the GUI action is the user's authoritative
-    correction. Source names and paths never participate.
+    The comparison uses content identity plus explicit supervised labels.
+    Source names and paths never participate.
     """
     locked_labels_by_identity: dict[str, str] = {}
     for row in base_rows:
@@ -854,6 +887,8 @@ def _partition_confirmed_inbox_rows(
             confirmation_count = int(str(row.get("confirmation_count", "0") or "0"))
         except ValueError:
             confirmation_count = 0
+        if row.get("confirmation_policy") != EXACT_TRAINING_POLICY:
+            confirmation_count = min(confirmation_count, 1)
         if (
             locked_label
             and proposed_label
@@ -884,14 +919,52 @@ def _row_content_identities(row: Mapping[str, str]) -> tuple[str, ...]:
     return tuple(dict.fromkeys(value for value in values if value))
 
 
+def _matching_current_row(
+    rows: Sequence[Mapping[str, str]],
+    identities: Sequence[str],
+) -> Mapping[str, str] | None:
+    """Return the newest row sharing any source-blind content identity."""
+    wanted = {identity for identity in identities if identity}
+    matches = [row for row in rows if wanted.intersection(_row_content_identities(row))]
+    if not matches:
+        return None
+    return max(
+        matches,
+        key=lambda row: (
+            str(row.get("last_approved_utc", "")),
+            str(row.get("candidate_id", "")),
+        ),
+    )
+
+
+def _deduplicate_current_rows(rows: Sequence[Mapping[str, str]]) -> list[Mapping[str, str]]:
+    """Collapse stale hash-schema duplicates, keeping the newest explicit row."""
+    deduplicated: list[Mapping[str, str]] = []
+    for row in sorted(
+        rows,
+        key=lambda candidate: (
+            str(candidate.get("last_approved_utc", "")),
+            str(candidate.get("candidate_id", "")),
+        ),
+    ):
+        identities = set(_row_content_identities(row))
+        deduplicated = [
+            existing for existing in deduplicated if not identities.intersection(_row_content_identities(existing))
+        ]
+        deduplicated.append(row)
+    return deduplicated
+
+
 def _merge_examples(
     base_examples: Sequence[NeuralTrainingExample],
     corrections: Sequence[NeuralTrainingExample],
 ) -> list[NeuralTrainingExample]:
-    by_content = {_example_content_identity(example): example for example in base_examples}
-    for correction in corrections:
-        by_content[_example_content_identity(correction)] = correction
-    return [by_content[key] for key in sorted(by_content)]
+    merged: list[NeuralTrainingExample] = []
+    for example in [*base_examples, *corrections]:
+        identities = set(_example_content_identities(example))
+        merged = [existing for existing in merged if not identities.intersection(_example_content_identities(existing))]
+        merged.append(example)
+    return sorted(merged, key=_example_content_identity)
 
 
 def _example_content_identity(example: NeuralTrainingExample) -> str:
@@ -902,6 +975,17 @@ def _example_content_identity(example: NeuralTrainingExample) -> str:
         or example.file_sha256
         or example.duplicate_group_id
     )
+
+
+def _example_content_identities(example: NeuralTrainingExample) -> tuple[str, ...]:
+    """Return every available identity for cross-schema deduplication."""
+    values = (
+        example.normalized_audio_sha256,
+        example.decoded_audio_sha256,
+        example.file_sha256,
+        example.duplicate_group_id,
+    )
+    return tuple(dict.fromkeys(value for value in values if value))
 
 
 def _evaluation_overlap_hashes(

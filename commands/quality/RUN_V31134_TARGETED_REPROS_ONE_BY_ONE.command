@@ -1,6 +1,6 @@
 #!/bin/bash
 set -euo pipefail
-cd /Volumes/T9/testbed/Aaron_Sound_Sorter
+cd /path/to/Aaron_Sound_Sorter
 find . -name '._*' -type f -delete
 find . -name '.DS_Store' -type f -delete
 

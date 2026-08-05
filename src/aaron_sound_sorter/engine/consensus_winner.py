@@ -24,8 +24,3 @@ class ConsensusWinnerPreselector:
         """
         del facts
         return shared[0] if shared else {}
-
-
-
-
-

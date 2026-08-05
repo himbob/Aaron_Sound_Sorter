@@ -1,7 +1,7 @@
 #!/bin/zsh
 set -e
 
-PROJECT="/Volumes/T9/testbed/Aaron_Sound_Sorter"
+PROJECT="/path/to/Aaron_Sound_Sorter"
 APPROVE_ROOT="$PROJECT/reports/metallic_percussion_review/_APPROVED_MOVES"
 
 TARGET_HIGH="$PROJECT/training/locked_curated_v1/Drums/Percussion/Bells and Metallic Percussion/High Rings and Chimes/One Shots"

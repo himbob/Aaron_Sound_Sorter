@@ -452,7 +452,7 @@ def default_report_dir(project_root: Path) -> Path:
 def build_parser() -> argparse.ArgumentParser:
     """Build the command-line parser."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--project-root", default="/Volumes/T9/testbed/Aaron_Sound_Sorter")
+    parser.add_argument("--project-root", default="/path/to/Aaron_Sound_Sorter")
     parser.add_argument("--panel", default=DEFAULT_PANEL)
     parser.add_argument("--base-brain", default=DEFAULT_BASE_BRAIN)
     parser.add_argument("--shape-memory-brain", default=SHAPE_MEMORY_BRAIN_NAME)

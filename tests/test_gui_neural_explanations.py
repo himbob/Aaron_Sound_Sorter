@@ -47,8 +47,7 @@ def test_neural_explanation_distinguishes_memory_clap_and_authority() -> None:
 
     assert lines[0].startswith("Your trained memory: exact human-approved audio match")
     assert lines[1] == (
-        "CLAP broad hearing (top families; raw similarity, not probability): "
-        "brass instrument 0.310; clear signal."
+        "CLAP broad hearing (top families; raw similarity, not probability): brass instrument 0.310; clear signal."
     )
     assert "experimental; advice only" in lines[2]
     assert "alto saxophone one shot" in lines[3]

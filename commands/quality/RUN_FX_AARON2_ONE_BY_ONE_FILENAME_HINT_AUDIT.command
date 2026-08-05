@@ -7,7 +7,7 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 ZIP_CANDIDATES=(
   "$ROOT/FX_Aaron2.zip"
-  "/Volumes/T9/music_production/samples/FX_Aaron2.zip"
+  "/path/to/sample-library/FX_Aaron2.zip"
   "/mnt/data/FX_Aaron2.zip"
 )
 ZIP=""
@@ -18,7 +18,7 @@ for CANDIDATE in "${ZIP_CANDIDATES[@]}"; do
   fi
 done
 if [ -z "$ZIP" ]; then
-  echo "ERROR: FX_Aaron2.zip not found. Put it in the project root or /Volumes/T9/music_production/samples."
+  echo "ERROR: FX_Aaron2.zip not found. Put it in the project root or /path/to/sample-library."
   exit 1
 fi
 STAMP="$(date +%Y%m%d_%H%M%S)"

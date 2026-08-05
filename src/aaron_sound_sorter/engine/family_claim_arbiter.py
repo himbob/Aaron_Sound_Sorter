@@ -1381,7 +1381,6 @@ class FamilyClaimArbiter:
             max_score=8.0,
         )
 
-
     @staticmethod
     def _facts_have_physics_drum_candidate(
         facts: SharedAudioFacts | None,
@@ -3616,7 +3615,6 @@ class FamilyClaimArbiter:
             "DesignedNoiseHybrid": ("designed", "hybrid", "noise"),
         }.get(branch, ("fx",))
 
-
     def _facts_support_clean_tonal_non_drum_hit(
         self,
         facts: SharedAudioFacts | None,
@@ -3848,7 +3846,6 @@ class FamilyClaimArbiter:
             if strong_rows >= 2:
                 return True
         return False
-
 
     def _review_pitched_music_hit_stolen_by_drum_leaf(
         self,
@@ -7203,7 +7200,6 @@ class FamilyClaimArbiter:
                 return True
         return False
 
-
     def _blocked_drum_loop_claim_is_safe(
         self,
         claim: ConsensusClaim,
@@ -10257,8 +10253,6 @@ class FamilyClaimArbiter:
             and not narrow_synth_lead_body
             and self._reed_sax_physics_witness_score(facts) < 0.62
         )
-
-
 
     def _facts_support_clean_vintage_keys_loop(
         self,

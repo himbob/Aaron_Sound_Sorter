@@ -180,7 +180,7 @@ def write_markdown_study(path: Path, winner_rows: Iterable[dict[str, str]]) -> N
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(description="Analyze brain-lane competence files from an existing sort run.")
-    parser.add_argument("run_dir", help="Sort run folder, e.g. /Volumes/T9/.../fx_YYYYMMDD_HHMMSS")
+    parser.add_argument("run_dir", help="Sort run folder, e.g. /path/to/storage/.../fx_YYYYMMDD_HHMMSS")
     parser.add_argument(
         "--rebuild-summary",
         action="store_true",

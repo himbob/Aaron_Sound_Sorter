@@ -70,7 +70,7 @@ Production sorting, voting, eligibility, roles, consensus, and final placement m
 Run:
 
 ```bash
-cd /Volumes/T9/testbed/Aaron_Sound_Sorter
+cd /path/to/Aaron_Sound_Sorter
 ./commands/quality/RUN_NO_SOURCE_NAME_SORTING_AUDIT.command
 ./commands/quality/RUN_ALL_PYTESTS_CHUNKED.command
 RUN_FX_ONE_BY_ONE=1 ./commands/quality/RUN_FULL_PYTEST_AND_GOLDEN_CHECKS.command

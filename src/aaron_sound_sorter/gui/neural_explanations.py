@@ -89,8 +89,7 @@ def broad_clap_summary(row: PreviewRow) -> str:
         if row.neural_semantic_second_family:
             ranked.append((row.neural_semantic_second_family, row.neural_semantic_second_score))
     family_text = "; ".join(
-        f"{SEMANTIC_FAMILY_NAMES.get(family, family)} {float(score):.3f}"
-        for family, score in ranked
+        f"{SEMANTIC_FAMILY_NAMES.get(family, family)} {float(score):.3f}" for family, score in ranked
     )
     if row.neural_semantic_score < 0.10:
         signal = "weak"
@@ -100,17 +99,16 @@ def broad_clap_summary(row: PreviewRow) -> str:
         signal = "mixed"
     else:
         signal = "close call"
-    return (
-        f"CLAP broad hearing (top families; raw similarity, not probability): {family_text}; "
-        f"{signal} signal."
-    )
+    return f"CLAP broad hearing (top families; raw similarity, not probability): {family_text}; {signal} signal."
 
 
 def detailed_clap_lines(row: PreviewRow) -> list[str]:
     """Format experimental detailed prompt suggestions for human review."""
     if row.neural_prompt_status != "advisory_only" or not row.neural_prompt_suggestions:
         if row.neural_prompt_status in {"unavailable", "invalid_index", "model_mismatch"}:
-            return [f"CLAP detailed suggestions: Unavailable ({row.neural_prompt_status}); they did not affect sorting."]
+            return [
+                f"CLAP detailed suggestions: Unavailable ({row.neural_prompt_status}); they did not affect sorting."
+            ]
         return [
             f"{_missing_lane_summary(row, 'CLAP detailed suggestions', lane_status=row.neural_prompt_status)}; "
             "they did not affect sorting."

@@ -949,5 +949,3 @@ class MeasuredMusicStructureClaimProducer:
 def _path_has_any(path: str, fragments: tuple[str, ...]) -> bool:
     low = _norm_path(path)
     return any(fragment in low for fragment in fragments)
-
-

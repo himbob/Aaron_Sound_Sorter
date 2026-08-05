@@ -90,7 +90,7 @@ try:
 except Exception:
     _sf = None
 
-DEFAULT_ROOT = "/Volumes/T9/music_production/samples/Sorted samples"
+DEFAULT_ROOT = os.environ.get("AARON_SORTED_OUTPUT_ROOT", str(Path.cwd() / "Sorted samples"))
 DEFAULT_PROJECT_DIR = str(Path(__file__).resolve().parents[2])
 
 AUDIO_EXTS = {".wav", ".aif", ".aiff", ".flac", ".ogg", ".au"}

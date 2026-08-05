@@ -43,7 +43,7 @@ No legacy brain or curated trainer was deleted or modified during verification.
 - The original handoff was recovered from
   `_reports/bundles/Aaron_Sound_Sorter_AI_HANDOFF_WITH_BRAINS_20260723_120611.zip`.
 - The real pack was found at
-  `/Volumes/T9/music_production/samples/Premium Deep House Vocals.zip`.
+  `/path/to/sample-library/Premium Deep House Vocals.zip`.
 
 ### Repaired in this patch
 

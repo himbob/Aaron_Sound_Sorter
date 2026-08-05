@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-PROJECT_ROOT="/Volumes/T9/testbed/Aaron_Sound_Sorter"
+PROJECT_ROOT="/path/to/Aaron_Sound_Sorter"
 if [ ! -d "$PROJECT_ROOT" ]; then
   PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 fi

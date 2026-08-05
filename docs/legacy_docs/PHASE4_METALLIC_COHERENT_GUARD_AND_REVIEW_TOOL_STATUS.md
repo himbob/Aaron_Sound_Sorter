@@ -175,7 +175,7 @@ Known sandbox limitations:
 From project root:
 
 ```bash
-cd /Users/aaron/Documents/Codex/2026-04-25/files-mentioned-by-the-user-create/Aaron_Sound_Sorter
+cd /Users/your-name/Documents/Codex/2026-04-25/files-mentioned-by-the-user-create/Aaron_Sound_Sorter
 chmod +x commands/review/RUN_METALLIC_PERCUSSION_REVIEW.command
 ./commands/review/RUN_METALLIC_PERCUSSION_REVIEW.command
 ```
@@ -183,7 +183,7 @@ chmod +x commands/review/RUN_METALLIC_PERCUSSION_REVIEW.command
 Optional: scan a different folder:
 
 ```bash
-./commands/review/RUN_METALLIC_PERCUSSION_REVIEW.command "/Volumes/T9/music_production/samples/Sorted samples"
+./commands/review/RUN_METALLIC_PERCUSSION_REVIEW.command "/path/to/sample-library/Sorted samples"
 ```
 
 The command creates a symlink review tree under:

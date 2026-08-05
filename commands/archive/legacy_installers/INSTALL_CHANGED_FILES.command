@@ -3,9 +3,9 @@
 set -e
 cd "$HOME/Downloads"
 unzip -o Aaron_Sound_Sorter_v31164_percussion_batch_repair_python_tests_only.zip
-cd "/Volumes/T9/testbed/Aaron_Sound_Sorter"
+cd "/path/to/Aaron_Sound_Sorter"
 PATCH_DIR="$HOME/Downloads/Aaron_Sound_Sorter_v31164_percussion_batch_repair_python_tests_only"
-rsync -a "$PATCH_DIR/" "/Volumes/T9/testbed/Aaron_Sound_Sorter/"
+rsync -a "$PATCH_DIR/" "/path/to/Aaron_Sound_Sorter/"
 find . -name '._*' -delete
 PY=".venv_phase4/bin/python"
 [ -x "$PY" ] || PY="python3"

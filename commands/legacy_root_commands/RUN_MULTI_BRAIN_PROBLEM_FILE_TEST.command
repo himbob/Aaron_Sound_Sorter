@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-PROJECT_ROOT="/Volumes/T9/testbed/Aaron_Sound_Sorter"
+PROJECT_ROOT="/path/to/Aaron_Sound_Sorter"
 INPUT_PATH="${1:-}"
 if [ -z "$INPUT_PATH" ]; then
   echo "Usage: ./RUN_MULTI_BRAIN_PROBLEM_FILE_TEST.command /path/to/problem.wav"

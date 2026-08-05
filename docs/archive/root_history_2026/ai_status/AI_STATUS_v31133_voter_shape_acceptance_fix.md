@@ -121,7 +121,7 @@ A complete 763-node one-by-one pytest sweep did not complete in the AI container
 Aaron should still run the full local checks on the Mac, where the private real-audio fixture matrix exists:
 
 ```bash
-cd /Volumes/T9/testbed/Aaron_Sound_Sorter
+cd /path/to/Aaron_Sound_Sorter
 make ai-check
 python3 tools/run_pytest_node_by_node.py --timeout-sec 180 --out-root _reports/pytest_node_by_node_local tests
 ./commands/quality/RUN_LOCKED_SMOKE_ACCEPTANCE_AI_SAFE.command --start-index 1 --max-cases 4

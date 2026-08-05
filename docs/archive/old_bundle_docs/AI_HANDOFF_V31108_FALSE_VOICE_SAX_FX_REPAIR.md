@@ -95,7 +95,7 @@ Passed one at a time after final code changes:
 The full node-by-node pytest runner was also started after fixing its nested-folder collection bug. It collected 718 nodes and passed the first five nodes before the container tool call timed out. This was an environment/tool-call limit, not a failing test result. Run it locally on the Mac with:
 
 ```bash
-cd /Volumes/T9/testbed/Aaron_Sound_Sorter
+cd /path/to/Aaron_Sound_Sorter
 PYTHON_BIN="$(command -v python3)" TIMEOUT_SEC=240 STOP_AFTER=1 ./commands/quality/RUN_ALL_PYTESTS_NODE_BY_NODE.command
 ```
 
@@ -104,7 +104,7 @@ PYTHON_BIN="$(command -v python3)" TIMEOUT_SEC=240 STOP_AFTER=1 ./commands/quali
 From the active project root:
 
 ```bash
-cd /Volumes/T9/testbed/Aaron_Sound_Sorter
+cd /path/to/Aaron_Sound_Sorter
 ZIP="$HOME/Downloads/Aaron_Sound_Sorter_v31108_false_voice_sax_fx_patch.zip"
 TMP="$(mktemp -d)"
 unzip -q "$ZIP" -d "$TMP"

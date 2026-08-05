@@ -13,7 +13,7 @@ if [ -z "$PYTHON_BIN" ]; then
   fi
 fi
 
-FX_ZIP="${FX_ZIP:-/Volumes/T9/music_production/samples/FX_Aaron2.zip}"
+FX_ZIP="${FX_ZIP:-/path/to/sample-library/FX_Aaron2.zip}"
 if [ ! -f "$FX_ZIP" ]; then
   echo "Missing FX zip: $FX_ZIP" >&2
   exit 2

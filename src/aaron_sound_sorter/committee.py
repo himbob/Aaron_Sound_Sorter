@@ -319,19 +319,9 @@ def _label_text(label: str) -> str:
     return public_label(label).lower().replace("\\", "/")
 
 
-
-
-
-
 def global_drum_loop_review_label(brain: dict, top5: Sequence[Tuple[str, float]] = ()) -> str:
     """Deprecated compatibility wrapper. No global category fallback is fabricated."""
     return ""
-
-
-
-
-
-
 
 
 def drum_local_loop_conflict_reason(
@@ -692,8 +682,6 @@ def sibling_imbalance_ambiguity_reason(
     except Exception as exc:
         return f"Sibling Imbalance Check Error: {str(exc)[:80]}"
     return ""
-
-
 
 
 def _score_label_for_dynamic_structure_gate(brain: dict, label: str, fingerprint: Sequence[float]) -> float:

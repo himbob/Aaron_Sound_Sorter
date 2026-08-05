@@ -100,7 +100,7 @@ Scanned Python files: 91
 Run this after installing the bundle:
 
 ```bash
-cd /Volumes/T9/testbed/Aaron_Sound_Sorter
+cd /path/to/Aaron_Sound_Sorter
 ./commands/quality/RUN_V31106_FX_VOICE_SAX_SELECTOR_AUDIT.command
 ```
 

@@ -20,8 +20,8 @@ find . -name '.DS_Store' -type f -delete
 SOURCE_ARGS=()
 for SRC in \
   "$ROOT/training/locked_curated_v1" \
-  "/Volumes/T9/testbed/Aaron_Sound_Sorter/training/locked_curated_v1" \
-  "/Volumes/T9/music_production/samples/Sorted samples"
+  "/path/to/Aaron_Sound_Sorter/training/locked_curated_v1" \
+  "/path/to/sample-library/Sorted samples"
 do
   if [ -d "$SRC" ]; then
     SOURCE_ARGS+=(--source-root "$SRC")
@@ -31,11 +31,11 @@ done
 ZIP_ARGS=()
 for ZIP in \
   "$ROOT/FX_Aaron2.zip" \
-  "/Volumes/T9/music_production/samples/FX_Aaron2.zip" \
+  "/path/to/sample-library/FX_Aaron2.zip" \
   "$ROOT/one_shot_percussive_sounds.zip" \
-  "/Volumes/T9/music_production/samples/one_shot_percussive_sounds.zip" \
+  "/path/to/sample-library/one_shot_percussive_sounds.zip" \
   "$ROOT/Combined_Training1_2_3_4.zip" \
-  "/Volumes/T9/music_production/samples/Combined_Training1_2_3_4.zip"
+  "/path/to/sample-library/Combined_Training1_2_3_4.zip"
 do
   if [ -f "$ZIP" ]; then
     ZIP_ARGS+=(--zip "$ZIP")

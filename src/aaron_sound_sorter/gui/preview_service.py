@@ -1003,8 +1003,6 @@ def declare_voters(candidate_count: int = 100) -> list[Voter]:
     ]
 
 
-
-
 def classify_audio_files_with_streaming_neural_finalization(
     sorter: SortSamplesUseCase,
     audio_files: list[Path],
@@ -1319,14 +1317,10 @@ def apply_neural_runtime_authority(
             row.neural_decision_state = "finalized_without_neural"
             if row.neural_row_error:
                 row.neural_runtime_status = "row_error"
-                row.diagnostic_summary = (
-                    f"{row.diagnostic_summary}; neural=row_error ({row.neural_row_error})"
-                )
+                row.diagnostic_summary = f"{row.diagnostic_summary}; neural=row_error ({row.neural_row_error})"
             elif batch.status == "partial_timeout":
                 row.neural_runtime_status = "not_completed_timeout"
-                row.diagnostic_summary = (
-                    f"{row.diagnostic_summary}; neural=not_completed_timeout ({batch.message})"
-                )
+                row.diagnostic_summary = f"{row.diagnostic_summary}; neural=not_completed_timeout ({batch.message})"
             elif batch.status in {"error", "unavailable"}:
                 row.diagnostic_summary = f"{row.diagnostic_summary}; neural={batch.status} ({batch.message})"
             continue
@@ -1592,7 +1586,6 @@ def detected_candidate_folders(result: SortFileResult, *, limit: int = 40) -> li
             if taxonomy_label_contract(candidate).structure_terminal != "One Shots"
         ]
     return candidates
-
 
 
 def add_guess_folders(

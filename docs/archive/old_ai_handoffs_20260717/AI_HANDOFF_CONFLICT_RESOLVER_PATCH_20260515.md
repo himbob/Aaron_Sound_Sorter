@@ -92,7 +92,7 @@ The bongo loop case is now detected by eligibility as `pitched_percussion_confli
 ## Validation command
 
 ```bash
-cd /Volumes/T9/testbed/Aaron_Sound_Sorter
+cd /path/to/Aaron_Sound_Sorter
 ./commands/quality/RUN_CONFLICT_RESOLVER_REGRESSION_TESTS.command
 ```
 

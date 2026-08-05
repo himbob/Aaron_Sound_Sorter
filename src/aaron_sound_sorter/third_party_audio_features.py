@@ -132,8 +132,6 @@ def _safe_percentile(values: object, percentile: float) -> float:
     return float(np.percentile(arr, percentile)) if arr.size else 0.0
 
 
-
-
 def _bounded_mono(mono: np.ndarray, sr: int) -> np.ndarray:
     """Return a normalized finite mono vector bounded for analysis cost."""
     y = np.asarray(mono, dtype=np.float32).reshape(-1)

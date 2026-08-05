@@ -15,9 +15,31 @@ import numpy as np
 
 from .contracts import EmbeddingRecord, LabelPrediction, Prototype, PrototypeIndexMetadata, l2_normalize
 
+PROTOTYPE_BUILD_ALGORITHM_VERSION = "spherical-kmeans-finite-reduction-v2"
+
+
+def _finite_dot(a: np.ndarray, b: np.ndarray) -> float:
+    """Return a float64 dot product without macOS Accelerate matmul."""
+    value = np.sum(np.asarray(a, dtype=np.float64) * np.asarray(b, dtype=np.float64), dtype=np.float64)
+    return float(np.clip(value, -1.0, 1.0))
+
+
+def _finite_similarity_matrix(rows: np.ndarray, centroids: np.ndarray) -> np.ndarray:
+    """Return row/centroid cosine products through a stable finite reduction."""
+    row_matrix = np.asarray(rows, dtype=np.float64)
+    centroid_matrix = np.asarray(centroids, dtype=np.float64)
+    if centroid_matrix.ndim == 1:
+        centroid_matrix = centroid_matrix.reshape(1, -1)
+    similarities = np.sum(
+        row_matrix[:, None, :] * centroid_matrix[None, :, :],
+        axis=2,
+        dtype=np.float64,
+    )
+    return np.clip(similarities, -1.0, 1.0)
+
 
 def cosine_distance(a: np.ndarray, b: np.ndarray) -> float:
-    return float(max(0.0, 1.0 - float(np.dot(l2_normalize(a), l2_normalize(b)))))
+    return float(max(0.0, 1.0 - _finite_dot(l2_normalize(a), l2_normalize(b))))
 
 
 def _spherical_centroid(rows: np.ndarray) -> np.ndarray:
@@ -26,7 +48,7 @@ def _spherical_centroid(rows: np.ndarray) -> np.ndarray:
 
 def _deterministic_seed_indices(rows: np.ndarray, k: int) -> list[int]:
     centroid = _spherical_centroid(rows)
-    distances = 1.0 - rows @ centroid
+    distances = 1.0 - _finite_similarity_matrix(rows, centroid)[:, 0]
     first = int(np.argmax(distances))
     seeds = [first]
     while len(seeds) < k:
@@ -35,7 +57,7 @@ def _deterministic_seed_indices(rows: np.ndarray, k: int) -> list[int]:
         for idx in range(rows.shape[0]):
             if idx in seeds:
                 continue
-            nearest = min(1.0 - float(np.dot(rows[idx], rows[seed])) for seed in seeds)
+            nearest = min(1.0 - _finite_dot(rows[idx], rows[seed]) for seed in seeds)
             if nearest > best_distance + 1e-12:
                 best_idx, best_distance = idx, nearest
         if best_idx < 0:
@@ -51,7 +73,7 @@ def _spherical_kmeans(rows: np.ndarray, k: int, max_iterations: int = 50) -> tup
     centroids = rows[seeds].copy()
     assignments = np.full(rows.shape[0], -1, dtype=np.int32)
     for _ in range(max_iterations):
-        similarities = rows @ centroids.T
+        similarities = _finite_similarity_matrix(rows, centroids)
         new_assignments = np.argmax(similarities, axis=1).astype(np.int32)
         if np.array_equal(assignments, new_assignments):
             break
@@ -83,7 +105,7 @@ def _loose_trim(rows: np.ndarray, hashes: Sequence[str], keep_fraction: float) -
     if rows.shape[0] < 20 or keep_fraction >= 1.0:
         return rows, tuple(hashes)
     centroid = _spherical_centroid(rows)
-    distances = 1.0 - rows @ centroid
+    distances = 1.0 - _finite_similarity_matrix(rows, centroid)[:, 0]
     keep_count = max(2, int(math.ceil(rows.shape[0] * keep_fraction)))
     keep_indices = np.argsort(distances, kind="stable")[:keep_count]
     return rows[keep_indices], tuple(hashes[idx] for idx in keep_indices)
@@ -131,10 +153,7 @@ class PrototypeIndexBuilder:
             k = min(rows.shape[0], _prototype_count(rows.shape[0], self.max_prototypes_per_label))
             centroids, assignments = _spherical_kmeans(rows, k)
             assigned_similarities = np.asarray(
-                [
-                    float(np.dot(rows[index], centroids[cluster_index]))
-                    for index, cluster_index in enumerate(assignments)
-                ],
+                [_finite_dot(rows[index], centroids[cluster_index]) for index, cluster_index in enumerate(assignments)],
                 dtype=np.float64,
             )
             assigned_distances = np.maximum(0.0, 1.0 - assigned_similarities)
@@ -146,10 +165,13 @@ class PrototypeIndexBuilder:
             for cluster_idx, centroid in enumerate(centroids):
                 member_indices = np.where(assignments == cluster_idx)[0]
                 if member_indices.size == 0:
-                    member_indices = np.array([int(np.argmax(rows @ centroid))])
+                    member_indices = np.array([int(np.argmax(_finite_similarity_matrix(rows, centroid)[:, 0]))])
                 member_vectors = rows[member_indices]
                 member_hashes = tuple(retained_hashes[idx] for idx in member_indices)
-                distances = np.maximum(0.0, 1.0 - member_vectors @ centroid)
+                distances = np.maximum(
+                    0.0,
+                    1.0 - _finite_similarity_matrix(member_vectors, centroid)[:, 0],
+                )
                 radius = float(np.percentile(distances, 95)) if distances.size else 0.0
                 mean_distance = float(np.mean(distances)) if distances.size else 0.0
                 prototypes.append(
@@ -173,6 +195,7 @@ class PrototypeIndexBuilder:
             label_example_counts=label_example_counts,
             label_prototype_counts=label_prototype_counts,
             build_settings={
+                "algorithm_version": PROTOTYPE_BUILD_ALGORITHM_VERSION,
                 "max_prototypes_per_label": self.max_prototypes_per_label,
                 "keep_fraction": self.keep_fraction,
             },
@@ -294,10 +317,14 @@ class PrototypeIndex:
         # for finite, normalized CLAP vectors on some macOS Accelerate builds.
         # Element-wise reduction is equally exact for this small index and
         # avoids that unstable BLAS path.
-        similarities = np.sum(
-            self._matrix.astype(np.float64) * record.vector.astype(np.float64)[None, :],
-            axis=1,
-            dtype=np.float64,
+        similarities = np.clip(
+            np.sum(
+                self._matrix.astype(np.float64) * record.vector.astype(np.float64)[None, :],
+                axis=1,
+                dtype=np.float64,
+            ),
+            -1.0,
+            1.0,
         )
         best_per_label: dict[str, tuple[float, int]] = {}
         for idx, proto in enumerate(self.prototypes):

@@ -19,7 +19,7 @@ the heart of it.
 - Uses a downloaded, pretrained LAION CLAP encoder; it is not trained from scratch.
 - Uses pretrained PANNs as an independent broad sound-event witness.
 - Lets approved GUI corrections teach small, versioned Aaron prototypes on top.
-- Remembers exact human-approved audio immediately.
+- Remembers approved audio by content hash.
 - Promotes broader neural ownership one tested category group at a time.
 - Sends uncertain or conflicting evidence to Review.
 
@@ -30,22 +30,21 @@ Requirements: Python 3.9+, macOS or Linux, and `libsndfile`.
 ```bash
 git clone https://github.com/himbob/Aaron_Sound_Sorter.git
 cd Aaron_Sound_Sorter
-git lfs install
-git lfs pull
 make bootstrap
 .venv_phase4/bin/python Aaron_Sound_Sorter.py self-test
 ```
 
-Optional local CLAP support:
+Optional local neural support:
 
 ```bash
 ./commands/neural/INSTALL_NEURAL_LAB.command
 ./commands/neural/PREFETCH_CLAP_MODEL.command
+./commands/neural/PREFETCH_PANNS_MODEL.command
 ```
 
-Git LFS carries the pinned model snapshots and compact neural indexes. Active
-brain JSONs are included. Sample audio, training trees, and private review
-reports are not.
+Models, trained brains, neural indexes, samples, and review data stay local and
+are ignored by Git. The download commands verify the pinned public model files.
+Your first useful prototype brain comes from audio you legally own and review.
 
 ## Sort audio
 
@@ -80,10 +79,10 @@ Large folders stay usable: the queue shows 200 sounds at a time and receives
 only new results. **Stop & Keep Results** ends new work but keeps completed
 sounds reviewable; **Cancel** abandons the run.
 
-Approved corrections enter a source-blind training inbox. The latest explicit
-choice owns that exact audio immediately. CLAP prototypes rebuild first;
-temporary legacy memories refresh second, so similar audio also contributes to
-the category neighborhood.
+Approved corrections enter a source-blind training inbox. A new correction is
+usable immediately. Changing a locked seed needs the same choice twice before
+its CLAP prototype changes. Similar audio then contributes to that category's
+neighborhood.
 
 The selected-file panel gives one plain-English decision. CLAP, PANNs, voter
 traces, and alternatives stay collapsed unless you want them. For an exact
@@ -130,7 +129,7 @@ before AI-assisted changes.
 
 ## Status
 
-- CLI and GUI: working with local trained assets.
+- CLI and GUI: working with locally installed/trained assets.
 - CLAP: pretrained encoder plus local prototypes; generalized authority is data-gated.
 - PANNs: pretrained broad-event support/contradiction; never a detailed-folder owner.
 - Cross-family or structural conflict: Review.

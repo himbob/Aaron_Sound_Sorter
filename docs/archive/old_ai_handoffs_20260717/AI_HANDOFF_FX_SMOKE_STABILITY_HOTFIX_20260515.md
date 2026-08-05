@@ -56,7 +56,7 @@ They pass after the fix:
 ## What to run
 
 ```bash
-cd /Volumes/T9/testbed/Aaron_Sound_Sorter
+cd /path/to/Aaron_Sound_Sorter
 ./commands/quality/RUN_FX_SMOKE_STABILITY_HOTFIX_TESTS.command
 ```
 

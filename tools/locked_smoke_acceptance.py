@@ -23,7 +23,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-DEFAULT_PROJECT_ROOT = Path("/Volumes/T9/testbed/Aaron_Sound_Sorter")
+DEFAULT_PROJECT_ROOT = Path("/path/to/Aaron_Sound_Sorter")
 DEFAULT_PANEL_REL = Path("tests/acceptance/locked_smoke_v1")
 DEFAULT_TIMEOUT_SECONDS = 90
 

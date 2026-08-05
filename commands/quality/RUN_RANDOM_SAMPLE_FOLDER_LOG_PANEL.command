@@ -4,7 +4,7 @@ set -euo pipefail
 # Random real-folder log panel for Aaron Sound Sorter.
 #
 # Defaults:
-#   SAMPLES_ROOT=/Volumes/T9/music_production/samples
+#   SAMPLES_ROOT=/path/to/sample-library
 #   FOLDER_COUNT=20
 #   FILES_PER_FOLDER=3
 #   TIMEOUT_SEC=0   # no timeout on Aaron's Mac
@@ -29,7 +29,7 @@ if [ -z "$PYTHON_BIN" ]; then
   fi
 fi
 
-SAMPLES_ROOT="${SAMPLES_ROOT:-/Volumes/T9/music_production/samples}"
+SAMPLES_ROOT="${SAMPLES_ROOT:-/path/to/sample-library}"
 BRAIN="${BRAIN:-stage4_folder_brain.json}"
 FOLDER_COUNT="${FOLDER_COUNT:-20}"
 FILES_PER_FOLDER="${FILES_PER_FOLDER:-3}"

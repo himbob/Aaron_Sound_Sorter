@@ -10,7 +10,7 @@ This bundle fixes the v0.4.61 handoff problem where the user could accidentally 
 - The new command `RUN_PHASE4_v0462_TRAIN_SORT_REPORTS_FINAL.command` performs the full sequence:
   1. compile `Aaron_Sound_Sorter.py`
   2. train the persistent folder-supervised brain at `stage4_folder_brain.json`
-  3. sort `/Volumes/T9/music_production/samples/FX_Aaron2.zip` using that saved brain
+  3. sort `/path/to/sample-library/FX_Aaron2.zip` using that saved brain
   4. verify that `Aaron_Sorted_Sounds_manifest.csv` and summary exist
   5. create one final upload ZIP named `PHASE4_v0462_SORT_RESULTS_UPLOAD_<timestamp>.zip`
 - The final upload ZIP excludes audio payloads but includes logs, reports, manifests, summaries, and verification text.

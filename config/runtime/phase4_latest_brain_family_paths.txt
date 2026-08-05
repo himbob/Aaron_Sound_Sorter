@@ -1,6 +1,0 @@
-full=stage4_folder_brain.json
-core_baby=stage4_folder_brain_core_baby.json
-spread_baby=stage4_folder_brain_spread_baby.json
-outlier_baby=stage4_folder_brain_outlier_baby.json
-run_root=stage4_brain_family_training/run_20260627_083000
-anchor_manifest=_reports/brain_restore/run_20260627_083849/brain_restore_manifest.csv

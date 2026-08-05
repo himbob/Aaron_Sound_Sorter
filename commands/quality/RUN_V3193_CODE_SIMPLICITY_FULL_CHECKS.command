@@ -68,7 +68,7 @@ if [ "$FAIL_COUNT" -ne 0 ]; then
 fi
 
 echo "Running representative FX one-file checks if FX_Aaron2.zip is available..."
-FX_ZIP="/Volumes/T9/music_production/samples/FX_Aaron2.zip"
+FX_ZIP="/path/to/sample-library/FX_Aaron2.zip"
 REAL_DIR="$REPORT_DIR/real_fx_samples"
 REAL_OUT="$REPORT_DIR/real_fx_outputs"
 mkdir -p "$REAL_DIR" "$REAL_OUT"

@@ -57,9 +57,7 @@ def test_panns_provider_requires_positive_segment_configuration(tmp_path: Path) 
         raise AssertionError("invalid segment configuration should fail")
 
 
-def test_official_panns_backend_allows_pinned_legacy_checkpoint_on_modern_torch(
-    monkeypatch, tmp_path: Path
-) -> None:
+def test_official_panns_backend_allows_pinned_legacy_checkpoint_on_modern_torch(monkeypatch, tmp_path: Path) -> None:
     seen = {}
 
     class FakeAudioTagging:
@@ -93,9 +91,7 @@ def test_official_panns_backend_allows_pinned_legacy_checkpoint_on_modern_torch(
     assert "TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD" not in os.environ
 
 
-def test_official_panns_backend_restores_existing_torch_load_setting(
-    monkeypatch, tmp_path: Path
-) -> None:
+def test_official_panns_backend_restores_existing_torch_load_setting(monkeypatch, tmp_path: Path) -> None:
     seen = []
 
     class FakeAudioTagging:

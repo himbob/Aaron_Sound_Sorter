@@ -87,7 +87,7 @@ The sandbox could not complete the macOS locked-smoke command cleanly because th
 Run these on Aaron's Mac after install:
 
 ```bash
-cd /Volumes/T9/testbed/Aaron_Sound_Sorter
+cd /path/to/Aaron_Sound_Sorter
 python3 -m compileall -q src tests tools Aaron_Sound_Sorter.py
 python3 tools/audit_no_source_name_sorting.py --project-root .
 NUMBA_DISABLE_JIT=1 python3 -m pytest \

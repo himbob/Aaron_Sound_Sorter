@@ -35,7 +35,7 @@ src/aaron_sound_sorter/engine/family_claim_arbiter.py
 ## Expected confirmation after install
 
 ```bash
-cd /Volumes/T9/testbed/Aaron_Sound_Sorter
+cd /path/to/Aaron_Sound_Sorter
 pytest
 ```
 

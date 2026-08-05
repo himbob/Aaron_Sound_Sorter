@@ -45,7 +45,7 @@ cd v31136_lowest_voter_acceptance_patch
 ## Suggested local test
 
 ```bash
-cd /Volumes/T9/testbed/Aaron_Sound_Sorter
+cd /path/to/Aaron_Sound_Sorter
 ./commands/quality/RUN_V31136_TARGETED_REPROS_ONE_BY_ONE.command
 ./commands/quality/RUN_LOCKED_SMOKE_ACCEPTANCE_ONE_BY_ONE.command
 ```

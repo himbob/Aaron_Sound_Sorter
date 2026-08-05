@@ -33,10 +33,10 @@ without destructively editing any training WAVs.
 ## How to enable it for the brain-family command
 
 ```bash
-cd /Volumes/T9/testbed/Aaron_Sound_Sorter
+cd /path/to/Aaron_Sound_Sorter
 
-PATH="/Volumes/T9/testbed/Aaron_Sound_Sorter/.venv_phase4/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
-TRAINING_ROOT="/Volumes/T9/music_production/samples/Sorted samples" \
+PATH="/path/to/Aaron_Sound_Sorter/.venv_phase4/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
+TRAINING_ROOT="/path/to/sample-library/Sorted samples" \
 CORE_ANCHORS=4 \
 SPREAD_ANCHORS=4 \
 OUTLIER_ANCHORS=4 \
@@ -53,7 +53,7 @@ DRY_CORE_AUGMENT_TIMEOUT_SEC=45 \
 
 ```bash
 python3 Aaron_Sound_Sorter.py train-brain-family \
-  "/Volumes/T9/music_production/samples/Sorted samples" \
+  "/path/to/sample-library/Sorted samples" \
   --augment-dry-core-voice-sax
 ```
 
